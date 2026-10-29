@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安装不是一条命令装到底：四种结局，没有「装一半算成功」</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-soft:    #5a6580;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', 'SimSun', serif;
+      --font-mono:     'Geist Mono', 'Noto Sans Mono CJK SC', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1280px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .lede {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--color-muted);
+      max-width: 68ch;
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 1280px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · 安装</p>
+    <h1>安装不是一条命令装到底：四种结局，没有「装一半算成功」</h1>
+    <p class="lede">运行安装脚本时先回答问题：宿主在哪、装没装、清单能不能读、版本是否一致。四种结局各自明确——安装、只校验、更新、拒绝；没有「装了一半但也算成功」。</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="install-branches-title install-branches-desc">
+        <title id="install-branches-title">安装的四种结局：安装、只校验、更新、拒绝</title>
+        <desc id="install-branches-desc">安装脚本依次判断宿主根、enhance 目录、清单可读性与版本：分别得到未安装则安装、同版本只做校验、异版本更新、清单坏则拒绝并给清理命令四种结局。</desc>
+
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 纵向「是」路径 -->
+        <path d="M640,152 V192" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M640,272 V312" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M640,392 V432" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="648" y="160" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="652" y="172" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="648" y="280" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="652" y="292" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="648" y="400" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="652" y="412" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+
+        <!-- 横向「否」路径 -->
+        <path d="M760,112 H840" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M520,232 H440" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M760,352 H840" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M520,472 H440" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <rect x="784" y="88" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="788" y="100" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="464" y="208" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="468" y="220" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="784" y="328" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="788" y="340" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="464" y="448" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="468" y="460" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="784" y="448" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="788" y="460" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+
+        <!-- 判定菱形 -->
+        <polygon points="640,72 760,112 640,152 520,112" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="116" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">找到 DSH 根？</text>
+
+        <polygon points="640,192 760,232 640,272 520,232" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="236" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">enhance/ 在？</text>
+
+        <polygon points="640,312 760,352 640,392 520,352" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="356" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">清单可读且带版本？</text>
+
+        <polygon points="640,432 760,472 640,512 520,472" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="476" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">版本一致？</text>
+
+        <!-- 结局 -->
+        <rect x="840" y="80" width="240" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="856" y="108" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">退出 1：不下载</text>
+        <text x="856" y="130" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">宿主没装就不动系统</text>
+
+        <rect x="200" y="200" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装</text>
+        <text x="216" y="250" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">默认 desktop；零目标 → 拒绝、不写盘</text>
+
+        <rect x="840" y="320" width="240" height="64" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="856" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">拒绝 + 一条清理命令</text>
+        <text x="856" y="370" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">uninstall --thorough &amp;&amp; install</text>
+
+        <rect x="200" y="440" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="468" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">只做一致性校验</text>
+        <text x="216" y="490" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">hash + doctor → 无需重启</text>
+
+        <rect x="840" y="440" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="856" y="468" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">更新</text>
+        <text x="856" y="490" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">重装并改清单版本 → 重启</text>
+
+        <!-- 注释 -->
+        <text x="64" y="576" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">四道判定之后没有「装一半」：要么校验、要么更新、要么拒绝；装与更新都不自动重启。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <polygon points="52,668 72,678 52,688 32,678" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="84" y="682" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">判定</text>
+        <rect x="140" y="670" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="160" y="682" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">结局</text>
+        <rect x="230" y="670" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="250" y="682" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：清单坏时拒绝，不静默跳过</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

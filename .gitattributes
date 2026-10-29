@@ -1,0 +1,16 @@
+# The project's own tooling assumes LF in cordis.patch.yml and in
+# content-scope.txt (see shared/text-lines.mjs).
+# Keep the working tree LF on every platform.
+* text=auto eol=lf
+
+# Windows shells/launchers keep CRLF: cmd.exe and older PowerShell hosts are
+# most reliable that way.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.asar binary

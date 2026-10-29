@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卸载三档：默认、彻底、以及只回滚一个档位</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-soft:    #5a6580;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', 'SimSun', serif;
+      --font-mono:     'Geist Mono', 'Noto Sans Mono CJK SC', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 960px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .lede {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--color-muted);
+      max-width: 68ch;
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Process · 卸载</p>
+    <h1>卸载三档：默认、彻底、以及只回滚一个档位</h1>
+    <p class="lede">同一份 patch，三种退出方式。默认先归档再删目录、保留所有 <code>.bak-*</code>；「彻底清理」是不归档的不可逆选项；<code>--to</code> 只回滚一个 profile 的 patch，不动 <code>&lt;home&gt;/enhance/</code>。</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="uninstall-modes-title uninstall-modes-desc">
+        <title id="uninstall-modes-title">卸载三档：默认、彻底、以及只回滚一个档位</title>
+        <desc id="uninstall-modes-desc">uninstall.mjs 有三种方式：默认归档并保留备份后删目录、彻底清理不归档并删本工具备份、--to 只回滚一个 profile 的 patch；三种都不碰别人写的 .bak-*。</desc>
+
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        </defs>
+
+        <rect width="960" height="600" fill="#f5f5f5"/>
+
+        <!-- 入口 → 三档 -->
+        <path d="M480,160 V184 q0,16 -16,16 H184 q-16,0 -16,16 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M480,160 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M480,160 V184 q0,16 16,16 H776 q16,0 16,16 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- 入口 -->
+        <rect x="360" y="96" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="376" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">uninstall.mjs</text>
+        <text x="376" y="146" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">三种方式，按需选一个</text>
+
+        <!-- 方式 1：默认 -->
+        <rect x="64" y="232" width="264" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="80" y="260" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">默认：行级卸载</text>
+        <text x="80" y="286" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">归档 → 删 enhance/</text>
+        <text x="80" y="312" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state / 文本 / 清单先进归档</text>
+        <text x="80" y="334" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">.bak-* 一份不删</text>
+        <text x="80" y="356" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">patch 回到装前 sha256</text>
+
+        <!-- 方式 2：彻底（焦点） -->
+        <rect x="348" y="232" width="264" height="200" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="364" y="260" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">--thorough：彻底清理</text>
+        <text x="364" y="286" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">不归档 → 连备份一起删</text>
+        <text x="364" y="312" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">删本工具的全部 .bak-*</text>
+        <text x="364" y="334" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">含历史迁移工具留下的前缀</text>
+        <text x="364" y="356" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">别人的 .bak-* 一个不碰</text>
+        <text x="364" y="378" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">需要二次确认</text>
+
+        <!-- 方式 3：--to -->
+        <rect x="632" y="232" width="264" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="648" y="260" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">--to &lt;备份&gt;：单档回滚</text>
+        <text x="648" y="286" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">只回滚一个 profile 的 patch</text>
+        <text x="648" y="312" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">保留 enhance/ 与归档</text>
+        <text x="648" y="334" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">执行前再备份 .bak-uninstall-*</text>
+        <text x="648" y="356" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不叫卸载：只回滚一次改动</text>
+
+        <!-- 注脚 -->
+        <text x="64" y="486" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">三种方式都不碰别人写的 .bak-*；只有「彻底清理」不可逆，默认方式永远留得回滚。</text>
+        <text x="64" y="512" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">—to 与 --thorough 不能同用；先预览再执行（--dry-run 打印计划，不写盘）。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="536" x2="920" y2="536" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="564" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="574" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">卸载方式</text>
+        <rect x="170" y="564" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="190" y="574" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：不可逆的那一档</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

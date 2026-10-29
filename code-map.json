@@ -1,0 +1,475 @@
+{
+  "version": 1,
+  "layers": [
+    "cli",
+    "core",
+    "plugin"
+  ],
+  "modules": [
+    {
+      "id": "core.state",
+      "layer": "core",
+      "path": "shared/state.mjs",
+      "owns": "state.json 与 content-scope.txt 的读写、派生"
+    },
+    {
+      "id": "plugin.scope",
+      "layer": "plugin",
+      "path": "enhance-scope/index.js",
+      "owns": "内容边界注入 + /enhance/api 路由"
+    },
+    {
+      "id": "plugin.approve",
+      "layer": "plugin",
+      "path": "auto-approve/index.js",
+      "owns": "审批放行（三态）"
+    },
+    {
+      "id": "plugin.permissions",
+      "layer": "plugin",
+      "path": "enhance-permissions/index.js",
+      "owns": "权限菜单图标（host 半空壳）"
+    },
+    {
+      "id": "tool.permissions-build",
+      "layer": "cli",
+      "path": "enhance-permissions/build-client.mjs",
+      "owns": "从官方产物派生 client.js（--check 漂移检测）"
+    },
+    {
+      "id": "cli.install",
+      "layer": "cli",
+      "path": "install.mjs",
+      "owns": "幂等安装"
+    },
+    {
+      "id": "cli.uninstall",
+      "layer": "cli",
+      "path": "uninstall.mjs",
+      "owns": "行级卸载 / 显式整份回滚（--to）"
+    },
+    {
+      "id": "cli.doctor",
+      "layer": "cli",
+      "path": "doctor.mjs",
+      "owns": "预检：源文件、落盘、insert 行目标、派生件戳"
+    },
+    {
+      "id": "plugin.permissions-client",
+      "layer": "plugin",
+      "path": "enhance-permissions/client.js",
+      "owns": "权限菜单派生产物（由 build-client 生成，勿手改）",
+      "generated": true
+    },
+    {
+      "id": "core.session-probe",
+      "layer": "core",
+      "path": "shared/session-probe.mjs",
+      "owns": "会话日志探针：证明边界文本真的进了系统提示"
+    },
+    {
+      "id": "plugin.ui",
+      "layer": "plugin",
+      "path": "ui/index.js",
+      "owns": "设置页壳：宿主半（空）"
+    },
+    {
+      "id": "plugin.ui-client",
+      "layer": "plugin",
+      "path": "ui/client.js",
+      "owns": "设置页：浏览器半，五节结构 + 结论句 + 就地错误行，注册 settings.section 并调 /enhance/api"
+    },
+    {
+      "id": "tool.docs-check",
+      "layer": "cli",
+      "path": "tools/docs-check.mjs",
+      "owns": "文档门禁：字面转义 / 死链 / 死路径"
+    },
+    {
+      "id": "core.text-lines",
+      "layer": "core",
+      "path": "shared/text-lines.mjs",
+      "owns": "行级 patch 手术：换行安全、删块、还尾换行"
+    },
+    {
+      "id": "core.patch-rows",
+      "layer": "core",
+      "path": "shared/patch-rows.mjs",
+      "owns": "权限选择器接线：停用官方行、插入派生行（install 与 wire 共用）"
+    },
+    {
+      "id": "tool.code-files",
+      "layer": "cli",
+      "path": "scripts/code-files.mjs",
+      "owns": "语法门禁的文件集合：git ls-files 优先，无 git 时走盘并跳过忽略目录"
+    },
+    {
+      "id": "core.version",
+      "layer": "core",
+      "path": "shared/tool-version.mjs",
+      "owns": "当前工具版本：读仓库根的 VERSION（package.json 与它由 version 门禁守住一致）"
+    }
+  ],
+  "edges": [
+    {
+      "from": "plugin.scope",
+      "to": "core.state",
+      "kind": "import"
+    },
+    {
+      "from": "plugin.approve",
+      "to": "core.state",
+      "kind": "import"
+    },
+    {
+      "from": "cli.doctor",
+      "to": "core.state",
+      "kind": "import"
+    },
+    {
+      "from": "cli.doctor",
+      "to": "core.patch-rows",
+      "kind": "import"
+    },
+    {
+      "from": "cli.install",
+      "to": "core.state",
+      "kind": "import"
+    },
+    {
+      "from": "plugin.scope",
+      "to": "host.systemPrompt",
+      "kind": "seam",
+      "via": "ctx.systemPrompt.section()"
+    },
+    {
+      "from": "plugin.scope",
+      "to": "host.webServer",
+      "kind": "seam",
+      "via": "ctx.inject(['webServer']) → register"
+    },
+    {
+      "from": "plugin.approve",
+      "to": "host.approval",
+      "kind": "seam",
+      "via": "ctx.on('approval/request')"
+    },
+    {
+      "from": "plugin.scope",
+      "to": "core.session-probe",
+      "kind": "import"
+    },
+    {
+      "from": "cli.install",
+      "to": "core.text-lines",
+      "kind": "import"
+    },
+    {
+      "from": "cli.install",
+      "to": "core.patch-rows",
+      "kind": "import"
+    },
+    {
+      "from": "cli.uninstall",
+      "to": "core.patch-rows",
+      "kind": "import"
+    },
+    {
+      "from": "core.patch-rows",
+      "to": "core.text-lines",
+      "kind": "import"
+    },
+    {
+      "from": "cli.uninstall",
+      "to": "core.text-lines",
+      "kind": "import"
+    },
+    {
+      "from": "cli.uninstall",
+      "to": "core.state",
+      "kind": "import"
+    },
+    {
+      "from": "cli.install",
+      "to": "core.version",
+      "kind": "import"
+    },
+    {
+      "from": "cli.doctor",
+      "to": "core.version",
+      "kind": "import"
+    }
+  ],
+  "events": [
+    {
+      "name": "approval/request",
+      "mode": "waterfall",
+      "owner": "plugin.approve"
+    }
+  ],
+  "state": {
+    "fields": [
+      "version",
+      "contentScope",
+      "approval",
+      "updatedAt"
+    ],
+    "derived": [
+      "injecting"
+    ],
+    "pluginScoped": [
+      "active"
+    ]
+  },
+  "diagrams": [
+    {
+      "id": "modules",
+      "title": "模块与接缝",
+      "subtitle": "实线=代码 import；虚线=宿主扩展点。由 code-map.json 生成，勿手改。",
+      "layout": "columns",
+      "nodes": [
+        {
+          "id": "core.state",
+          "label": "core/state",
+          "group": 0
+        },
+        {
+          "id": "plugin.scope",
+          "label": "enhance-scope",
+          "group": 1
+        },
+        {
+          "id": "plugin.approve",
+          "label": "auto-approve",
+          "group": 1
+        },
+        {
+          "id": "plugin.permissions",
+          "label": "enhance-permissions",
+          "group": 1
+        },
+        {
+          "id": "host.systemPrompt",
+          "label": "systemPrompt",
+          "group": 2
+        },
+        {
+          "id": "host.webServer",
+          "label": "webServer",
+          "group": 2
+        },
+        {
+          "id": "host.approval",
+          "label": "approval",
+          "group": 2
+        }
+      ],
+      "edges": [
+        {
+          "from": "plugin.scope",
+          "to": "core.state"
+        },
+        {
+          "from": "plugin.approve",
+          "to": "core.state"
+        },
+        {
+          "from": "plugin.scope",
+          "to": "host.systemPrompt",
+          "dashed": true
+        },
+        {
+          "from": "plugin.scope",
+          "to": "host.webServer",
+          "dashed": true
+        },
+        {
+          "from": "plugin.approve",
+          "to": "host.approval",
+          "dashed": true
+        }
+      ]
+    },
+    {
+      "id": "flow",
+      "title": "一个动作的旅程",
+      "subtitle": "每一关只回答一个问题；任一关拒绝即结束。",
+      "layout": "row",
+      "nodes": [
+        {
+          "id": "call",
+          "label": "工具调用"
+        },
+        {
+          "id": "approval",
+          "label": "审批：要不要问人？"
+        },
+        {
+          "id": "sandbox",
+          "label": "沙箱：地盘够不够？"
+        },
+        {
+          "id": "exec",
+          "label": "执行"
+        }
+      ],
+      "edges": [
+        {
+          "from": "call",
+          "to": "approval"
+        },
+        {
+          "from": "approval",
+          "to": "sandbox"
+        },
+        {
+          "from": "sandbox",
+          "to": "exec"
+        }
+      ]
+    },
+    {
+      "id": "state",
+      "title": "状态与派生",
+      "subtitle": "两个可写字段 → 一个派生结论；页面只显示派生。",
+      "layout": "columns",
+      "nodes": [
+        {
+          "id": "f.contentScope",
+          "label": "contentScope",
+          "group": 0
+        },
+        {
+          "id": "f.approval",
+          "label": "approval",
+          "group": 0
+        },
+        {
+          "id": "d.injecting",
+          "label": "injecting",
+          "group": 1
+        },
+        {
+          "id": "b.prompt",
+          "label": "提示词末段",
+          "group": 2
+        },
+        {
+          "id": "b.approve",
+          "label": "审批决定",
+          "group": 2
+        }
+      ],
+      "edges": [
+        {
+          "from": "f.contentScope",
+          "to": "d.injecting"
+        },
+        {
+          "from": "f.approval",
+          "to": "b.approve"
+        },
+        {
+          "from": "d.injecting",
+          "to": "b.prompt"
+        }
+      ]
+    },
+    {
+      "id": "lifecycle",
+      "title": "一件增强件的生命周期",
+      "subtitle": "每一步都有回退点：装前备份、卸后提示重启。",
+      "layout": "row",
+      "nodes": [
+        {
+          "id": "install",
+          "label": "安装"
+        },
+        {
+          "id": "boot",
+          "label": "启动加载"
+        },
+        {
+          "id": "run",
+          "label": "日常使用"
+        },
+        {
+          "id": "upgrade",
+          "label": "宿主升级"
+        },
+        {
+          "id": "uninstall",
+          "label": "卸载 / 回滚"
+        }
+      ],
+      "edges": [
+        {
+          "from": "install",
+          "to": "boot"
+        },
+        {
+          "from": "boot",
+          "to": "run"
+        },
+        {
+          "from": "run",
+          "to": "upgrade"
+        },
+        {
+          "from": "upgrade",
+          "to": "uninstall"
+        }
+      ]
+    },
+    {
+      "id": "dataflow",
+      "title": "一个开关的旅程",
+      "subtitle": "页面 → 路由 → 文件 → 提示词 / 审批；每一步都可从接口验。",
+      "layout": "row",
+      "nodes": [
+        {
+          "id": "page",
+          "label": "设置页"
+        },
+        {
+          "id": "api",
+          "label": "POST /enhance/api"
+        },
+        {
+          "id": "store",
+          "label": "state.json"
+        },
+        {
+          "id": "text",
+          "label": "content-scope.txt"
+        },
+        {
+          "id": "out",
+          "label": "提示词 / 审批"
+        }
+      ],
+      "edges": [
+        {
+          "from": "page",
+          "to": "api"
+        },
+        {
+          "from": "api",
+          "to": "store"
+        },
+        {
+          "from": "api",
+          "to": "text"
+        },
+        {
+          "from": "store",
+          "to": "out"
+        },
+        {
+          "from": "text",
+          "to": "out"
+        }
+      ]
+    }
+  ]
+}

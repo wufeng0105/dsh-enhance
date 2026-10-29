@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>审批三态：拿到请求之后回什么</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-soft:    #5a6580;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', 'SimSun', serif;
+      --font-mono:     'Geist Mono', 'Noto Sans Mono CJK SC', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 960px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .lede {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--color-muted);
+      max-width: 68ch;
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">State machine · 审批</p>
+    <h1>审批三态：拿到请求之后回什么</h1>
+    <p class="lede">这个开关不管权限范围，只管 DSH 把 <code>approval/request</code> 递过来之后回什么。三态里 <code>ask</code> 是默认值，也是状态读坏时的回退。</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="approval-three-states-title approval-three-states-desc">
+        <title id="approval-three-states-title">审批三态：拿到请求之后回什么</title>
+        <desc id="approval-three-states-desc">档位开关在 allow、ask、deny 之间三选一：allow 回 allowed-once，ask 交还宿主审批界面，deny 回 rejected；ask 是默认与降级回退。</desc>
+
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="960" height="600" fill="#f5f5f5"/>
+
+        <!-- 开关 → 三个状态 -->
+        <path d="M440,168 V200 q0,8 -8,8 H208 q-8,0 -8,8 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M480,168 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M520,168 V200 q0,8 8,8 H752 q8,0 8,8 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+
+        <!-- 档位开关 -->
+        <rect x="360" y="96" width="240" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="376" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">档位开关（三选一）</text>
+        <text x="376" y="146" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state.json · approval</text>
+
+        <!-- 状态：allow -->
+        <rect x="80" y="232" width="240" height="128" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="96" y="262" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">allow</text>
+        <text x="96" y="286" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">自动同意</text>
+        <text x="96" y="314" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">回 allowed-once</text>
+        <text x="96" y="336" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">这一次放行，不改档位</text>
+
+        <!-- 状态：ask（焦点，默认 + 降级回退） -->
+        <rect x="360" y="232" width="240" height="128" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="376" y="262" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">ask</text>
+        <text x="376" y="286" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">问人（默认）</text>
+        <text x="376" y="314" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">交还宿主</text>
+        <text x="376" y="336" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">走宿主自己的审批界面</text>
+        <text x="584" y="252" text-anchor="end" fill="#bf4520" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">默认 / 回退</text>
+
+        <!-- 状态：deny -->
+        <rect x="640" y="232" width="240" height="128" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="656" y="262" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">deny</text>
+        <text x="656" y="286" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">自动回绝</text>
+        <text x="656" y="314" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">回 rejected</text>
+        <text x="656" y="336" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不给你选择</text>
+
+        <!-- 注释 -->
+        <text x="64" y="448" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">三态只回答「拿到 approval/request 之后回什么」；权限范围由宿主档位决定，与本开关无关。</text>
+        <text x="64" y="480" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">宿主档位是 approval: never 时请求根本不发——三态都轮不到。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="516" x2="920" y2="516" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="544" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="554" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">档位状态</text>
+        <line x1="170" y1="550" x2="226" y2="550" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="238" y="554" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">切换 / 选择</text>
+        <rect x="360" y="544" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="380" y="554" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：默认与降级回退</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

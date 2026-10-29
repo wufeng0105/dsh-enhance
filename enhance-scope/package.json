@@ -1,0 +1,9 @@
+{
+  "name": "dsh-enhance-scope",
+  "version": "0.1.0",
+  "private": true,
+  "description": "把由文件托管的内容边界注入成系统提示的一段。",
+  "type": "module",
+  "exports": { ".": "./index.js" },
+  "files": ["index.js"]
+}

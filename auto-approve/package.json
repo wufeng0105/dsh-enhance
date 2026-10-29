@@ -1,0 +1,9 @@
+{
+  "name": "dsh-auto-approve",
+  "version": "0.1.0",
+  "private": true,
+  "description": "审批三态（allow / ask / deny）处理器，可用 state.json 切换。",
+  "type": "module",
+  "exports": { ".": "./index.js" },
+  "files": ["index.js"]
+}

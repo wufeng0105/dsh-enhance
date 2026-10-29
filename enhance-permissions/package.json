@@ -1,0 +1,11 @@
+{
+  "name": "dsh-enhance-permissions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "权限选择器：多一个 enhanced 图标。",
+  "type": "module",
+  "main": "./index.js",
+  "exports": { ".": "./index.js", "./client": "./client.js" },
+  "files": ["index.js", "client.js"],
+  "dsh": { "client": { "platform": "web" } }
+}

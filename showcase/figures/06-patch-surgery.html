@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安装只做行级追加：patch 文件前后对比</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-paper-2: #ececec;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-soft:    #5a6580;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', 'SimSun', serif;
+      --font-mono:     'Geist Mono', 'Noto Sans Mono CJK SC', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1280px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .lede {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--color-muted);
+      max-width: 68ch;
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 1280px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">自定义构图 · patch 手术</p>
+    <h1>安装只做行级追加，不改已有行</h1>
+    <p class="lede">装的时候不重写 <code>cordis.patch.yml</code>：只在末尾追加一个 insert 块（三个插件入口），再补权限表与 desktop 的替换行；已有行一个字节不动，卸载时按清单把新增段摘掉。</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="patch-surgery-title patch-surgery-desc">
+        <title id="patch-surgery-title">安装只做行级追加：patch 文件前后对比</title>
+        <desc id="patch-surgery-desc">左栏是安装前的 cordis.patch.yml，右栏是安装后：原有行保持原样，末尾新增一个 insert 块与权限相关行；卸载时摘掉新增段即可逐字节还原。</desc>
+
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 左：安装前 -->
+        <rect x="40" y="160" width="560" height="400" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <text x="64" y="184" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装前 · cordis.patch.yml</text>
+
+        <text x="88" y="216" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">1</text>
+        <text x="104" y="216" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace"># 宿主自己的 patch</text>
+        <text x="88" y="238" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">2</text>
+        <text x="104" y="238" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: locale</text>
+        <text x="88" y="260" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">3</text>
+        <text x="104" y="260" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  preference: zh</text>
+        <text x="88" y="282" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">4</text>
+        <text x="104" y="282" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: fs-observation-policy</text>
+        <text x="88" y="304" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">5</text>
+        <text x="104" y="304" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  config: {}</text>
+        <text x="88" y="326" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">6</text>
+        <text x="104" y="326" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  …… 其余已有行，原样保留 ……</text>
+
+        <!-- 左 → 右：安装 -->
+        <path d="M600,360 H680" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="602" y="336" width="56" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="630" y="348" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装</text>
+
+        <!-- 右：安装后 -->
+        <rect x="680" y="160" width="560" height="400" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <text x="704" y="184" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装后 · cordis.patch.yml</text>
+        <text x="1216" y="184" text-anchor="end" fill="#bf4520" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">新增：3 个插件入口</text>
+
+        <!-- 新增段底色与左侧竖线 -->
+        <rect x="732" y="310" width="484" height="158" rx="2" fill="rgba(191,69,32,0.08)"/>
+        <rect x="732" y="310" width="2" height="158" fill="#bf4520"/>
+
+        <text x="728" y="216" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">1</text>
+        <text x="744" y="216" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace"># 宿主自己的 patch</text>
+        <text x="728" y="238" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">2</text>
+        <text x="744" y="238" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: locale</text>
+        <text x="728" y="260" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">3</text>
+        <text x="744" y="260" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  preference: zh</text>
+        <text x="728" y="282" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">4</text>
+        <text x="744" y="282" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: fs-observation-policy</text>
+        <text x="728" y="304" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">5</text>
+        <text x="744" y="304" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  config: {}</text>
+        <text x="728" y="326" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">6</text>
+        <text x="744" y="326" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- insert:</text>
+        <text x="728" y="348" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">7</text>
+        <text x="744" y="348" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">    - id: enhance-scope</text>
+        <text x="728" y="370" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">8</text>
+        <text x="744" y="370" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">      name: '../../enhance/enhance-scope/index.js'</text>
+        <text x="728" y="392" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">9</text>
+        <text x="744" y="392" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">    - id: auto-approve</text>
+        <text x="728" y="414" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">10</text>
+        <text x="744" y="414" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">      name: '../../enhance/auto-approve/index.js'</text>
+        <text x="728" y="436" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">11</text>
+        <text x="744" y="436" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">    - id: enhance-ui</text>
+        <text x="728" y="458" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">12</text>
+        <text x="744" y="458" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">      name: '../../enhance/ui/index.js'</text>
+
+        <!-- 注释：同一次写入还包括什么 -->
+        <text x="64" y="592" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">同一次写入还包括：权限表与 enhanced 档（首次安装才加）、desktop 的 enhance-permissions 替换行。</text>
+        <text x="64" y="618" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">卸载时摘掉新增段、还原 ui-permission 的 disabled → sha256 与安装前相同。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="648" x2="1240" y2="648" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="676" width="12" height="12" rx="2" fill="#ececec" stroke="rgba(45,49,66,0.20)" stroke-width="0.8"/>
+        <text x="60" y="686" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">已有行</text>
+        <rect x="170" y="676" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="190" y="686" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">本次新增（可被逐字节还原）</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# runtime state written under <DSH_HOME>/enhance — never part of this repo
+state.json
+install-manifest.json
+
+# install/uninstall backups of cordis.patch.yml
+*.bak-*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# local design previews (not part of the repo); anchored so a tracked design/ still works
+/design/
+
+# local code index (codegraph cli), machine-specific
+.codegraph/
+
+# zhll draft area
+.zhll/
+
+# DSH project-local skills / runtime state (installed copies, never part of the repo)
+.dsh/

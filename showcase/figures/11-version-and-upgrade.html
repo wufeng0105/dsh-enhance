@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>版本与升级：一个版本号，三处比对，一条处置</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-soft:    #5a6580;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', 'SimSun', serif;
+      --font-mono:     'Geist Mono', 'Noto Sans Mono CJK SC', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1280px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .lede {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--color-muted);
+      max-width: 68ch;
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 1280px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Process · 版本</p>
+    <h1>版本与升级：一个版本号，三处比对，一条处置</h1>
+    <p class="lede">版本只有一个来源（<code>VERSION</code>），安装把它写进清单，<code>doctor</code> 拿清单比当前；宿主升级后另有一件事要查——派生件是不是同一代。</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="version-and-upgrade-title version-and-upgrade-desc">
+        <title id="version-and-upgrade-title">版本与升级：一个版本号，三处比对，一条处置</title>
+        <desc id="version-and-upgrade-desc">发布时 VERSION 与 package.json 由门禁守住一致；安装把 toolVersion 写进清单；doctor 比对清单版本；宿主升级后 build-client --check --asar 判派生件代际；不一致时唯一动作是重跑 install。</desc>
+
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 步骤链 -->
+        <line x1="268" y1="260" x2="292" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="508" y1="260" x2="532" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="748" y1="260" x2="772" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="988" y1="260" x2="1012" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- 01 -->
+        <text x="68" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">01</text>
+        <rect x="52" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="68" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">发布 1.0.0</text>
+        <text x="68" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">VERSION + package.json</text>
+        <text x="68" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">version 门禁守一致</text>
+        <text x="68" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">1.0.0 · private · module</text>
+
+        <!-- 02 -->
+        <text x="308" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">02</text>
+        <rect x="292" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="308" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装</text>
+        <text x="308" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">清单写 toolVersion</text>
+        <text x="308" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">记下「这份落盘是谁写的」</text>
+        <text x="308" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">清单是唯一版本记录</text>
+
+        <!-- 03 -->
+        <text x="548" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">03</text>
+        <rect x="532" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="548" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">日常核对</text>
+        <text x="548" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">doctor 比对清单版本</text>
+        <text x="548" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不一致 → 一行提示</text>
+        <text x="548" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">install-manifest 行</text>
+
+        <!-- 04（焦点） -->
+        <text x="788" y="188" fill="#bf4520" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">04</text>
+        <rect x="772" y="200" width="216" height="120" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="788" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">宿主升级</text>
+        <text x="788" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">build-client --check --asar</text>
+        <text x="788" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">判派生件代际</text>
+        <text x="788" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">代际 ≠ 版本号</text>
+
+        <!-- 05 -->
+        <text x="1028" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">05</text>
+        <rect x="1012" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="1028" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">处置</text>
+        <text x="1028" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">同代 → 重启即可</text>
+        <text x="1028" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不同代 → 重派生 + 重装</text>
+        <text x="1028" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不做静默升级</text>
+
+        <!-- 注释 -->
+        <text x="64" y="500" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">清单版本与当前工具不一致：唯一动作是重跑 install.mjs——doctor 的 install-manifest 行会给这条提示。</text>
+        <text x="64" y="532" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">doctor 只验派生件带没带来源戳；「是不是同一代」只有 build-client --check --asar 能回答。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="668" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">生命周期步骤</text>
+        <rect x="200" y="668" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="220" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：宿主升级后必须重判代际</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

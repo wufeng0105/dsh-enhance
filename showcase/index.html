@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一页读懂 dsh-enhance</title>
+  <meta name="description" content="用 12 张图读懂 dsh-enhance：它插在 DSH 的哪里、一条消息怎么走、怎么装退、凭什么相信它、边界在哪。">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #f5f5f5;
+      --ink: #2d3142;
+      --muted: #4f5d75;
+      --soft: #5a6580;
+      --accent: #bf4520;
+      --rule: rgba(45, 49, 66, 0.12);
+      --font-sans: 'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', 'SimSun', serif;
+      --font-mono: 'Geist Mono', 'Noto Sans Mono CJK SC', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--paper); color: var(--ink); line-height: 1.65; }
+    .page { max-width: 1360px; margin: 0 auto; padding: 4rem 2rem 5rem; }
+
+    .masthead { border-bottom: 1px solid var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+    .eyebrow, .chapter-eyebrow {
+      font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+    }
+    h1 { font-family: var(--font-serif); font-weight: 400; font-size: clamp(2.2rem, 4vw + 1rem, 3.4rem);
+      letter-spacing: -0.02em; line-height: 1.08; margin: 0.6rem 0 1rem; }
+    .lede { font-size: 1.05rem; color: var(--muted); max-width: 74ch; }
+    .lede code, .claim code, .caption code, .evidence code { font-family: var(--font-mono); font-size: 0.92em; }
+
+    .abstract { margin-bottom: 2.5rem; max-width: 84ch; }
+    .abstract h2, .toc h2, .limits h2, .commands h2 {
+      font-family: var(--font-serif); font-weight: 400; font-size: 1.4rem; margin-bottom: 0.6rem;
+    }
+    .abstract p { color: var(--muted); }
+
+    .toc { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 1.5rem 0; margin-bottom: 3rem; }
+    .toc ol { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem 2rem; }
+    .toc a { color: var(--ink); text-decoration: none; display: flex; gap: 0.7rem; font-size: 0.95rem; }
+    .toc a:hover { color: var(--accent); }
+    .toc-num { font-family: var(--font-mono); color: var(--soft); font-size: 0.78rem; padding-top: 0.2em; }
+
+    .chapter { padding: 2.5rem 0 3rem; border-top: 1px solid var(--rule); }
+    .chapter:first-of-type { border-top: none; }
+    .chapter h2 { font-family: var(--font-serif); font-weight: 400; font-size: clamp(1.5rem, 2vw + 1rem, 2rem);
+      letter-spacing: -0.01em; margin: 0.35rem 0 0.8rem; }
+    .claim { color: var(--muted); max-width: 78ch; margin-bottom: 1.6rem; }
+
+    .figure { margin: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; padding: 0.5rem 0 0.25rem; }
+    .diagram-container svg { width: 100%; display: block; }
+    figcaption { border-top: 1px solid var(--rule); margin-top: 0.9rem; padding-top: 0.7rem;
+      display: flex; flex-wrap: wrap; gap: 0.35rem 1.2rem; align-items: baseline; }
+    .caption { color: var(--soft); font-size: 0.86rem; }
+    .evidence { font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); overflow-wrap: anywhere; }
+
+    .limits { border-top: 1px solid var(--rule); padding-top: 2rem; margin-top: 1rem; }
+    .limits ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 2rem; }
+    .limits li { color: var(--muted); font-size: 0.92rem; }
+    .limits li::before { content: "— "; color: var(--accent); }
+
+    .commands { margin-top: 2.5rem; }
+    .commands pre { background: #ececec; border: 1px solid var(--rule); border-radius: 6px;
+      padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink); }
+
+    .colophon { border-top: 1px solid var(--rule); margin-top: 3rem; padding-top: 1.2rem;
+      font-family: var(--font-mono); font-size: 0.72rem; color: var(--soft); display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; }
+    .to-top { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-decoration: none; }
+    .to-top:hover { color: var(--accent); }
+
+    @media (max-width: 760px) {
+      .page { padding: 2.5rem 1.1rem 3rem; }
+      .toc ol, .limits ul { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { max-width: none; padding: 0; }
+      .diagram-container { overflow-x: visible; }
+      .diagram-container svg { min-width: 0 !important; }
+      .chapter { break-inside: avoid; page-break-inside: avoid; }
+      .toc { break-after: page; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page" id="top">
+    <header class="masthead">
+      <p class="eyebrow">dsh-enhance · v1.0.0 · 读图指南</p>
+      <h1>一页读懂 dsh-enhance</h1>
+      <p class="lede">给完全没听过它的人准备的读图指南：12 张图按顺序回答 6 个问题——它是什么、插在哪、一条消息怎么走、装与退怎么执行、凭什么相信它、边界在哪。每张图只新增一个概念；不想读长文时，从第 1 张往下看即可。</p>
+    </header>
+
+    <section class="abstract">
+      <h2>先读这一段</h2>
+      <p>dsh-enhance 是 DeepSeek Harness 的本地增强件：把「内容边界注入」「审批三态开关」「设置页」做成可开关、可验证、可退出的三件事。它不改宿主代码，只通过 profile patch 里的几行接入；开关与文本住在 <code>&lt;home&gt;/enhance/</code> 的两个文件里；门禁与负例保证「说的」和「做的」是同一件事；装与卸按行级手术执行，干净路径逐字节还原。</p>
+    </section>
+
+    <nav class="toc">
+      <h2>按顺序读（12 张）</h2>
+      <ol>
+          <li><a href="#c1"><span class="toc-num">01</span>它插在宿主哪里</a></li>
+          <li><a href="#c2"><span class="toc-num">02</span>一条消息的一生</a></li>
+          <li><a href="#c3"><span class="toc-num">03</span>开关与文本只住在这两个文件里</a></li>
+          <li><a href="#c4"><span class="toc-num">04</span>为什么这次没有注入</a></li>
+          <li><a href="#c5"><span class="toc-num">05</span>审批三态：拿到请求之后回什么</a></li>
+          <li><a href="#c6"><span class="toc-num">06</span>安装只做行级追加</a></li>
+          <li><a href="#c7"><span class="toc-num">07</span>卸载怎么知道哪一行是我们加的</a></li>
+          <li><a href="#c8"><span class="toc-num">08</span>安装的四种结局</a></li>
+          <li><a href="#c9"><span class="toc-num">09</span>卸载三档：默认、彻底、单档回滚</a></li>
+          <li><a href="#c10"><span class="toc-num">10</span>门禁与负例：绿不是信，能红才是</a></li>
+          <li><a href="#c11"><span class="toc-num">11</span>版本与升级：一个版本号，三处比对</a></li>
+          <li><a href="#c12"><span class="toc-num">12</span>失败矩阵：每个坑由谁发现</a></li>
+      </ol>
+    </nav>
+
+      <section class="chapter" id="c1">
+        <p class="chapter-eyebrow">01 · ARCHITECTURE</p>
+        <h2>它插在宿主哪里</h2>
+        <p class="claim">enhance 不碰宿主代码：宿主启动时读 profile patch 里的三行 insert 与一个权限替换行，这几行用相对路径指向 &lt;home&gt;/enhance/。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="01-runtime-architecture-runtime-architecture-title 01-runtime-architecture-runtime-architecture-desc">
+        <title id="01-runtime-architecture-runtime-architecture-title">运行期架构：enhance 只通过 patch 行接入宿主</title>
+        <desc id="01-runtime-architecture-runtime-architecture-desc">宿主通过 cordis.patch.yml 里的插入行与权限替换行加载 enhance 目录下的插件；插件读取内容边界文本与状态文件，设置页经 API 读写这两个文件。</desc>
+
+        <defs>
+          <marker id="01-runtime-architecture-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="01-runtime-architecture-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 分区：宿主 / 配置 / 落盘 -->
+        <rect x="40" y="96" width="300" height="400" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="380" y="96" width="330" height="400" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="748" y="96" width="492" height="400" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+
+        <rect x="48" y="100" width="48" height="16" rx="2" fill="#f5f5f5"/>
+        <rect x="388" y="100" width="136" height="16" rx="2" fill="#f5f5f5"/>
+        <rect x="756" y="100" width="148" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="56" y="112" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">宿主</text>
+        <text x="396" y="112" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">配置：profile patch</text>
+        <text x="764" y="112" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">落盘：&lt;home&gt;/enhance/</text>
+
+        <!-- 箭头先画（压在节点下面） -->
+        <!-- 宿主 → 配置 -->
+        <path d="M284,284 H364 q8,0 8,-8 V232 q0,-8 8,-8 H404" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#01-runtime-architecture-arrow)"/>
+        <rect x="296" y="260" width="64" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="328" y="272" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">启动加载</text>
+
+        <!-- 插入行 → 插件目录 -->
+        <path d="M684,216 H776" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#01-runtime-architecture-arrow)"/>
+        <rect x="690" y="192" width="80" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="730" y="204" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">相对路径导入</text>
+
+        <!-- 权限替换行 → 插件目录 -->
+        <path d="M684,372 H716 q8,0 8,-8 V276 q0,-8 8,-8 H776" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#01-runtime-architecture-arrow)"/>
+
+        <!-- 插件 → 内容边界文本 -->
+        <path d="M846,288 V344" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#01-runtime-architecture-arrow)"/>
+        <rect x="854" y="312" width="48" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="858" y="324" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">读文本</text>
+
+        <!-- 插件 → 状态文件 -->
+        <path d="M994,288 V344" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#01-runtime-architecture-arrow)"/>
+        <rect x="1002" y="312" width="48" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="1006" y="324" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">读开关</text>
+
+        <!-- 设置页 → 插件（API） -->
+        <path d="M1148,344 V288" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#01-runtime-architecture-arrow-link)"/>
+        <rect x="1156" y="312" width="64" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="1160" y="324" fill="#2e5aa8" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">API 读写</text>
+
+        <!-- 节点：宿主 -->
+        <rect x="64" y="248" width="220" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="80" y="276" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">DSH 宿主</text>
+        <text x="80" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">Electron · 进程内装配</text>
+
+        <!-- 节点：插入行 -->
+        <rect x="404" y="176" width="280" height="80" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="420" y="204" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">3 行 insert</text>
+        <text x="420" y="226" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">enhance-scope · auto-approve · enhance-ui</text>
+
+        <!-- 节点：权限替换行（焦点） -->
+        <rect x="404" y="336" width="280" height="72" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="420" y="364" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">enhance-permissions 行</text>
+        <text x="420" y="386" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">替换官方 ui-permission（菜单图标）</text>
+
+        <!-- 节点：插件与共享层 -->
+        <rect x="776" y="176" width="440" height="112" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="792" y="212" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">4 个插件 + 5 个共享模块</text>
+        <text x="792" y="236" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">enhance-scope · auto-approve · enhance-permissions · ui</text>
+        <text x="792" y="254" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">shared/state · text-lines · session-probe · patch-rows · tool-version</text>
+
+        <!-- 节点：内容边界文本 -->
+        <rect x="776" y="344" width="140" height="68" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="792" y="372" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">内容边界文本</text>
+        <text x="792" y="394" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">content-scope.txt</text>
+
+        <!-- 节点：状态文件 -->
+        <rect x="924" y="344" width="140" height="68" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="940" y="372" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">状态文件</text>
+        <text x="940" y="394" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state.json</text>
+
+        <!-- 节点：设置页 -->
+        <rect x="1080" y="344" width="136" height="68" rx="6" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="1"/>
+        <text x="1096" y="372" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">设置页</text>
+        <text x="1096" y="394" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">ui/ · 宿主 web</text>
+
+        <!-- 注释：两处大白话边界 -->
+        <text x="64" y="556" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">官方 fs-observation-policy（先读后写）不属于本工具：装/卸都不读不写。</text>
+        <text x="64" y="592" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">默认只装 desktop；headless / web 需要显式 --profiles。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="636" x2="1240" y2="636" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="664" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">节点</text>
+        <rect x="150" y="664" width="12" height="12" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="170" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">落盘文件</text>
+        <rect x="300" y="664" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="320" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：权限替换行</text>
+        <line x1="520" y1="670" x2="556" y2="670" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#01-runtime-architecture-arrow-link)"/>
+        <text x="568" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">HTTP API</text>
+      </svg></div>
+          <figcaption><span class="caption">宿主 → patch 行 → &lt;home&gt;/enhance/；代码、文本、状态、设置页都落在这个目录。</span><span class="evidence">证据：node install.mjs --home &lt;DSH_HOME&gt; → node doctor.mjs --home &lt;DSH_HOME&gt; 的 patch:&lt;profile&gt; 行</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c2">
+        <p class="chapter-eyebrow">02 · SEQUENCE</p>
+        <h2>一条消息的一生</h2>
+        <p class="claim">内容边界不是插件往对话里塞字：宿主装配系统提示时，插件把自己的段落接在末段；证据在会话日志的 system 事件里。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="02-message-lifecycle-message-lifecycle-title 02-message-lifecycle-message-lifecycle-desc">
+        <title id="02-message-lifecycle-message-lifecycle-title">一条消息的一生：内容边界怎么进系统提示</title>
+        <desc id="02-message-lifecycle-message-lifecycle-desc">用户发出消息后，宿主在装配系统提示时向 enhance-scope 插件取内容边界段并拼进末段，会话日志记录 system 事件，插件随后读日志确认。</desc>
+
+        <defs>
+          <marker id="02-message-lifecycle-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="02-message-lifecycle-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+          <marker id="02-message-lifecycle-arrow-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polyline points="0 0, 8 3, 0 6" fill="none" stroke="#4f5d75" stroke-width="1.2"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 生命线 -->
+        <line x1="200" y1="152" x2="200" y2="560" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="500" y1="152" x2="500" y2="560" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="800" y1="152" x2="800" y2="560" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="1100" y1="152" x2="1100" y2="560" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- 激活条 -->
+        <rect x="496" y="192" width="8" height="216" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+        <rect x="796" y="240" width="8" height="112" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+        <rect x="1096" y="420" width="8" height="72" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+
+        <!-- 消息：用户 → 宿主 -->
+        <line x1="200" y1="208" x2="500" y2="208" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#02-message-lifecycle-arrow)"/>
+        <rect x="320" y="184" width="56" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="348" y="196" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">发送消息</text>
+
+        <!-- 消息：宿主 → 插件 -->
+        <line x1="500" y1="248" x2="800" y2="248" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#02-message-lifecycle-arrow)"/>
+        <rect x="616" y="224" width="72" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="652" y="236" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">section() 装配</text>
+
+        <!-- 自调用：插件读文件 -->
+        <path d="M800,288 H824 V304 H800" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#02-message-lifecycle-arrow)"/>
+        <text x="832" y="296" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">读 state.json + 文本</text>
+
+        <!-- 焦点：插件 → 宿主 返回段 -->
+        <line x1="800" y1="336" x2="500" y2="336" stroke="#bf4520" stroke-width="1.2" marker-end="url(#02-message-lifecycle-arrow-accent)"/>
+        <rect x="568" y="312" width="164" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="650" y="324" text-anchor="middle" fill="#bf4520" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">返回 enhance:content-scope 段</text>
+
+        <!-- 自调用：宿主拼装 -->
+        <path d="M500,384 H524 V400 H500" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#02-message-lifecycle-arrow)"/>
+        <text x="532" y="392" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">拼进系统提示末段</text>
+
+        <!-- 异步写入：宿主 → 会话日志 -->
+        <line x1="500" y1="432" x2="1100" y2="432" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#02-message-lifecycle-arrow-open)"/>
+        <rect x="716" y="408" width="152" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="792" y="420" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">写入 system 事件原文</text>
+
+        <!-- 探针：会话日志 → 插件 -->
+        <line x1="1100" y1="480" x2="800" y2="480" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#02-message-lifecycle-arrow)"/>
+        <rect x="900" y="456" width="88" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="944" y="468" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">探针读日志确认</text>
+
+        <!-- 参与者 -->
+        <rect x="90" y="96" width="220" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="200" y="120" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">用户</text>
+        <text x="200" y="140" text-anchor="middle" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">聊天输入</text>
+
+        <rect x="390" y="96" width="220" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="500" y="120" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">DSH 宿主</text>
+        <text x="500" y="140" text-anchor="middle" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">装配系统提示</text>
+
+        <rect x="690" y="96" width="220" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="800" y="120" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">enhance-scope</text>
+        <text x="800" y="140" text-anchor="middle" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">插件 · section()</text>
+
+        <rect x="990" y="96" width="220" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="1100" y="120" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">会话日志</text>
+        <text x="1100" y="140" text-anchor="middle" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">sessions/*.zstd</text>
+
+
+        <!-- 图例 -->
+        <line x1="40" y1="636" x2="1240" y2="636" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <line x1="40" y1="670" x2="96" y2="670" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#02-message-lifecycle-arrow)"/>
+        <text x="108" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">请求</text>
+        <line x1="250" y1="670" x2="306" y2="670" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#02-message-lifecycle-arrow-open)"/>
+        <text x="318" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">异步写入</text>
+        <line x1="430" y1="670" x2="486" y2="670" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#02-message-lifecycle-arrow)"/>
+        <text x="498" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">只读 / 返回</text>
+        <line x1="620" y1="670" x2="676" y2="670" stroke="#bf4520" stroke-width="1.2" marker-end="url(#02-message-lifecycle-arrow-accent)"/>
+        <text x="688" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：进入提示词的那一段</text>
+      </svg></div>
+          <figcaption><span class="caption">4 条生命线、7 条消息；珊瑚标出唯一一次进入提示词的返回段。</span><span class="evidence">证据：设置页「开始检查」→ 读 &lt;home&gt;/sessions/ 下的会话日志</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c3">
+        <p class="chapter-eyebrow">03 · ARCHITECTURE · 数据流</p>
+        <h2>开关与文本只住在这两个文件里</h2>
+        <p class="claim">state.json 存三个开关，content-scope.txt 存内容边界；插件每次装配重读，派生结果只有「注入」或「带着原因不注入」。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="03-three-truths-three-truths-title 03-three-truths-three-truths-desc">
+        <title id="03-three-truths-three-truths-title">开关与文本只住在这两个文件里</title>
+        <desc id="03-three-truths-three-truths-desc">状态文件与内容边界文本一起交给 derive：四个条件全真才注入，任一不满足就返回原因；坏文件会降级为 ask 并标记 degraded。</desc>
+
+        <defs>
+          <marker id="03-three-truths-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="03-three-truths-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 箭头先画：文件 → derive -->
+        <path d="M340,200 V232 q0,8 8,8 H512 q8,0 8,8 V280" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#03-three-truths-arrow)"/>
+        <rect x="380" y="216" width="64" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="412" y="228" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">读开关</text>
+
+        <path d="M940,200 V232 q0,8 -8,8 H768 q-8,0 -8,8 V280" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#03-three-truths-arrow)"/>
+        <rect x="820" y="216" width="64" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="852" y="228" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">读文本</text>
+
+        <!-- derive → 注入（焦点） -->
+        <path d="M600,400 V432 q0,8 -8,8 H348 q-8,0 -8,8 V480" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#03-three-truths-arrow-accent)"/>
+        <rect x="430" y="416" width="80" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="470" y="428" text-anchor="middle" fill="#bf4520" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">四条件全真</text>
+
+        <!-- derive → 不注入 -->
+        <path d="M680,400 V432 q0,8 8,8 H932 q8,0 8,8 V480" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#03-three-truths-arrow)"/>
+        <rect x="760" y="416" width="80" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="800" y="428" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">任一不满足</text>
+
+        <!-- 节点：state.json -->
+        <rect x="200" y="120" width="280" height="80" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="216" y="148" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">状态文件</text>
+        <text x="216" y="170" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state.json · 三个开关 · version 3</text>
+
+        <!-- 节点：content-scope.txt -->
+        <rect x="800" y="120" width="280" height="80" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="816" y="148" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">内容边界文本</text>
+        <text x="816" y="170" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">content-scope.txt · 上限 8 KB</text>
+
+        <!-- 节点：derive -->
+        <rect x="480" y="280" width="320" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="496" y="308" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">derive()</text>
+        <text x="496" y="330" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">每次装配重读 · 纯函数</text>
+        <text x="496" y="350" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">归一 / 上限 / 降级</text>
+        <text x="496" y="376" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">enabled · contentScope · 文本非空 · ≤ 8 KB</text>
+
+        <!-- 节点：注入（焦点） -->
+        <rect x="200" y="480" width="280" height="100" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="216" y="508" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">注入</text>
+        <text x="216" y="530" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">injecting: true</text>
+        <text x="216" y="552" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">拼进系统提示末段</text>
+
+        <!-- 节点：不注入 -->
+        <rect x="800" y="480" width="280" height="100" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="816" y="508" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">不注入</text>
+        <text x="816" y="530" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">injecting: false</text>
+        <text x="816" y="552" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">返回卡在哪一个条件</text>
+
+        <!-- 注释 -->
+        <text x="64" y="612" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">坏文件、缺字段或非法 approval：读成默认值并标 degraded（审批回落到 ask），不静默放行。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="668" width="12" height="12" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="60" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">落盘文件</text>
+        <rect x="170" y="668" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="190" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">判定</text>
+        <rect x="280" y="668" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="300" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：会注入</text>
+      </svg></div>
+          <figcaption><span class="caption">两个文件 → derive() → 注入 / 不注入；坏文件降级为 ask 并标记 degraded。</span><span class="evidence">证据：shared/state.mjs 的 readState / derive；8 KB 上限在写入与读取两侧生效</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c4">
+        <p class="chapter-eyebrow">04 · FLOWCHART</p>
+        <h2>为什么这次没有注入</h2>
+        <p class="claim">四道门按顺序问：总开关、内容边界开关、文本非空、文本不超过 8 KB。第一个「否」就是原因，后面的门不再问。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="04-injection-gates-injection-gates-title 04-injection-gates-injection-gates-desc">
+        <title id="04-injection-gates-injection-gates-title">四道门：为什么这次没有注入</title>
+        <desc id="04-injection-gates-injection-gates-desc">总开关、内容边界开关、文本非空、文本不超过 8 KB 四道门按顺序判断；任何一道不通过就停并带回原因，四道全过才注入。</desc>
+
+        <defs>
+          <marker id="04-injection-gates-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="04-injection-gates-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <g transform="translate(120 0)">
+        <!-- 通过路径（竖线） -->
+        <path d="M320,152 V184" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#04-injection-gates-arrow)"/>
+        <path d="M320,248 V280" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#04-injection-gates-arrow)"/>
+        <path d="M320,344 V376" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#04-injection-gates-arrow)"/>
+        <path d="M320,440 V496" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#04-injection-gates-arrow-accent)"/>
+
+        <rect x="328" y="160" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="332" y="172" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="328" y="256" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="332" y="268" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="328" y="352" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="332" y="364" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="328" y="464" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="332" y="476" fill="#bf4520" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+
+        <!-- 否决路径（横线） -->
+        <path d="M440,120 H560" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#04-injection-gates-arrow)"/>
+        <path d="M440,216 H560" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#04-injection-gates-arrow)"/>
+        <path d="M440,312 H560" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#04-injection-gates-arrow)"/>
+        <path d="M440,408 H560" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#04-injection-gates-arrow)"/>
+
+        <rect x="480" y="96" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="484" y="108" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="480" y="192" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="484" y="204" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="480" y="288" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="484" y="300" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="480" y="384" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="484" y="396" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+
+        <!-- 四道门 -->
+        <rect x="200" y="88" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="116" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">第 1 关：总开关</text>
+        <text x="216" y="138" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state.json · enabled</text>
+
+        <rect x="200" y="184" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="212" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">第 2 关：内容边界开关</text>
+        <text x="216" y="234" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state.json · contentScope</text>
+
+        <rect x="200" y="280" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="308" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">第 3 关：文本非空</text>
+        <text x="216" y="330" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">归一之后仍不是空串</text>
+
+        <rect x="200" y="376" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">第 4 关：≤ 8 KB</text>
+        <text x="216" y="426" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">超过上限就不注入</text>
+
+        <!-- 四道否决结果 -->
+        <rect x="560" y="88" width="320" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="576" y="116" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">停手：三件事都不做</text>
+        <text x="576" y="138" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不注入、不接管审批、不显示开关效果</text>
+
+        <rect x="560" y="184" width="320" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="576" y="212" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">不注入：边界被关掉</text>
+        <text x="576" y="234" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">injecting: false · contentScope</text>
+
+        <rect x="560" y="280" width="320" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="576" y="308" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">不注入：文本是空的</text>
+        <text x="576" y="330" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">injecting: false · empty</text>
+
+        <rect x="560" y="376" width="320" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="576" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">不注入：超过上限</text>
+        <text x="576" y="426" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">injecting: false · 8 KB 上限</text>
+
+        <!-- 结果：注入（焦点） -->
+        <rect x="200" y="496" width="240" height="72" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="216" y="524" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">注入</text>
+        <text x="216" y="546" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">injecting: true</text>
+
+        </g>
+        <!-- 注释 -->
+        <text x="64" y="616" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">顺序固定；第一个「否」就是原因，后面的门不再问。设置页和 doctor 都按同一个顺序报。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <line x1="40" y1="672" x2="96" y2="672" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#04-injection-gates-arrow)"/>
+        <text x="108" y="676" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">通过</text>
+        <line x1="180" y1="672" x2="236" y2="672" stroke="#4f5d75" stroke-width="1" marker-end="url(#04-injection-gates-arrow)"/>
+        <text x="248" y="676" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否决</text>
+        <rect x="330" y="666" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="350" y="676" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：四关全过</text>
+      </svg></div>
+          <figcaption><span class="caption">顺序固定；设置页与 doctor 按同一个顺序报。</span><span class="evidence">证据：node doctor.mjs --home &lt;DSH_HOME&gt; 的 home-text / home-state 行</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c5">
+        <p class="chapter-eyebrow">05 · STATE MACHINE</p>
+        <h2>审批三态：拿到请求之后回什么</h2>
+        <p class="claim">这个开关不管权限范围，只管 approval/request 递过来之后回什么：allow → allowed-once，ask → 交还宿主，deny → rejected。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:960px" viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="05-approval-three-states-approval-three-states-title 05-approval-three-states-approval-three-states-desc">
+        <title id="05-approval-three-states-approval-three-states-title">审批三态：拿到请求之后回什么</title>
+        <desc id="05-approval-three-states-approval-three-states-desc">档位开关在 allow、ask、deny 之间三选一：allow 回 allowed-once，ask 交还宿主审批界面，deny 回 rejected；ask 是默认与降级回退。</desc>
+
+        <defs>
+          <marker id="05-approval-three-states-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="05-approval-three-states-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="960" height="600" fill="#f5f5f5"/>
+
+        <!-- 开关 → 三个状态 -->
+        <path d="M440,168 V200 q0,8 -8,8 H208 q-8,0 -8,8 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#05-approval-three-states-arrow)"/>
+        <path d="M480,168 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#05-approval-three-states-arrow)"/>
+        <path d="M520,168 V200 q0,8 8,8 H752 q8,0 8,8 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#05-approval-three-states-arrow)"/>
+
+
+        <!-- 档位开关 -->
+        <rect x="360" y="96" width="240" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="376" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">档位开关（三选一）</text>
+        <text x="376" y="146" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state.json · approval</text>
+
+        <!-- 状态：allow -->
+        <rect x="80" y="232" width="240" height="128" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="96" y="262" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">allow</text>
+        <text x="96" y="286" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">自动同意</text>
+        <text x="96" y="314" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">回 allowed-once</text>
+        <text x="96" y="336" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">这一次放行，不改档位</text>
+
+        <!-- 状态：ask（焦点，默认 + 降级回退） -->
+        <rect x="360" y="232" width="240" height="128" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="376" y="262" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">ask</text>
+        <text x="376" y="286" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">问人（默认）</text>
+        <text x="376" y="314" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">交还宿主</text>
+        <text x="376" y="336" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">走宿主自己的审批界面</text>
+        <text x="584" y="252" text-anchor="end" fill="#bf4520" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">默认 / 回退</text>
+
+        <!-- 状态：deny -->
+        <rect x="640" y="232" width="240" height="128" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="656" y="262" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">deny</text>
+        <text x="656" y="286" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">自动回绝</text>
+        <text x="656" y="314" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">回 rejected</text>
+        <text x="656" y="336" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不给你选择</text>
+
+        <!-- 注释 -->
+        <text x="64" y="448" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">三态只回答「拿到 approval/request 之后回什么」；权限范围由宿主档位决定，与本开关无关。</text>
+        <text x="64" y="480" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">宿主档位是 approval: never 时请求根本不发——三态都轮不到。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="516" x2="920" y2="516" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="544" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="554" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">档位状态</text>
+        <line x1="170" y1="550" x2="226" y2="550" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#05-approval-three-states-arrow)"/>
+        <text x="238" y="554" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">切换 / 选择</text>
+        <rect x="360" y="544" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="380" y="554" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：默认与降级回退</text>
+      </svg></div>
+          <figcaption><span class="caption">ask 是默认值，也是状态读坏时的回退；宿主档位是 never 时请求根本不发。</span><span class="evidence">证据：state.json 的 approval；auto-approve/index.js 的三条返回</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c6">
+        <p class="chapter-eyebrow">06 · 自定义 · patch 手术</p>
+        <h2>安装只做行级追加</h2>
+        <p class="claim">装的时候不重写 cordis.patch.yml：只在末尾追加一个 insert 块，再补权限表与 desktop 的替换行；已有行一个字节不动。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="06-patch-surgery-patch-surgery-title 06-patch-surgery-patch-surgery-desc">
+        <title id="06-patch-surgery-patch-surgery-title">安装只做行级追加：patch 文件前后对比</title>
+        <desc id="06-patch-surgery-patch-surgery-desc">左栏是安装前的 cordis.patch.yml，右栏是安装后：原有行保持原样，末尾新增一个 insert 块与权限相关行；卸载时摘掉新增段即可逐字节还原。</desc>
+
+        <defs>
+          <marker id="06-patch-surgery-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 左：安装前 -->
+        <rect x="40" y="160" width="560" height="400" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <text x="64" y="184" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装前 · cordis.patch.yml</text>
+
+        <text x="88" y="216" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">1</text>
+        <text x="104" y="216" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace"># 宿主自己的 patch</text>
+        <text x="88" y="238" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">2</text>
+        <text x="104" y="238" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: locale</text>
+        <text x="88" y="260" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">3</text>
+        <text x="104" y="260" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  preference: zh</text>
+        <text x="88" y="282" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">4</text>
+        <text x="104" y="282" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: fs-observation-policy</text>
+        <text x="88" y="304" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">5</text>
+        <text x="104" y="304" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  config: {}</text>
+        <text x="88" y="326" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">6</text>
+        <text x="104" y="326" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  …… 其余已有行，原样保留 ……</text>
+
+        <!-- 左 → 右：安装 -->
+        <path d="M600,360 H680" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#06-patch-surgery-arrow)"/>
+        <rect x="602" y="336" width="56" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="630" y="348" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装</text>
+
+        <!-- 右：安装后 -->
+        <rect x="680" y="160" width="560" height="400" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <text x="704" y="184" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装后 · cordis.patch.yml</text>
+        <text x="1216" y="184" text-anchor="end" fill="#bf4520" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">新增：3 个插件入口</text>
+
+        <!-- 新增段底色与左侧竖线 -->
+        <rect x="732" y="310" width="484" height="158" rx="2" fill="rgba(191,69,32,0.08)"/>
+        <rect x="732" y="310" width="2" height="158" fill="#bf4520"/>
+
+        <text x="728" y="216" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">1</text>
+        <text x="744" y="216" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace"># 宿主自己的 patch</text>
+        <text x="728" y="238" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">2</text>
+        <text x="744" y="238" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: locale</text>
+        <text x="728" y="260" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">3</text>
+        <text x="744" y="260" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  preference: zh</text>
+        <text x="728" y="282" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">4</text>
+        <text x="744" y="282" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- id: fs-observation-policy</text>
+        <text x="728" y="304" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">5</text>
+        <text x="744" y="304" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  config: {}</text>
+        <text x="728" y="326" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">6</text>
+        <text x="744" y="326" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">- insert:</text>
+        <text x="728" y="348" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">7</text>
+        <text x="744" y="348" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">    - id: enhance-scope</text>
+        <text x="728" y="370" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">8</text>
+        <text x="744" y="370" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">      name: '../../enhance/enhance-scope/index.js'</text>
+        <text x="728" y="392" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">9</text>
+        <text x="744" y="392" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">    - id: auto-approve</text>
+        <text x="728" y="414" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">10</text>
+        <text x="744" y="414" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">      name: '../../enhance/auto-approve/index.js'</text>
+        <text x="728" y="436" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">11</text>
+        <text x="744" y="436" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">    - id: enhance-ui</text>
+        <text x="728" y="458" text-anchor="end" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">12</text>
+        <text x="744" y="458" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">      name: '../../enhance/ui/index.js'</text>
+
+        <!-- 注释：同一次写入还包括什么 -->
+        <text x="64" y="592" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">同一次写入还包括：权限表与 enhanced 档（首次安装才加）、desktop 的 enhance-permissions 替换行。</text>
+        <text x="64" y="618" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">卸载时摘掉新增段、还原 ui-permission 的 disabled → sha256 与安装前相同。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="648" x2="1240" y2="648" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="676" width="12" height="12" rx="2" fill="#ececec" stroke="rgba(45,49,66,0.20)" stroke-width="0.8"/>
+        <text x="60" y="686" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">已有行</text>
+        <rect x="170" y="676" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="190" y="686" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">本次新增（可被逐字节还原）</text>
+      </svg></div>
+          <figcaption><span class="caption">卸载按清单摘掉新增段，patch 的 sha256 与安装前相同。</span><span class="evidence">证据：uninstall.mjs 的摘除计划；doctor 的 home-files 行</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c7">
+        <p class="chapter-eyebrow">07 · 自定义 · 归属账本</p>
+        <h2>卸载怎么知道哪一行是我们加的</h2>
+        <p class="claim">install-manifest.json 记下「我们改了什么」；卸载按字段决定动作，清单丢了也不猜——逐字节认领，认不出就保留并告警。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="07-ownership-ledger-ownership-ledger-title 07-ownership-ledger-ownership-ledger-desc">
+        <title id="07-ownership-ledger-ownership-ledger-title">归属账本：卸载怎么知道哪一行是我们加的</title>
+        <desc id="07-ownership-ledger-ownership-ledger-desc">安装清单记录每个 profile 的归属字段；卸载按字段摘行或只摘 disabled。清单缺失时逐字节认领，认不出就保留并告警，doctor 判红。</desc>
+
+        <defs>
+          <marker id="07-ownership-ledger-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="07-ownership-ledger-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 账本面板 -->
+        <rect x="64" y="112" width="440" height="264" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <text x="88" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装时写入：install-manifest.json</text>
+
+        <text x="88" y="176" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">profiles.desktop:</text>
+        <text x="88" y="200" xml:space="preserve" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  uiPermissionAction: added</text>
+        <text x="88" y="224" xml:space="preserve" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  permissionPresetAction: added</text>
+        <text x="88" y="248" xml:space="preserve" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  permissionDefaultAction: kept</text>
+        <text x="88" y="272" xml:space="preserve" fill="#2d3142" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  original: …bak-enhance-20261029</text>
+        <text x="88" y="296" xml:space="preserve" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  # 每个 profile 一条；value 是「我们当时做了什么」</text>
+        <text x="88" y="336" xml:space="preserve" fill="#5a6580" font-size="12" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">  fileHashes: 15 件（doctor 用来查改坏）</text>
+
+        <!-- 账本 → 三条规则 -->
+        <path d="M504,180 H544" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#07-ownership-ledger-arrow)"/>
+        <path d="M504,276 H544" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#07-ownership-ledger-arrow)"/>
+        <path d="M504,372 H544" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#07-ownership-ledger-arrow)"/>
+
+        <!-- 三条规则 -->
+        <rect x="544" y="144" width="440" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="560" y="172" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">uiPermissionAction: added</text>
+        <text x="560" y="194" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">→ 整行是我们插的：摘整行</text>
+
+        <rect x="544" y="240" width="440" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="560" y="268" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">uiPermissionAction: flipped</text>
+        <text x="560" y="290" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">→ 官方行是我们停的：只摘 disabled</text>
+
+        <rect x="544" y="336" width="440" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="560" y="364" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">permissionPresetAction: added</text>
+        <text x="560" y="386" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">→ 权限表/档位是我们插的：摘掉它</text>
+
+        <!-- 兜底路径 -->
+        <text x="64" y="444" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">清单丢了 / 字段缺失时（旧安装、手删清单）</text>
+
+        <path d="M288,520 H352" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#07-ownership-ledger-arrow)"/>
+        <rect x="296" y="498" width="48" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="320" y="510" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">认不出</text>
+        <path d="M640,520 H704" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#07-ownership-ledger-arrow)"/>
+        <rect x="644" y="498" width="56" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="672" y="510" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">残留可见</text>
+
+        <rect x="64" y="480" width="224" height="80" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="80" y="508" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">逐字节认领</text>
+        <text x="80" y="530" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">与我们的输出逐字节比对</text>
+
+        <rect x="352" y="480" width="288" height="80" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="368" y="508" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">认不出归属</text>
+        <text x="368" y="530" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不猜：原样保留 + 打 warn</text>
+
+        <rect x="704" y="480" width="296" height="80" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="720" y="508" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">doctor 判红</text>
+        <text x="720" y="530" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">残留看得见，人工核对</text>
+
+        <!-- 注释 -->
+        <text x="64" y="608" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">规则只有一条：能证明确实是我们写的，才动；证明不了，就留给人工。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="636" x2="1240" y2="636" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="664" width="12" height="12" rx="2" fill="#ececec" stroke="rgba(45,49,66,0.20)" stroke-width="0.8"/>
+        <text x="60" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">账本</text>
+        <rect x="130" y="664" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="150" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">规则与结果</text>
+        <rect x="270" y="664" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="290" y="674" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：不猜的那条路</text>
+      </svg></div>
+          <figcaption><span class="caption">三条规则 + 一条兜底；doctor 会把认不出的残留判红。</span><span class="evidence">证据：install-manifest.json 的 uiPermissionAction / permissionPresetAction / original</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c8">
+        <p class="chapter-eyebrow">08 · FLOWCHART</p>
+        <h2>安装的四种结局</h2>
+        <p class="claim">依次判断宿主根、enhance/、清单可读性与版本；四种结局各自明确：安装、只校验、更新、拒绝——没有「装一半也算成功」。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="08-install-branches-install-branches-title 08-install-branches-install-branches-desc">
+        <title id="08-install-branches-install-branches-title">安装的四种结局：安装、只校验、更新、拒绝</title>
+        <desc id="08-install-branches-install-branches-desc">安装脚本依次判断宿主根、enhance 目录、清单可读性与版本：分别得到未安装则安装、同版本只做校验、异版本更新、清单坏则拒绝并给清理命令四种结局。</desc>
+
+        <defs>
+          <marker id="08-install-branches-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="08-install-branches-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 纵向「是」路径 -->
+        <path d="M640,152 V192" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#08-install-branches-arrow)"/>
+        <path d="M640,272 V312" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#08-install-branches-arrow)"/>
+        <path d="M640,392 V432" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#08-install-branches-arrow)"/>
+        <rect x="648" y="160" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="652" y="172" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="648" y="280" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="652" y="292" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="648" y="400" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="652" y="412" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+
+        <!-- 横向「否」路径 -->
+        <path d="M760,112 H840" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#08-install-branches-arrow)"/>
+        <path d="M520,232 H440" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#08-install-branches-arrow)"/>
+        <path d="M760,352 H840" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#08-install-branches-arrow)"/>
+        <path d="M520,472 H440" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#08-install-branches-arrow)"/>
+
+        <rect x="784" y="88" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="788" y="100" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="464" y="208" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="468" y="220" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="784" y="328" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="788" y="340" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+        <rect x="464" y="448" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="468" y="460" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">是</text>
+        <rect x="784" y="448" width="24" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="788" y="460" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">否</text>
+
+        <!-- 判定菱形 -->
+        <polygon points="640,72 760,112 640,152 520,112" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="116" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">找到 DSH 根？</text>
+
+        <polygon points="640,192 760,232 640,272 520,232" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="236" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">enhance/ 在？</text>
+
+        <polygon points="640,312 760,352 640,392 520,352" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="356" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">清单可读且带版本？</text>
+
+        <polygon points="640,432 760,472 640,512 520,472" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="476" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">版本一致？</text>
+
+        <!-- 结局 -->
+        <rect x="840" y="80" width="240" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="856" y="108" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">退出 1：不下载</text>
+        <text x="856" y="130" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">宿主没装就不动系统</text>
+
+        <rect x="200" y="200" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装</text>
+        <text x="216" y="250" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">默认 desktop；零目标 → 拒绝、不写盘</text>
+
+        <rect x="840" y="320" width="240" height="64" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="856" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">拒绝 + 一条清理命令</text>
+        <text x="856" y="370" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">uninstall --thorough &amp;&amp; install</text>
+
+        <rect x="200" y="440" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="216" y="468" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">只做一致性校验</text>
+        <text x="216" y="490" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">hash + doctor → 无需重启</text>
+
+        <rect x="840" y="440" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="856" y="468" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">更新</text>
+        <text x="856" y="490" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">重装并改清单版本 → 重启</text>
+
+        <!-- 注释 -->
+        <text x="64" y="576" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">四道判定之后没有「装一半」：要么校验、要么更新、要么拒绝；装与更新都不自动重启。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <polygon points="52,668 72,678 52,688 32,678" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="84" y="682" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">判定</text>
+        <rect x="140" y="670" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="160" y="682" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">结局</text>
+        <rect x="230" y="670" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="250" y="682" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：清单坏时拒绝，不静默跳过</text>
+      </svg></div>
+          <figcaption><span class="caption">零可装目标在安装分支里直接拒绝，且发生在任何写盘之前。</span><span class="evidence">证据：install.mjs 的四条退出路径；doctor 的 profiles-wired 行</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c9">
+        <p class="chapter-eyebrow">09 · PROCESS</p>
+        <h2>卸载三档：默认、彻底、单档回滚</h2>
+        <p class="claim">默认先归档再删目录、保留所有 .bak-*；--thorough 是不归档的不可逆选项；--to 只回滚一个 profile 的 patch。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:960px" viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="09-uninstall-modes-uninstall-modes-title 09-uninstall-modes-uninstall-modes-desc">
+        <title id="09-uninstall-modes-uninstall-modes-title">卸载三档：默认、彻底、以及只回滚一个档位</title>
+        <desc id="09-uninstall-modes-uninstall-modes-desc">uninstall.mjs 有三种方式：默认归档并保留备份后删目录、彻底清理不归档并删本工具备份、--to 只回滚一个 profile 的 patch；三种都不碰别人写的 .bak-*。</desc>
+
+        <defs>
+          <marker id="09-uninstall-modes-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        </defs>
+
+        <rect width="960" height="600" fill="#f5f5f5"/>
+
+        <!-- 入口 → 三档 -->
+        <path d="M480,160 V184 q0,16 -16,16 H184 q-16,0 -16,16 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#09-uninstall-modes-arrow)"/>
+        <path d="M480,160 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#09-uninstall-modes-arrow)"/>
+        <path d="M480,160 V184 q0,16 16,16 H776 q16,0 16,16 V232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#09-uninstall-modes-arrow)"/>
+
+        <!-- 入口 -->
+        <rect x="360" y="96" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="376" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">uninstall.mjs</text>
+        <text x="376" y="146" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">三种方式，按需选一个</text>
+
+        <!-- 方式 1：默认 -->
+        <rect x="64" y="232" width="264" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="80" y="260" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">默认：行级卸载</text>
+        <text x="80" y="286" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">归档 → 删 enhance/</text>
+        <text x="80" y="312" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">state / 文本 / 清单先进归档</text>
+        <text x="80" y="334" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">.bak-* 一份不删</text>
+        <text x="80" y="356" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">patch 回到装前 sha256</text>
+
+        <!-- 方式 2：彻底（焦点） -->
+        <rect x="348" y="232" width="264" height="200" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="364" y="260" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">--thorough：彻底清理</text>
+        <text x="364" y="286" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">不归档 → 连备份一起删</text>
+        <text x="364" y="312" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">删本工具的全部 .bak-*</text>
+        <text x="364" y="334" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">含历史迁移工具留下的前缀</text>
+        <text x="364" y="356" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">别人的 .bak-* 一个不碰</text>
+        <text x="364" y="378" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">需要二次确认</text>
+
+        <!-- 方式 3：--to -->
+        <rect x="632" y="232" width="264" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="648" y="260" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">--to &lt;备份&gt;：单档回滚</text>
+        <text x="648" y="286" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">只回滚一个 profile 的 patch</text>
+        <text x="648" y="312" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">保留 enhance/ 与归档</text>
+        <text x="648" y="334" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">执行前再备份 .bak-uninstall-*</text>
+        <text x="648" y="356" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不叫卸载：只回滚一次改动</text>
+
+        <!-- 注脚 -->
+        <text x="64" y="486" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">三种方式都不碰别人写的 .bak-*；只有「彻底清理」不可逆，默认方式永远留得回滚。</text>
+        <text x="64" y="512" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">—to 与 --thorough 不能同用；先预览再执行（--dry-run 打印计划，不写盘）。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="536" x2="920" y2="536" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="564" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="574" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">卸载方式</text>
+        <rect x="170" y="564" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="190" y="574" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：不可逆的那一档</text>
+      </svg></div>
+          <figcaption><span class="caption">三种方式都不碰别人写的 .bak-*；默认方式永远留得回滚。</span><span class="evidence">证据：node uninstall.mjs --home &lt;DSH_HOME&gt; --dry-run（先看计划）</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c10">
+        <p class="chapter-eyebrow">10 · PROCESS</p>
+        <h2>门禁与负例：绿不是信，能红才是</h2>
+        <p class="claim">七道 fast 门禁串成一条链；绿灯只说明「这次没抓到」。真正证明门禁活着的是负例：在副本上把守卫改回旧写法，它必须变红。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="10-gates-and-negatives-gates-and-negatives-title 10-gates-and-negatives-gates-and-negatives-desc">
+        <title id="10-gates-and-negatives-gates-and-negatives-title">门禁与负例：绿不是信，能红才是</title>
+        <desc id="10-gates-and-negatives-gates-and-negatives-desc">七道 fast 门禁依次运行：version、syntax、tests、doctor、graph、docs、lifecycle；每道门在副本上都有负例，把守卫改回旧写法后必须变红。</desc>
+
+        <defs>
+          <marker id="10-gates-and-negatives-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="10-gates-and-negatives-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 门禁链 -->
+        <line x1="208" y1="200" x2="232" y2="200" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#10-gates-and-negatives-arrow)"/>
+        <line x1="376" y1="200" x2="400" y2="200" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#10-gates-and-negatives-arrow)"/>
+        <line x1="544" y1="200" x2="568" y2="200" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#10-gates-and-negatives-arrow)"/>
+        <line x1="712" y1="200" x2="736" y2="200" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#10-gates-and-negatives-arrow)"/>
+        <line x1="880" y1="200" x2="904" y2="200" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#10-gates-and-negatives-arrow)"/>
+        <line x1="1048" y1="200" x2="1072" y2="200" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#10-gates-and-negatives-arrow)"/>
+
+        <!-- 七道门 -->
+        <rect x="64" y="172" width="144" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="136" y="204" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">version</text>
+
+        <rect x="232" y="172" width="144" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="304" y="204" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">syntax</text>
+
+        <rect x="400" y="172" width="144" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="472" y="204" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">tests</text>
+
+        <rect x="568" y="172" width="144" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="640" y="204" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">doctor</text>
+
+        <rect x="736" y="172" width="144" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="808" y="204" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">graph</text>
+
+        <rect x="904" y="172" width="144" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="976" y="204" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">docs</text>
+
+        <rect x="1072" y="172" width="144" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="1144" y="204" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">lifecycle</text>
+
+        <!-- 负例：从链上取一道门，回退源码看它红不红 -->
+        <line x1="64" y1="248" x2="1216" y2="248" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+        <line x1="64" y1="248" x2="64" y2="256" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+        <line x1="1216" y1="248" x2="1216" y2="256" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+        <rect x="520" y="264" width="240" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="640" y="276" text-anchor="middle" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">整条链的每一道门都有对应负例</text>
+
+        <rect x="300" y="320" width="280" height="80" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="316" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">一次性副本：把守卫改回旧写法</text>
+        <text x="316" y="370" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不改真仓库，不动工作树</text>
+
+        <path d="M580,360 H700" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#10-gates-and-negatives-arrow-accent)"/>
+        <rect x="588" y="336" width="64" height="16" rx="2" fill="#f5f5f5"/>
+        <text x="620" y="348" text-anchor="middle" fill="#bf4520" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">逐门跑</text>
+
+        <rect x="700" y="320" width="280" height="80" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="716" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">该门必须红</text>
+        <text x="716" y="370" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">红了，才说明守卫在吃劲</text>
+
+        <!-- 注释 -->
+        <text x="64" y="480" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">负例不造坏产物：造出来的正是被测代码该抓的东西，证明不了守卫本身还在。</text>
+        <text x="64" y="512" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">full 层多两道：graph-strict（逐字节比图）与 build-client（派生件同代）；没有产物记 SKIP，不算 PASS。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="668" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">fast 门禁</text>
+        <line x1="170" y1="674" x2="226" y2="674" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#10-gates-and-negatives-arrow)"/>
+        <text x="238" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">负例入口</text>
+        <rect x="330" y="668" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="350" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：必须变红</text>
+      </svg></div>
+          <figcaption><span class="caption">full 层多两道；没有产物时记 SKIP，不算 PASS。</span><span class="evidence">证据：node scripts/check.mjs --layer full；node scripts/check.mjs --self-test（26 条负例）</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c11">
+        <p class="chapter-eyebrow">11 · PROCESS</p>
+        <h2>版本与升级：一个版本号，三处比对</h2>
+        <p class="claim">版本只有 VERSION 一个来源；安装把它写进清单，doctor 拿清单比当前；宿主升级后另有一件事要查——派生件是不是同一代。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="11-version-and-upgrade-version-and-upgrade-title 11-version-and-upgrade-version-and-upgrade-desc">
+        <title id="11-version-and-upgrade-version-and-upgrade-title">版本与升级：一个版本号，三处比对，一条处置</title>
+        <desc id="11-version-and-upgrade-version-and-upgrade-desc">发布时 VERSION 与 package.json 由门禁守住一致；安装把 toolVersion 写进清单；doctor 比对清单版本；宿主升级后 build-client --check --asar 判派生件代际；不一致时唯一动作是重跑 install。</desc>
+
+        <defs>
+          <marker id="11-version-and-upgrade-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        </defs>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 步骤链 -->
+        <line x1="268" y1="260" x2="292" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#11-version-and-upgrade-arrow)"/>
+        <line x1="508" y1="260" x2="532" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#11-version-and-upgrade-arrow)"/>
+        <line x1="748" y1="260" x2="772" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#11-version-and-upgrade-arrow)"/>
+        <line x1="988" y1="260" x2="1012" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#11-version-and-upgrade-arrow)"/>
+
+        <!-- 01 -->
+        <text x="68" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">01</text>
+        <rect x="52" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="68" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">发布 1.0.0</text>
+        <text x="68" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">VERSION + package.json</text>
+        <text x="68" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">version 门禁守一致</text>
+        <text x="68" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">1.0.0 · private · module</text>
+
+        <!-- 02 -->
+        <text x="308" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">02</text>
+        <rect x="292" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="308" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">安装</text>
+        <text x="308" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">清单写 toolVersion</text>
+        <text x="308" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">记下「这份落盘是谁写的」</text>
+        <text x="308" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">清单是唯一版本记录</text>
+
+        <!-- 03 -->
+        <text x="548" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">03</text>
+        <rect x="532" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="548" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">日常核对</text>
+        <text x="548" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">doctor 比对清单版本</text>
+        <text x="548" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不一致 → 一行提示</text>
+        <text x="548" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">install-manifest 行</text>
+
+        <!-- 04（焦点） -->
+        <text x="788" y="188" fill="#bf4520" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">04</text>
+        <rect x="772" y="200" width="216" height="120" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="788" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">宿主升级</text>
+        <text x="788" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">build-client --check --asar</text>
+        <text x="788" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">判派生件代际</text>
+        <text x="788" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">代际 ≠ 版本号</text>
+
+        <!-- 05 -->
+        <text x="1028" y="188" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">05</text>
+        <rect x="1012" y="200" width="216" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="1028" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">处置</text>
+        <text x="1028" y="252" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">同代 → 重启即可</text>
+        <text x="1028" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不同代 → 重派生 + 重装</text>
+        <text x="1028" y="298" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">不做静默升级</text>
+
+        <!-- 注释 -->
+        <text x="64" y="500" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">清单版本与当前工具不一致：唯一动作是重跑 install.mjs——doctor 的 install-manifest 行会给这条提示。</text>
+        <text x="64" y="532" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">doctor 只验派生件带没带来源戳；「是不是同一代」只有 build-client --check --asar 能回答。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <rect x="40" y="668" width="12" height="12" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">生命周期步骤</text>
+        <rect x="200" y="668" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="220" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：宿主升级后必须重判代际</text>
+      </svg></div>
+          <figcaption><span class="caption">不一致时唯一动作是重跑 install.mjs；代际判断要 build-client --check --asar。</span><span class="evidence">证据：node -e "console.log(require('./package.json').version)"；build-client.mjs --check --asar &lt;app.asar&gt;</span></figcaption>
+        </figure>
+      </section>
+      <section class="chapter" id="c12">
+        <p class="chapter-eyebrow">12 · 自定义 · 失败矩阵</p>
+        <h2>失败矩阵：每个坑由谁发现</h2>
+        <p class="claim">门禁和 doctor 不是万能的：五行失败形态里，标出来的那一行合并了两条设计边界——没有自动检测，只能人工核对。</p>
+        <figure class="figure">
+          <div class="diagram-container"><svg style="min-width:1280px" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="12-failure-matrix-failure-matrix-title 12-failure-matrix-failure-matrix-desc">
+        <title id="12-failure-matrix-failure-matrix-title">失败矩阵：每个坑由谁发现，或者只能人工核对</title>
+        <desc id="12-failure-matrix-failure-matrix-desc">五行失败形态分别对应 doctor、门禁与自检、设置页或人工三种发现方式；无 Origin 放行与会话探针读错会话只能人工核对。</desc>
+
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <!-- 表头 -->
+        <text x="64" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">失败形态</text>
+        <text x="480" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">doctor --home</text>
+        <text x="736" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">门禁 / 自检</text>
+        <text x="992" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">设置页 / 人工</text>
+        <line x1="64" y1="160" x2="1216" y2="160" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+
+        <!-- 第 1 行 -->
+        <rect x="64" y="176" width="1152" height="64" fill="rgba(45,49,66,0.02)"/>
+        <text x="80" y="204" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">approval: never（宿主不发请求）</text>
+        <text x="80" y="224" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">三态里 allow 轮不到</text>
+        <text x="480" y="210" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● 档位语义判红</text>
+        <text x="736" y="210" fill="#5a6580" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">—</text>
+        <text x="992" y="204" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">◐ 显示「轮不到」</text>
+        <text x="992" y="224" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">需要人读结论句</text>
+
+        <!-- 第 2 行 -->
+        <text x="80" y="268" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">文本超过 8 KB</text>
+        <text x="80" y="288" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">直接编辑文件写超限</text>
+        <text x="480" y="274" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● home-text 判红</text>
+        <text x="736" y="274" fill="#5a6580" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">—</text>
+        <text x="992" y="274" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● 保存前拦</text>
+
+        <!-- 第 3 行 -->
+        <rect x="64" y="304" width="1152" height="64" fill="rgba(45,49,66,0.02)"/>
+        <text x="80" y="332" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">patch 结构坏（重复键 / 缩进）</text>
+        <text x="80" y="352" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">行级追加后手改坏了</text>
+        <text x="480" y="338" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● dup-keys / patch 行</text>
+        <text x="736" y="338" fill="#5a6580" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">—</text>
+        <text x="992" y="338" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">◐ 指到行号，人工修</text>
+
+        <!-- 第 4 行 -->
+        <text x="80" y="396" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">装了但没接线（零目标安装）</text>
+        <text x="80" y="416" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">enhance/ 在，patch 无引用</text>
+        <text x="480" y="402" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● profiles-wired 判红</text>
+        <text x="736" y="402" fill="#5a6580" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● 安装前拒绝</text>
+        <text x="992" y="402" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● 重装提示</text>
+
+        <!-- 第 5 行（焦点：设计边界） -->
+        <rect x="64" y="432" width="1152" height="64" fill="rgba(191,69,32,0.08)"/>
+        <rect x="64" y="432" width="2" height="64" fill="#bf4520"/>
+        <text x="80" y="460" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">无 Origin 放行 / 探针读错会话</text>
+        <text x="80" y="480" fill="#5a6580" font-size="9" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">设计边界：接口无 token；探针只读最新会话</text>
+        <text x="480" y="466" fill="#5a6580" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">○ 不报</text>
+        <text x="736" y="466" fill="#5a6580" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">○ 不覆盖</text>
+        <text x="992" y="466" fill="#2d3142" font-size="12" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">○ 只能人工核对</text>
+
+        <!-- 注释 -->
+        <text x="64" y="548" fill="#2d3142" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif SC', 'Noto Serif', 'Songti SC', serif">绿色只覆盖被检查过的东西；标出来的这一行没有自动检测，属于已知限制，不假装它被覆盖。</text>
+
+        <!-- 图例 -->
+        <line x1="40" y1="640" x2="1240" y2="640" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <text x="40" y="678" fill="#2d3142" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">● 自动发现</text>
+        <text x="160" y="678" fill="#2d3142" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">◐ 部分发现（要人读）</text>
+        <text x="360" y="678" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">○ 不检测</text>
+        <text x="480" y="678" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">— 不适用</text>
+        <rect x="600" y="668" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="620" y="678" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">焦点：已知限制（只能人工）</text>
+      </svg></div>
+          <figcaption><span class="caption">绿色只覆盖被检查过的东西；已知限制不假装被覆盖。</span><span class="evidence">证据：README「已知限制」；scripts/check.mjs --self-test 的覆盖范围</span></figcaption>
+        </figure>
+      </section>
+
+    <section class="limits">
+      <h2>已知限制（不假装被覆盖）</h2>
+      <ul>
+        <li>宿主档位是 approval: never 时，审批请求根本不发，三态都轮不到。</li>
+        <li>patch 只做行级追加、不解析整份 YAML：结构坏要靠人看。</li>
+        <li>无 Origin 的请求（curl / CLI）直接放行；接口没有额外 token。</li>
+        <li>会话探针只读最新一份会话：多工作区并行时可能读错对象。</li>
+        <li>doctor 只验派生件带没带来源戳；「同一代」要靠 build-client --check --asar。</li>
+        <li>文本上限在写入与读取两侧都生效；超限不注入，doctor 判红。</li>
+      </ul>
+    </section>
+
+    <section class="commands">
+      <h2>自己跑一遍</h2>
+      <pre><code>node install.mjs   --home &lt;DSH_HOME&gt; --dry-run   # 先看要写什么
+node install.mjs   --home &lt;DSH_HOME&gt;             # 装（有变化才备份 patch）
+node doctor.mjs    --home &lt;DSH_HOME&gt;             # 全 PASS 再重启
+node uninstall.mjs --home &lt;DSH_HOME&gt;             # 卸载（默认归档、保留备份）
+node scripts/check.mjs --layer full             # 七道门 + 两道 full</code></pre>
+    </section>
+
+    <footer class="colophon">
+      <span>版本 1.0.0</span>
+      <span>12 张图 · 单文件 · 无 JS</span>
+      <span>字体：Instrument Serif / Geist / Geist Mono（Google Fonts，离线回退系统字体）</span>
+      <a class="to-top" href="#top">回到顶部 ↑</a>
+    </footer>
+  </main>
+</body>
+</html>
