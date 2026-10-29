@@ -1,14 +1,16 @@
 # dsh-enhance bundle patch —— `dsh plugin add` 安装后由 host 叠加进 profile。
 # 只插三个入口；桌面权限菜单图标要按宿主 asar 派生，仍由 enhance-install.cmd 负责。
 #
-# 为什么 enhance-ui 用「路径」而不是 `dsh-enhance/ui/index.js`：
-# 浏览器的 dsh.client 发现只认「包根名」或「路径」，裸子路径会被当成非包跳过
-# （dsh-client-modules 的 locatePkgJson）。路径相对 profile 目录解析，
-# 最近的 package.json 正好是 ui/package.json，浏览器半才会被装载。
+# 两条解析规则（实测 DSH 0.2.1-rc.3）：
+#   - bundle patch 的 entry name 相对**本包目录**解析（不是 profile 目录）；
+#   - 浏览器的 dsh.client 发现只认「包的精确包名」或「路径」里的最近 package.json，
+#     裸子路径（`dsh-enhance/ui/index.js`）会被当成非包跳过。
+# 所以 enhance-ui 用 `./ui/index.js`：入口从包目录解析，最近的 package.json 是
+# ui/package.json，浏览器半才会被装载。scope / approve 没有浏览器半，用包名子路径即可。
 - insert:
     - id: enhance-scope
       name: 'dsh-enhance/enhance-scope/index.js'
     - id: auto-approve
       name: 'dsh-enhance/auto-approve/index.js'
     - id: enhance-ui
-      name: './node_modules/dsh-enhance/ui/index.js'
+      name: './ui/index.js'

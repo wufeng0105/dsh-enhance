@@ -225,16 +225,16 @@ function gateBundle(base = root) {
       const nameMatch = /^[ \t]+name:[ \t]*['"]?([^'"\s]+)['"]?[ \t]*$/.exec(line)
       if (nameMatch === null || currentId === undefined) continue
       const target = nameMatch[1]
-      // 三种合法形态：本包精确包名（包根 main）、本包子路径、相对 profile 的包内路径。
+      // 合法形态：本包精确包名（包根 main）、本包子路径、包内相对路径（相对本包目录）。
       let rel
       if (target === packageName) {
         rel = undefined
       } else if (packageName !== '' && target.startsWith(`${packageName}/`)) {
         rel = target.slice(packageName.length + 1)
-      } else if (packageName !== '' && target.startsWith(`./node_modules/${packageName}/`)) {
-        rel = target.slice(`./node_modules/${packageName}/`.length)
+      } else if (target.startsWith('./')) {
+        rel = target.slice(2)
       } else {
-        problems.push(`insert ${currentId} 的 name 既不是本包路径、也不是相对 profile 的包内路径：${target}`)
+        problems.push(`insert ${currentId} 的 name 既不是本包路径、也不是包内相对路径：${target}`)
       }
       if (rel !== undefined && !existsSync(join(base, rel))) problems.push(`insert ${currentId} 指向不存在的文件：${rel}`)
       currentId = undefined
