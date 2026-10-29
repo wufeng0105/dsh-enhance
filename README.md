@@ -2,13 +2,24 @@
 
 给 DeepSeek Harness 的本地破甲插件。
 
-它只做一件事：把 `<DSH_HOME>/enhance/content-scope.txt` 里的一段纯文本，接在 DSH 系统提示的末尾（section `enhance:content-scope`），每条消息都带。换成破甲提示词，模型就不再一开口就是「我不能」。
-
-- **不改 DSH 本来的东西**：原有系统提示、20+ 工具的说明、默认人格都原样保留；不修改宿主源码，只往 profile patch 里加几行。
-- **可装、可查、可退**：装了什么记在清单里；默认卸载逐字节还原，`--thorough` 彻底清理。
-- **审批三态 + 设置页**：`allow` / `ask` / `deny` 三档；DSH 设置页里能改文本、检查注入、发起卸载。
+核心只有一件事：把 `<DSH_HOME>/enhance/content-scope.txt` 里的一段纯文本，追加到系统提示的最后一个槽位（官方 `DEPLOYMENT_PERSONA_SUFFIX` 档，section `enhance:content-scope`），每条消息都带。换成破甲提示词，模型的行为就跟着变——效果取决于你写的文本和目标模型，本工具不内置提示词库。
 
 **兼容**：dsh-enhance `1.0.0` · DeepSeek Harness `0.2.1-rc.3`（验证基线）· Node.js ≥ 22 · 不需要 `npm install`。升级 DSH 后先跑 `node doctor.mjs --home <DSH_HOME>`；权限菜单图标那份派生件要按新版本重新生成（`node enhance-permissions/build-client.mjs --asar "<DSH_ROOT>\resources\app.asar"`），否则图标可能对不上新宿主。
+
+## 它到底改了什么
+
+宿主本体不碰：不修改 `app.asar` / 宿主源码，宿主内置的系统提示、工具说明、基础人格段都不动。会动的是 profile 配置和 `<DSH_HOME>/enhance/`：
+
+| 位置 | 安装时做什么 |
+|---|---|
+| `<DSH_HOME>/enhance/` | 落 4 个插件 + 共享模块 + `uninstall.mjs`；`state.json` / `content-scope.txt` 缺失才种，已存在不覆盖 |
+| `profiles/<profile>/cordis.patch.yml` | 追加 3 行 insert：`enhance-scope`、`auto-approve`、`enhance-ui` |
+| 同上 · desktop 档 | 把官方 `ui-permission` 行停用（`disabled: true`），插入本工具的权限菜单副本 `enhance-permissions` |
+| 同上 · 权限预设 | 补一个 `enhanced` 档（`sandbox: danger-full-access` + `approval: ask`）；原来没有默认档时，把默认档设成 `enhanced` |
+| 同上 · 人格后缀 | 如果写了内联 `personaSuffix`（部署人格后缀）或预设 `suffix`，会清成 `''`——内容边界要占那个槽位 |
+| 备份 | 每次改前留 `cordis.patch.yml.bak-enhance-<时间戳>`；默认卸载按备份/清单还原，干净路径逐字节一致 |
+
+这些改动 `--dry-run` 会逐条打印出来，装之前可以先看。
 
 ## 安装
 
@@ -16,7 +27,7 @@
 git clone https://github.com/wufeng0105/dsh-enhance.git
 cd dsh-enhance
 
-node install.mjs --home <DSH_HOME> --dry-run   # 1. 先看要写什么，不落盘
+node install.mjs --home <DSH_HOME> --dry-run   # 1. 先看每个 profile 会改哪几行
 node install.mjs --home <DSH_HOME>             # 2. 真装：有变化才备份 patch
 node doctor.mjs  --home <DSH_HOME>             # 3. 全 PASS 后重启 DeepSeek Harness
 ```
@@ -33,11 +44,13 @@ node doctor.mjs  --home <DSH_HOME>             # 3. 全 PASS 后重启 DeepSeek 
 
 开关在 `<DSH_HOME>/enhance/state.json`：
 
-| 键 | 默认 | 说明 |
+| 键 | 首装种子 | 说明 |
 |---|---|---|
 | `enabled` | `true` | `false` = 全部停手 |
 | `contentScope` | `true` | 是否注入内容边界 |
-| `approval` | `ask` | `allow` 自动放行 / `ask` 问人 / `deny` 拒绝；状态缺失或损坏时回落到 `ask` |
+| `approval` | `allow` | `allow` 自动放行 / `ask` 问人 / `deny` 拒绝。宿主默认档位是 `approval: never` 时种 `ask`；运行时状态缺失或损坏，一律回落到 `ask` |
+
+**首装审批种子是 `allow`**：装完默认自动放行工具审批、不再弹窗。不想这样，就在设置页把它改成 `ask`（每次都问）或 `deny`（直接拒）。
 
 也可以在 DSH 设置页的 enhance 一节里操作：改文本、改开关、检查注入（读会话日志，确认那段文本真的进了系统提示）、发起卸载。
 
@@ -85,7 +98,7 @@ node uninstall.mjs --home <DSH_HOME> --thorough  # 彻底清理：不归档，�
 
 ![审批三态](docs/images/05-approval-three-states.png)
 
-*审批三态：allow / ask / deny 分别回什么，默认与降级为什么都是 ask。*
+*审批三态：allow / ask / deny 分别回什么，以及状态坏了为什么回落到 ask。*
 
 ## 许可
 
