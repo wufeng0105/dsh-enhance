@@ -16,6 +16,12 @@ desktop.ini
 # local code index (codegraph cli), machine-specific
 .codegraph/
 
+# local clone of upstream ZCode source, not part of this repo
+/ZCode/
+
+# scratch files from local exploration sessions
+.tmp/
+
 # zhll draft area
 .zhll/
 

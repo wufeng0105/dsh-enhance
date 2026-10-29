@@ -122,6 +122,8 @@ node enhance-permissions/build-client.mjs --asar "<DSH_ROOT>\resources\app.asar"
 
 *审批三态：自动放行 / 每次问人 / 直接拒绝分别是什么结果，以及开关文件坏了为什么回落到「每次问人」。*
 
+还有一页把 DSH 的系统提示是怎么一层层拼起来的、dsh-enhance 接在哪一档讲清楚了：`showcase/prompt-assembly.html`（下载后用浏览器打开）。
+
 ## 许可
 
 [MIT](LICENSE)
