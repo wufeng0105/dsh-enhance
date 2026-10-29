@@ -160,4 +160,4 @@ node --test "tests/*.test.mjs"
 ## 版本与许可
 
 - 当前版本 `1.0.0`。版本只有一个来源：根 `VERSION`；`package.json` 的 `version`、安装写进清单的 `toolVersion` 由 `version` 门禁守住一致。
-- 仓库目前**没有 LICENSE 文件**；在补上之前，默认保留所有权利。要按开源方式分发，需要先确定许可证（本页不代替法律声明）。
+- 以 [MIT 许可证](LICENSE) 发布，许可证全文见根目录 `LICENSE`。

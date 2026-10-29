@@ -2,6 +2,7 @@
   "name": "dsh-enhance",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "给 DeepSeek Harness 用的本地增强件：由文件托管的内容边界注入、审批三态开关与设置页。",
   "engines": {
