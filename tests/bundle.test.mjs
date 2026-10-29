@@ -37,8 +37,18 @@ test('package.json 声明 dsh.bundle.patch，且 insert 名都能解析到文件
       const nameMatch = /^[ \t]+name:[ \t]*['"]?([^'"\s]+)/.exec(line)
       if (nameMatch === null || id === undefined) continue
       const target = nameMatch[1]
-      assert.ok(target.startsWith(`${pkg.name}/`), `insert ${id} 的 name 不是本包路径：${target}`)
-      assert.ok(existsSync(join(repo, target.slice(pkg.name.length + 1))), `insert ${id} 指向不存在的文件`)
+      // 三种合法形态：本包精确包名（包根 main）、本包子路径、相对 profile 的包内路径。
+      let rel
+      if (target === pkg.name) {
+        rel = undefined
+      } else if (target.startsWith(`${pkg.name}/`)) {
+        rel = target.slice(pkg.name.length + 1)
+      } else if (target.startsWith(`./node_modules/${pkg.name}/`)) {
+        rel = target.slice(`./node_modules/${pkg.name}/`.length)
+      } else {
+        assert.fail(`insert ${id} 的 name 既不是本包路径、也不是相对 profile 的包内路径：${target}`)
+      }
+      if (rel !== undefined) assert.ok(existsSync(join(repo, rel)), `insert ${id} 指向不存在的文件`)
       rows += 1
       id = undefined
     }
