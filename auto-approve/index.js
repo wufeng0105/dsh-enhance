@@ -14,13 +14,18 @@
  * 所以拨开关后下一条需要审批的动作即生效，不用重启。
  */
 
-import { markPluginActive, paths, readState } from '../shared/state.mjs'
+import { fileURLToPath } from 'node:url'
+import { markPluginActive, paths, readState, resolveHome } from '../shared/state.mjs'
+import { ensureEnhanceData } from '../shared/seed.mjs'
 
 /** Diagnostics label. */
 export const name = 'auto-approve'
 
 /** @param {import('@deepseek-ai/cordis').Context} ctx */
 export function apply(ctx) {
+  // bundle 安装（dsh plugin add）没有 install.mjs 参与：首次加载时补齐 <home>/enhance/
+  ensureEnhanceData(resolveHome(), fileURLToPath(new URL('../shared/content-scope.default.txt', import.meta.url)))
+
   ctx.on(
     'approval/request',
     (_req, next) => {

@@ -11,5 +11,26 @@
   "scripts": {
     "check": "node scripts/check.mjs",
     "test": "node --test \"tests/*.test.mjs\""
-  }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "auto-approve",
+    "enhance-permissions",
+    "enhance-scope",
+    "ui",
+    "shared",
+    "content-scope.txt",
+    "cordis.patch.yml",
+    "screenshots.json",
+    "install.mjs",
+    "uninstall.mjs",
+    "doctor.mjs",
+    "README.md",
+    "LICENSE",
+    "VERSION"
+  ]
 }

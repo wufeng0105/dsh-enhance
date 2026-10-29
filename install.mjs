@@ -33,7 +33,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { APPROVALS, STATE_VERSION, TEXT_LIMIT, normalizeText, paths, readState, textBytes, textSha256, writeFileAtomic, writeState, writeText } from './shared/state.mjs'
 import { eolOf, joinLines, splitLines } from './shared/text-lines.mjs'
-import { wirePermissions, ensureEnhancedPreset, defaultPresetApproval } from './shared/patch-rows.mjs'
+import { wirePermissions, ensureEnhancedPreset } from './shared/patch-rows.mjs'
+import { decideApprovalSeed } from './shared/seed.mjs'
 import { toolVersion } from './shared/tool-version.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -54,7 +55,7 @@ const PLUGIN_DIRS = [
 ]
 
 /** 插件入口 import 到的共享层：不在任何插件目录里，必须单独落盘。 */
-const EXTRA_FILES = ['shared/state.mjs', 'shared/text-lines.mjs', 'shared/session-probe.mjs', 'shared/patch-rows.mjs', 'uninstall.mjs']
+const EXTRA_FILES = ['shared/state.mjs', 'shared/text-lines.mjs', 'shared/session-probe.mjs', 'shared/patch-rows.mjs', 'shared/seed.mjs', 'shared/content-scope.default.txt', 'uninstall.mjs']
 
 /** Where the manifest lives; `uninstall.mjs` reads the same path. */
 const MANIFEST_NAME = 'install-manifest.json'
@@ -155,24 +156,6 @@ async function readProfilePatches(home, profiles) {
   return out
 }
 
-/**
- * 首装时该种哪一档审批。
- *
- * 宿主在 `user-approval` 里先判档位策略：`approval: never` 的档位在分发前就 `rejected`，
- * 我们种的 `allow` 永远轮不到。所以播种必须看这台机器的实际默认档位，不能无条件种 `allow`：
- * 只要有一个目标 profile 的 `defaultPreset` 是 `never`，就种 `ask`（问人，语义诚实）并警告。
- *
- * @param {{ profile: string, text: string }[]} patches
- * @returns {{ approval: 'allow' | 'ask', blockedBy: string | undefined }}
- */
-function seedApproval(patches) {
-  for (const patch of patches) {
-    const preset = defaultPresetApproval(patch.text)
-    if (preset?.approval === 'never') return { approval: 'ask', blockedBy: `${patch.profile}:${preset.name}` }
-  }
-  return { approval: 'allow', blockedBy: undefined }
-}
-
 async function copyPluginDirs(home, dryRun, profiles = []) {
   const target = join(home, 'enhance')
   const copied = []
@@ -214,7 +197,7 @@ async function copyPluginDirs(home, dryRun, profiles = []) {
   const p = paths(home)
   const stateMissing = readState(p).degradedReason === 'missing'
   const patches = stateMissing ? await readProfilePatches(home, profiles) : []
-  const seed = seedApproval(patches)
+  const seed = decideApprovalSeed(patches)
   if (stateMissing && !dryRun) writeState(p, { contentScope: true, approval: seed.approval })
   if (stateMissing && seed.blockedBy !== undefined) {
     console.log(`warn: ${seed.blockedBy} 的默认档位是 approval: never，宿主会在分发前拒绝审批请求；state 种成 approval=ask（要自动放行请把默认档位改成 Enhanced）`)

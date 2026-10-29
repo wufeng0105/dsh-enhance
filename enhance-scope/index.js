@@ -22,11 +22,12 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   APPROVALS, TEXT_LIMIT, derive, isPluginActive, markPluginActive, paths,
   readState, readText, resolveHome, textBytes, textSha256, textStat, writeState, writeText,
 } from '../shared/state.mjs'
+import { ensureEnhanceData } from '../shared/seed.mjs'
 import { sessionContains } from '../shared/session-probe.mjs'
 
 /** Diagnostics label. */
@@ -158,6 +159,9 @@ export function apply(ctx, config = {}) {
   const p = paths(home)
   const file = typeof config.file === 'string' && config.file.trim() !== '' ? config.file : p.text
   const onMissing = config.onMissing === 'warn' ? 'warn' : 'fail'
+
+  // bundle 安装（dsh plugin add）没有 install.mjs 参与：首次加载时补齐 <home>/enhance/
+  ensureEnhanceData(home, fileURLToPath(new URL('../shared/content-scope.default.txt', import.meta.url)))
 
   let lastGood = readText({ ...p, text: file })
   if (!lastGood.ok && onMissing === 'fail') {

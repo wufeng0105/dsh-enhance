@@ -187,6 +187,57 @@ function gateDocs(base = root) {
 }
 
 /** One temp home: install, doctor, uninstall; assert the patch returns to []. */
+/**
+ * bundle 门禁：能 `dsh plugin add` 的仓库必须同时满足
+ *   - `package.json` 声明 `dsh.bundle.patch`（字符串或字符串数组）；
+ *   - 声明的 patch 文件存在；
+ *   - patch 里每条 insert 的 `name` 是本包路径（`<包名>/…`），且有对应文件。
+ * 解析只够用：按行找 `- id:` 后紧跟的 `name:`，不做完整 YAML。
+ */
+function gateBundle(base = root) {
+  let pkg
+  try {
+    pkg = JSON.parse(readFileSync(join(base, 'package.json'), 'utf8'))
+  } catch (error) {
+    return { pass: false, detail: `package.json 读不到：${String(error?.message ?? error)}` }
+  }
+  const declared = pkg?.dsh?.bundle?.patch
+  const patches = typeof declared === 'string' ? [declared] : declared
+  if (!Array.isArray(patches) || patches.length === 0 || !patches.every((file) => typeof file === 'string')) {
+    return { pass: false, detail: 'package.json 缺 dsh.bundle.patch（字符串或字符串数组）' }
+  }
+  const packageName = typeof pkg.name === 'string' ? pkg.name : ''
+  const problems = []
+  for (const file of patches) {
+    const patchPath = resolve(base, file)
+    if (!existsSync(patchPath)) {
+      problems.push(`bundle patch 不存在：${file}`)
+      continue
+    }
+    const lines = readFileSync(patchPath, 'utf8').split(/\r?\n/)
+    let currentId
+    for (const line of lines) {
+      const idMatch = /^[ \t]*-[ \t]*id:[ \t]*(\S+)[ \t]*$/.exec(line)
+      if (idMatch !== null) {
+        currentId = idMatch[1]
+        continue
+      }
+      const nameMatch = /^[ \t]+name:[ \t]*['"]?([^'"\s]+)['"]?[ \t]*$/.exec(line)
+      if (nameMatch === null || currentId === undefined) continue
+      const target = nameMatch[1]
+      if (packageName === '' || !target.startsWith(`${packageName}/`)) {
+        problems.push(`insert ${currentId} 的 name 不是本包路径：${target}`)
+      } else {
+        const rel = target.slice(packageName.length + 1)
+        if (!existsSync(join(base, rel))) problems.push(`insert ${currentId} 指向不存在的文件：${rel}`)
+      }
+      currentId = undefined
+    }
+  }
+  if (problems.length > 0) return { pass: false, detail: problems.join(' | ') }
+  return { pass: true, detail: `${patches.length} 个 bundle patch` }
+}
+
 function gateLifecycle(base = root) {
   const home = mkdtempSync(join(tmpdir(), 'enhance-check-'))
   try {
@@ -293,6 +344,18 @@ function runSelfTest() {
     // 仓库已没有 docs/，门禁扫的是 README.md：正文里点名一个不存在的仓内路径必须判红
     (copy) => appendFileSync(join(copy, 'README.md'), '\n临时负例：`docs/nope.md`\n'),
     (copy) => expectRed('不存在的路径')(gateDocs(copy)),
+  ))
+
+  cases.push(withCopy(
+    'bundle red',
+    // bundle 门禁：把 patch 指向一个不存在的文件，必须判红
+    (copy) => {
+      const file = join(copy, 'package.json')
+      const pkg = JSON.parse(readFileSync(file, 'utf8'))
+      pkg.dsh.bundle.patch = './nope.yml'
+      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
+    },
+    (copy) => expectRed('bundle patch 不存在')(gateBundle(copy)),
   ))
 
   cases.push(withCopy(
@@ -732,6 +795,7 @@ const gates = [
   ['doctor', gateDoctor],
   ['graph', gateGraph],
   ['docs', gateDocs],
+  ['bundle', gateBundle],
   ['lifecycle', gateLifecycle],
 ]
 if (layer === 'full') {

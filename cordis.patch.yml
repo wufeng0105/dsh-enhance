@@ -1,0 +1,9 @@
+# dsh-enhance bundle patch —— `dsh plugin add` 安装后由 host 叠加进 profile。
+# 只插三个入口；桌面权限菜单图标要按宿主 asar 派生，仍由 enhance-install.cmd 负责。
+- insert:
+    - id: enhance-scope
+      name: 'dsh-enhance/enhance-scope/index.js'
+    - id: auto-approve
+      name: 'dsh-enhance/auto-approve/index.js'
+    - id: enhance-ui
+      name: 'dsh-enhance/ui/index.js'

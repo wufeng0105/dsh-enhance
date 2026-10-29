@@ -108,6 +108,12 @@
       "layer": "core",
       "path": "shared/tool-version.mjs",
       "owns": "当前工具版本：读仓库根的 VERSION（package.json 与它由 version 门禁守住一致）"
+    },
+    {
+      "id": "core.seed",
+      "layer": "core",
+      "path": "shared/seed.mjs",
+      "owns": "首装种子：审批档位规则 + <home>/enhance 目录的幂等补齐（bundle 安装没有 installer 参与）"
     }
   ],
   "edges": [
@@ -197,6 +203,31 @@
     {
       "from": "cli.doctor",
       "to": "core.version",
+      "kind": "import"
+    },
+    {
+      "from": "core.seed",
+      "to": "core.state",
+      "kind": "import"
+    },
+    {
+      "from": "core.seed",
+      "to": "core.patch-rows",
+      "kind": "import"
+    },
+    {
+      "from": "plugin.scope",
+      "to": "core.seed",
+      "kind": "import"
+    },
+    {
+      "from": "plugin.approve",
+      "to": "core.seed",
+      "kind": "import"
+    },
+    {
+      "from": "cli.install",
+      "to": "core.seed",
       "kind": "import"
     }
   ],
