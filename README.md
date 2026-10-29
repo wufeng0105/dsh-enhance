@@ -14,6 +14,18 @@ DSH 每次回答前，都会先读一段很长的系统提示词：它是谁、�
 
 ## 安装
 
+两种装法，二选一：
+
+### 市场 / 一行装（bundle）
+
+```powershell
+dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
+```
+
+装完重启 DeepSeek Harness。这条路径只把本包装进这个 profile 的依赖和 `bundles`，**profile 自己的 `cordis.patch.yml` 一个字节不改**；装的是内容边界注入 + 审批三态 + 设置页。它不带「权限菜单图标」和 `enhanced` 预设——要这些就用下面的完整安装。
+
+### 完整安装（桌面版，双击）
+
 **下载或 clone 仓库，然后双击 `enhance-install.cmd`，就这一下。** 它会自己找 DSH 和它的 home，先说明找到了什么、打算做什么，问一句「继续？[Y/n]」，回车就开始装；安装过程会把改了哪几行打出来，装完自己跑一遍检查，最后提示你重启 DeepSeek Harness。
 
 重启后在 DSH 设置页的 enhance 那一节点一次「开始检查」，确认真的生效了。
@@ -36,7 +48,8 @@ DSH 每次回答前，都会先读一段很长的系统提示词：它是谁、�
 
 ## 卸载
 
-**双击 `enhance-uninstall.cmd`。** 菜单选 `1` 保留备份（默认：先把你的文本和开关归档，再删掉工具装的文件）或 `2` 彻底清理（会再确认一次），然后重启 DSH 就行。
+- **一行装（bundle）**：`dsh plugin --profile desktop remove dsh-enhance`，然后重启。`<DSH_HOME>/enhance/` 里你写的文本和开关会保留；想彻底清掉就删掉这个目录。
+- **完整安装**：**双击 `enhance-uninstall.cmd`。** 菜单选 `1` 保留备份（默认：先把你的文本和开关归档，再删掉工具装的文件）或 `2` 彻底清理（会再确认一次），然后重启 DSH 就行。
 
 带参数跑的话：
 
@@ -50,21 +63,22 @@ DSH 每次回答前，都会先读一段很长的系统提示词：它是谁、�
 
 ## 它到底改了什么
 
-DSH 的程序和自带提示词不动，改的是它的配置文件，再加上工具自己放在 `<DSH_HOME>/enhance/` 里的文件：
+DSH 的程序和自带提示词不动。一行装只动 profile 清单；完整安装还会改下面这些：
 
 | 改的地方 | 具体做了什么 |
 |---|---|
-| `<DSH_HOME>/enhance/` | 放这个工具的文件。`state.json`（开关）和 `content-scope.txt`（你写的那段话）只在没有的时候才创建，已经有就不覆盖 |
-| DSH 的配置 `cordis.patch.yml` | 加几行记录，让 DSH 开机时加载它；桌面版还会把权限菜单换成它的版本 |
-| 权限档位 | 多一个 `enhanced` 档（沙箱全开、审批仍问人）。原来没有默认档位的话，会把默认设成它 |
-| 自带的「人格后缀」 | 如果你在配置里写过 `personaSuffix` 或 `suffix` 这段文字，它会被清空——这个位置要让给那段提示词；卸载会还原 |
-| 备份 | 每次动配置前先存一份 `.bak-enhance-<时间>`，卸载时按备份还原 |
+| 一行装（bundle） | 只往 profile 的 `package.json` 加一条依赖、在 `dsh.profile.bundles` 记一笔；不改 `cordis.patch.yml` |
+| `<DSH_HOME>/enhance/` | 放这个工具的文件。`state.json`（开关）和 `content-scope.txt`（你写的那段话）只在没有的时候才创建，已经有就不覆盖；一行装会在首次加载时自动补齐 |
+| DSH 的配置 `cordis.patch.yml`（完整安装） | 加几行记录，让 DSH 开机时加载它；桌面版还会把权限菜单换成它的版本 |
+| 权限档位（完整安装） | 多一个 `enhanced` 档（沙箱全开、审批仍问人）。原来没有默认档位的话，会把默认设成它 |
+| 自带的「人格后缀」（完整安装） | 如果你在配置里写过 `personaSuffix` 或 `suffix` 这段文字，它会被清空——这个位置要让给那段提示词；卸载会还原 |
+| 备份（完整安装） | 每次动配置前先存一份 `.bak-enhance-<时间>`，卸载时按备份还原 |
 
 装之前可以用 `-DryRun` 跑一次，上面这些改动作它会逐条打出来，你看一眼再决定装不装。
 
 ## 使用
 
-改 `<DSH_HOME>/enhance/content-scope.txt` 里那段话：存盘就生效，下一条消息就带上；最多 8 KB（会自动去 BOM、统一换行、去控制字符、去首尾空白）。仓库根目录的那个 `content-scope.txt` 只是第一次装的时候抄进去的默认内容，你的文件已经存在就不会被覆盖。
+改 `<DSH_HOME>/enhance/content-scope.txt` 里那段话：存盘就生效，下一条消息就带上；最多 8 KB（会自动去 BOM、统一换行、去控制字符、去首尾空白）。仓库根目录的那个 `content-scope.txt` 只是首次安装（或首次加载）时抄进去的默认内容，你的文件已经存在就不会被覆盖。
 
 开关在 `<DSH_HOME>/enhance/state.json`：
 
