@@ -13,6 +13,9 @@
  * 找不到文本；PATH 上的 v24.22.1 才解全。判据不能随宿主小版本漂移，所以这里按帧切：
  * 找 zstd 魔数、逐帧解、拼起来。
  *
+ * 只扫最新一份会误判：desktop / web / headless 共用一个 sessions 目录，最新那份可能是
+ * 另一个 profile 的会话。所以按 mtime 倒序扫最近若干个，任一命中即通过。
+ *
  * 上限：单个文件 64 MB，超过就跳过（提示词在几十 KB 量级，撞到 64 MB 说明选错了文件）。
  */
 
@@ -23,6 +26,9 @@ import { zstdDecompressSync } from 'node:zlib'
 /** 单个日志文件的解压上限。 */
 const MAX_BYTES = 64 * 1024 * 1024
 
+/** 一次检查最多扫多少个最近会话。 */
+const SCAN_LIMIT = 10
+
 /** 会话文件的固定名（换版本会变，变了这里就要跟着改）。 */
 const SESSION_FILE = 'session.v4.jsonl.zstd'
 
@@ -30,18 +36,19 @@ const SESSION_FILE = 'session.v4.jsonl.zstd'
 const MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd])
 
 /**
- * 找最新的一个会话文件。目录结构固定两层：`sessions/<workspace>/<session>/`。
+ * 最近的会话文件，按 mtime 倒序。目录结构固定两层：`sessions/<workspace>/<session>/`。
  * @param {string} sessionsDir
- * @returns {{ file: string, mtimeMs: number } | undefined}
+ * @param {number} [limit]
+ * @returns {{ file: string, mtimeMs: number }[]}
  */
-export function newestSessionFile(sessionsDir) {
+export function recentSessionFiles(sessionsDir, limit = SCAN_LIMIT) {
+  const out = []
   let workspaces
   try {
     workspaces = readdirSync(sessionsDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())
   } catch {
-    return undefined
+    return out
   }
-  let best
   for (const workspace of workspaces) {
     const workspaceDir = join(sessionsDir, workspace.name)
     let sessions
@@ -58,10 +65,20 @@ export function newestSessionFile(sessionsDir) {
       } catch {
         continue
       }
-      if (best === undefined || stat.mtimeMs > best.mtimeMs) best = { file, mtimeMs: stat.mtimeMs }
+      out.push({ file, mtimeMs: stat.mtimeMs })
     }
   }
-  return best
+  out.sort((a, b) => b.mtimeMs - a.mtimeMs)
+  return out.slice(0, Math.max(1, limit))
+}
+
+/**
+ * 找最新的一个会话文件（保留给需要单文件的调用方）。
+ * @param {string} sessionsDir
+ * @returns {{ file: string, mtimeMs: number } | undefined}
+ */
+export function newestSessionFile(sessionsDir) {
+  return recentSessionFiles(sessionsDir, 1)[0]
 }
 
 /**
@@ -93,8 +110,21 @@ export function decompressFrames(raw) {
   return { text, frames, partial: frames === 0 }
 }
 
+/** 读整个文件（显式 fd：宿主的 fs 可能被 asar 垫片包过，这里要磁盘原始字节）。 */
+function readAll(file, size) {
+  const fd = openSync(file, 'r')
+  try {
+    const buffer = Buffer.allocUnsafe(size)
+    const read = readSync(fd, buffer, 0, size, 0)
+    return buffer.subarray(0, read)
+  } finally {
+    closeSync(fd)
+  }
+}
+
 /**
- * 在最新会话里找 `needle`。返回 Promise 是为了调用方语义稳定（内部是同步的）。
+ * 在最近若干个会话里找 `needle`。任一命中即通过（不同 profile 共用一个 sessions 目录，
+ * 只看最新一份会误判）。返回 Promise 是为了调用方语义稳定（内部是同步的）。
  * @param {string} sessionsDir
  * @param {string} needle 已经归一过的文本（`normalizeText` 之后）
  * @returns {Promise<{ ok: boolean, detail: string, file?: string, sessionAt?: string, hits?: number, textLen?: number, frames?: number, bytes?: number }>}
@@ -103,55 +133,56 @@ export async function sessionContains(sessionsDir, needle) {
   const wanted = String(needle ?? '')
   if (wanted.length === 0) return { ok: false, detail: '文本为空，没有可验的目标' }
 
-  const newest = newestSessionFile(sessionsDir)
-  if (newest === undefined) return { ok: false, detail: `没有会话日志（${sessionsDir} 下没有 ${SESSION_FILE}）` }
+  const candidates = recentSessionFiles(sessionsDir, SCAN_LIMIT)
+  if (candidates.length === 0) return { ok: false, detail: `没有会话日志（${sessionsDir} 下没有 ${SESSION_FILE}）` }
 
-  let stat
-  try {
-    stat = statSync(newest.file)
-  } catch {
-    return { ok: false, detail: `读不到 ${newest.file}` }
-  }
-  if (stat.size > MAX_BYTES) return { ok: false, detail: `会话日志 ${stat.size} B，超过 ${MAX_BYTES} B 上限，跳过` }
-
-  let raw
-  try {
-    // 显式 fd 读：宿主的 fs 可能被 asar 垫片包过，这里要磁盘原始字节
-    const fd = openSync(newest.file, 'r')
+  let scanned = 0
+  let skipped = 0
+  let lastAt
+  for (const candidate of candidates) {
+    let stat
     try {
-      const buffer = Buffer.allocUnsafe(stat.size)
-      const read = readSync(fd, buffer, 0, stat.size, 0)
-      raw = buffer.subarray(0, read)
-    } finally {
-      closeSync(fd)
+      stat = statSync(candidate.file)
+    } catch {
+      continue
     }
-  } catch (error) {
-    return { ok: false, detail: `读取失败：${String(error?.message ?? error)}` }
+    scanned += 1
+    lastAt = stat.mtime.toISOString()
+    if (stat.size > MAX_BYTES) {
+      skipped += 1
+      continue
+    }
+    let decoded
+    try {
+      decoded = decompressFrames(readAll(candidate.file, stat.size))
+    } catch {
+      continue
+    }
+    // 只认「system-prompt 记录里出现这句话」。
+    // 整份文本匹配会假绿：任何会话只要读过含这句话的文件（比如本项目的 gates），
+    // 工具结果里就会有它；那证明不了注入，只证明文件被读过。
+    let hits = 0
+    for (const line of decoded.text.split('\n')) {
+      if (!line.includes('"system-prompt"')) continue
+      if (line.includes(wanted) || (wanted.includes('\n') && line.includes(wanted.replace(/\n/g, '\\n')))) hits += 1
+    }
+    if (hits > 0) {
+      return {
+        ok: true,
+        detail: `命中 ${hits} 次`,
+        file: candidate.file,
+        sessionAt: stat.mtime.toISOString(),
+        hits,
+        textLen: decoded.text.length,
+        frames: decoded.frames,
+        bytes: stat.size,
+      }
+    }
   }
 
-  let decoded
-  try {
-    decoded = decompressFrames(raw)
-  } catch (error) {
-    return { ok: false, detail: `解压失败：${String(error?.message ?? error)}` }
-  }
-
-  // 只认「system-prompt 记录里出现这句话」。
-  // 整份文本匹配会假绿：任何会话只要读过含这句话的文件（比如本项目的 gates），
-  // 工具结果里就会有它；那证明不了注入，只证明文件被读过。
-  let hits = 0
-  for (const line of decoded.text.split('\n')) {
-    if (!line.includes('"system-prompt"')) continue
-    if (line.includes(wanted) || (wanted.includes('\n') && line.includes(wanted.replace(/\n/g, '\\n')))) hits += 1
-  }
+  const suffix = skipped > 0 ? `（跳过 ${skipped} 份超大日志）` : ''
   return {
-    ok: hits > 0,
-    detail: hits > 0 ? `命中 ${hits} 次` : '会话里没有这段文本',
-    file: newest.file,
-    sessionAt: stat.mtime.toISOString(),
-    hits,
-    textLen: decoded.text.length,
-    frames: decoded.frames,
-    bytes: stat.size,
+    ok: false,
+    detail: `最近 ${scanned} 个会话里都没有这段文本${suffix}${lastAt === undefined ? '' : `（最新 ${lastAt.slice(11, 16)}）`}——装好后先发一条消息再检查`,
   }
 }
