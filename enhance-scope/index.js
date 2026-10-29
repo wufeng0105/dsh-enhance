@@ -255,7 +255,12 @@ export function apply(ctx, config = {}) {
           : `没有注入：${effective.reason ?? '未知'}`,
       })
 
-      checks.push(clientCheck(p.dir))
+      // 第四项只在完整安装下成立：只有 `enhance/` 下带派生的 client.js 才有权限菜单图标。
+      // bundle 安装（dsh plugin add）按设计不含它，标成「不适用」而不是红叉。
+      const installedClient = join(p.dir, 'enhance-permissions', 'client.js')
+      checks.push(existsSync(installedClient)
+        ? clientCheck(p.dir)
+        : { name: 'client', pass: true, na: true, detail: 'bundle 安装不含权限菜单图标（Enhanced 档要用完整安装）' })
 
       return { ok: checks.every((check) => check.pass), checks }
     }
@@ -319,7 +324,9 @@ export function apply(ctx, config = {}) {
  */
 async function handleUninstall(res, body, home, p) {
   const tool = join(p.dir, 'uninstall.mjs')
-  if (!existsSync(tool)) return fail(res, 500, 'EIO', 'uninstall.mjs 未安装：重跑 install.mjs')
+  if (!existsSync(tool)) {
+    return fail(res, 409, 'EBUNDLE', '当前是 bundle 安装：用 `dsh plugin --profile <profile> remove dsh-enhance` 卸载；设置页这个按钮只服务完整安装')
+  }
 
   const load = () => import(pathToFileURL(tool).href)
   const thorough = body.thorough === true

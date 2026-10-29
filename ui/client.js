@@ -74,8 +74,8 @@ window.__ModuleLoader__.load({
 			plugins: "插件在进程里",
 			text: "文本合不合规",
 			inject: "真的进了系统提示",
-			// 标题直接写文件名：用户不用猜「派生件」是什么。
-			client: "enhance-permissions/client.js",
+			// 完整安装才有的派生件；bundle 安装里这一项是「不适用」，见 checkRows 的 na。
+			client: "权限菜单图标",
 		};
 
 		function approvalOf(value) {
@@ -222,7 +222,7 @@ window.__ModuleLoader__.load({
 			];
 		}
 
-		/** 四项按 API 的 name 排；pass 一律用服务端值，本页不伪造 ✓。 */
+		/** 四项按 API 的 name 排；pass / na 一律用服务端值，本页不伪造 ✓；na = 当前装法不适用。 */
 		function checkRows(checks) {
 			if (!checks || !checks.checks) return [];
 			return checks.checks.map(function (item) {
@@ -230,6 +230,7 @@ window.__ModuleLoader__.load({
 					key: item.name,
 					title: CHECK_TITLES[item.name] || item.name,
 					pass: item.pass === true,
+					na: item.na === true,
 					detail: item.detail || "",
 				};
 			});
@@ -323,6 +324,7 @@ window.__ModuleLoader__.load({
 			".enh-mark{font:12px/18px var(--ds-font-family-code);text-align:center}",
 			".enh-mark[data-r=pass]{color:var(--enh-mark-pass)}",
 			".enh-mark[data-r=fail]{color:var(--enh-mark-fail)}",
+			".enh-mark[data-r=na]{color:var(--dsw-alias-label-tertiary)}",
 			".enh-name{color:var(--dsw-alias-label-primary)}",
 			".enh-ev{font:11px/18px var(--ds-font-family-code);color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}",
 			".enh-group{display:flex;flex-direction:column;gap:8px}",
@@ -688,7 +690,7 @@ window.__ModuleLoader__.load({
 						: h("ul", { className: "enh-checks", "aria-live": "polite" },
 							rows.map(function (row) {
 								return h("li", { key: row.key, className: "enh-check-row" },
-									h("span", { className: "enh-mark", "data-r": row.pass ? "pass" : "fail" }, row.pass ? "✓" : "✗"),
+									h("span", { className: "enh-mark", "data-r": row.na ? "na" : (row.pass ? "pass" : "fail") }, row.na ? "–" : (row.pass ? "✓" : "✗")),
 									h("span", { className: "enh-name" }, row.title),
 									h("span", { className: "enh-ev" }, row.detail),
 								);

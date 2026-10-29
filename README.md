@@ -22,7 +22,7 @@ DSH 每次回答前，都会先读一段很长的系统提示词：它是谁、�
 dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 ```
 
-装完重启 DeepSeek Harness。这条路径只把本包装进这个 profile 的依赖和 `bundles`，**profile 自己的 `cordis.patch.yml` 一个字节不改**；装的是内容边界注入 + 审批三态 + 设置页。它不带「权限菜单图标」和 `enhanced` 预设——要这些就用下面的完整安装。
+装完重启 DeepSeek Harness。这条路径只把本包装进这个 profile 的依赖和 `bundles`，**profile 自己的 `cordis.patch.yml` 一个字节不改**；装的是内容边界注入 + 审批三态 + 设置页。它不带「权限菜单图标」和 `enhanced` 预设——要这些就用下面的完整安装。设置页检查里「权限菜单图标」那一项会显示「不适用」，这是正常的，不是坏了。
 
 ### 完整安装（桌面版，双击）
 

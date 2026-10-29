@@ -242,13 +242,14 @@ test('检查节：四项以 API 的 name 为键、标题是本地映射、pass �
       { name: 'plugins', pass: true, detail: 'enhance-scope=在 · auto-approve=在' },
       { name: 'text', pass: false, detail: '9000 B / 上限 8192 B' },
       { name: 'inject', pass: false, detail: '会话里没有这段文本' },
-      { name: 'client', pass: true, detail: '存在，文件完整' },
+      { name: 'client', pass: true, na: true, detail: 'bundle 安装不含权限菜单图标' },
     ],
   })
   assert.deepEqual(rows.map((r) => r.key), ['plugins', 'text', 'inject', 'client'])
-  assert.deepEqual(rows.map((r) => r.title), ['插件在进程里', '文本合不合规', '真的进了系统提示', 'enhance-permissions/client.js'])
-  // 关键：pass 来自服务端，页面不伪造通过
+  assert.deepEqual(rows.map((r) => r.title), ['插件在进程里', '文本合不合规', '真的进了系统提示', '权限菜单图标'])
+  // 关键：pass / na 来自服务端，页面不伪造通过
   assert.deepEqual(rows.map((r) => r.pass), [true, false, false, true])
+  assert.deepEqual(rows.map((r) => r.na), [false, false, false, true])
   assert.equal(rows[1].detail, '9000 B / 上限 8192 B')
 
   // 未知 name 不吞掉，原样显示；缺 checks 时返回空数组
