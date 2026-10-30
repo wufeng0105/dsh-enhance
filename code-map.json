@@ -16,7 +16,7 @@
       "id": "plugin.scope",
       "layer": "plugin",
       "path": "enhance-scope/index.js",
-      "owns": "内容边界注入 + /enhance/api 路由"
+      "owns": "内容边界注入 + /enhance/api 路由（state / set / check / preset）+ 本机版本探测（只读 app.asar 清单）"
     },
     {
       "id": "plugin.approve",
