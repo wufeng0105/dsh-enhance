@@ -44,7 +44,7 @@ dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 
 宿主内置的 `danger-full-access` 档是「沙箱全开 **并且** 审批不问人（`never`）」。想要「沙箱全开但越界仍问你」，需要一个自定义档；而宿主的档位表只认插件配置里定义的名字，所以只能写进你自己的 profile。
 
-怎么用：设置页「增强」→ 04「Enhanced 权限档」→ 点「写入 Enhanced 档」→ 重启。之后左下角档位菜单、`/permission`、设置页的「默认档位」下拉里会多一个纯文字的 **Enhanced**（沙箱全开、审批 `ask`）。
+怎么用：设置页「增强」→「Enhanced 权限档」→ 点「写入 Enhanced 档」→ 重启。之后左下角档位菜单、`/permission`、设置页的「默认档位」下拉里会多一个纯文字的 **Enhanced**（沙箱全开、审批 `ask`）。
 
 - **它写了什么**：当前 profile 的 `cordis.patch.yml` 里 `permission` 行的档位表。因为 patch 的 `config` 是**整块替换**，本工具写的是完整表（宿主基础三档 + enhanced）——只写一条会把另外三档抹掉。
 - **它没改什么**：不动你的默认档位。原来没有 `defaultPreset` 就仍然没有，宿主按组合的沙箱与审批推导。

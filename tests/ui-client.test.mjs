@@ -1,11 +1,11 @@
 /**
- * 设置页（`enhance/ui/client.js`）的测试。
+ * 设置页（`ui/client.js`）的测试。
  *
  * 两层：
  *   1. 行为断言 —— 装载、注册、首帧、`call` 的 ok:false 语义。这些是契约，不随文案变。
- *   2. 意图断言 —— 五节结构、结论句状态机、审批三档语义、检查项映射、卸载分组、
- *      就地错误行、字节口径、CSS 守卫。断言的是「页面必须守住的行为」，
- *      不是某一版文案快照。
+ *   2. 意图断言 —— 四组结构、审批三态语义、检查项映射、Enhanced 四种状态、就地错误行、
+ *      字节口径、CSS 守卫、以及「按宿主设置页刻度排版」这件事本身（16/24 标题、
+ *      14/22 行标题、0.5px 发丝线、12px 节间距、720 上限宽、焦点环走宿主 token）。
  *
  * 浏览器里没有 Node 测试跑得了它，但它在浏览器里做的事只有两件：注册 `settings.section`，
  * 组件首帧不抛且只发一次 `state`。这两件都能用一个假 `window.__ModuleLoader__` + 假 react 验掉。
@@ -121,6 +121,7 @@ test('客户端半：注册 settings.section，id 与顺序固定', () => {
   assert.equal(registered.length, 1)
   assert.equal(registered[0].spec.name, 'settings.section')
   assert.equal(registered[0].spec.id, 'enhance')
+  assert.equal(registered[0].spec.order, 30)
   assert.equal(typeof registered[0].spec.label, 'function')
   assert.equal(registered[0].spec.label(), '增强')
   assert.equal(typeof registered[0].component, 'function')
@@ -178,87 +179,76 @@ test('call：HTTP 层失败与结构化错误都要抛', async () => {
   delete globalThis.fetch
 })
 
-// ───────────────────────────────────────────── 意图断言
+// ───────────────────────────────────────────── 结构
 
-test('结构：六节按 01→06 排列，标题各自说事', () => {
-  // 用 section() 的调用位置定序（标题字符串可能在别处先出现，比如注释里的「检查项」）
-  const ids = ['enh-block-verdict', 'enh-block-approval', 'enh-block-scope', 'enh-block-preset', 'enh-block-check', 'enh-block-lifecycle']
-  const at = ids.map((id) => source.indexOf(`section("0${ids.indexOf(id) + 1}", "${id}"`))
-  at.forEach((index, i) => assert.ok(index >= 0, `缺节：${ids[i]}`))
-  const sorted = [...at].sort((a, b) => a - b)
-  assert.deepEqual(at, sorted, '六节的顺序变了')
+test('结构：四组按顺序排列（内容边界 → 越界审批 → Enhanced → 检查）', () => {
+  const ids = ['enh-block-scope', 'enh-block-approval', 'enh-block-preset', 'enh-block-check']
+  const at = ids.map((id) => source.indexOf(`"${id}"`))
+  at.forEach((index, i) => assert.ok(index >= 0, `缺组：${ids[i]}`))
+  assert.deepEqual(at, [...at].sort((a, b) => a - b), '四组的顺序变了')
 
-  const titles = ['现在会怎么做事', '越界时怎么办', '提示词末尾的内容边界', 'Enhanced 权限档', '检查', '升级与卸载']
+  const titles = ['提示词末尾的内容边界', '越界时怎么办', 'Enhanced 权限档', '检查']
   titles.forEach((title, i) => {
     const slice = source.slice(at[i], i + 1 < at.length ? at[i + 1] : source.length)
-    assert.ok(slice.includes(title), `第 ${i + 1} 节的标题不对：缺「${title}」`)
+    assert.ok(slice.includes(title), `第 ${i + 1} 组的标题不对：缺「${title}」`)
   })
+})
 
-  // 每节都有四层的容器类：标题 / 副行 / 右上现状 / 下方后果
-  for (const cls of ['enh-h3', 'enh-sub', 'enh-now', 'enh-reason']) {
-    assert.ok(source.includes(cls), `缺四层之一：${cls}`)
+test('结构：头部是 h2 + 状态标签 + 页级总开关，没有旧的结论句/元信息/横幅', () => {
+  assert.ok(source.includes('className: "enh-title"'), '缺页面标题')
+  assert.ok(source.includes('h("h2", { className: "enh-title" }'), '标题应当是 h2（宿主分节标题的层级）')
+  assert.ok(source.includes('"总开关"'), '缺页级总开关')
+  assert.ok(source.includes('className: "enh-pill"'), '缺状态标签')
+
+  // 用户明确要求删掉的东西，一个字都不许回来
+  for (const gone of ['现在会怎么做事', '升级与卸载', '格式 v', '最后改动', '当前会话在哪个档', 'enh-rail', 'enh-banner', 'enh-verdict']) {
+    assert.ok(!source.includes(gone), `残留了已删除的内容：${gone}`)
   }
 })
 
-test('结构：结论句在第一节内部，不在页面底部', () => {
-  // 用带引号的 className 定位实际使用处，避免匹配到 CSS 里的类定义
-  const verdict = source.indexOf('className: "enh-verdict"')
-  const firstBlock = source.indexOf('"enh-block-verdict"')
-  const lastBlock = source.indexOf('"enh-block-lifecycle"')
-  assert.ok(verdict > 0, '结论句没有渲染')
-  assert.ok(firstBlock > 0, '01 节缺少 id')
-  assert.ok(verdict > firstBlock, '结论句不在 01 节内')
-  assert.ok(verdict < lastBlock, '结论句掉到了页面后半段')
+test('结构：越界审批组的最后一行是适用范围说明（read-only / workspace-write）', () => {
+  const groupAt = source.indexOf('"enh-block-approval"')
+  const nextGroupAt = source.indexOf('"enh-block-preset"')
+  assert.ok(groupAt > 0 && nextGroupAt > groupAt, '找不到越界审批组')
+  const block = source.slice(groupAt, nextGroupAt)
+
+  assert.ok(block.includes('APPROVAL_SCOPE_HINT'), '该组的后果行里应带上适用范围常量')
+  const hintAt = source.indexOf('var APPROVAL_SCOPE_HINT')
+  assert.ok(hintAt > 0, '缺适用范围常量')
+  const hint = source.slice(hintAt, source.indexOf('\n', hintAt))
+  for (const word of ['read-only', 'workspace-write', 'danger-full-access']) {
+    assert.ok(hint.includes(word), `适用范围必须点名 ${word}`)
+  }
+  assert.match(hint, /不会产生需要审批的请求/, '要说明全开档下为什么用不上')
 })
 
-test('结论句：关闭态一句、开启态三句，三句都可跳转（第三句指向 Enhanced 档）', () => {
-  const { verdictClauses } = loadBundle().__testing
-
-  const off = verdictClauses({ ...SNAPSHOT, enabled: false })
-  assert.equal(off.length, 1)
-  assert.equal(off[0].kind, 'static')
-  assert.match(off[0].text, /不接管审批/)
-  assert.match(off[0].text, /开关和文本都还在/)
-
-  const on = verdictClauses({ ...SNAPSHOT, approval: 'ask', contentScope: true, text: 'hello' })
-  assert.equal(on.length, 3)
-  // 转型后第三句也能点：这一页确实能改「菜单里有没有这个档」
-  assert.deepEqual(on.map((c) => c.kind), ['jump', 'jump', 'jump'])
-  assert.match(on[0].text, /越界时先问我/)
-  assert.equal(on[0].target, 'enh-block-approval')
-  assert.equal(on[1].text, '提示词末尾带内容边界')
-  assert.equal(on[1].target, 'enh-block-scope')
-  assert.match(on[2].text, /菜单里没有 Enhanced 档/)
-  assert.equal(on[2].target, 'enh-block-preset')
-
-  // 边界那一句随状态三态变化
-  assert.equal(verdictClauses({ ...SNAPSHOT, contentScope: false })[1].text, '提示词末尾不带内容边界')
-  assert.equal(verdictClauses({ ...SNAPSHOT, text: '  ' })[1].text, '尾段为空、实际不注入')
-
-  // 第三句随 preset 状态变化：已写入 / 写不进去 / 管不了
-  assert.match(verdictClauses({ ...SNAPSHOT, preset: { ...SNAPSHOT.preset, present: true } })[2].text, /菜单里有 Enhanced 档/)
-  assert.match(verdictClauses({ ...SNAPSHOT, preset: { ...SNAPSHOT.preset, unreadable: true } })[2].text, /写不进去/)
-  assert.match(verdictClauses({ ...SNAPSHOT, preset: { ...SNAPSHOT.preset, patchPath: null } })[2].text, /管不了/)
+test('结构：四组的说明都走 .enh-note，且每组至多一行后果 + 需要时的额外说明', () => {
+  const noteCount = (source.match(/className: "enh-note"/g) ?? []).length
+  assert.equal(noteCount, 1, '说明行只有一处实现（group() 里统一渲染）')
+  assert.ok(source.includes('notes || []'), 'group() 应接受说明数组')
 })
 
-test('结论句：审批词随三档变化，且用的是与宿主菜单错开的词', () => {
-  const { verdictClauses, approvalOf } = loadBundle().__testing
-  assert.match(verdictClauses({ ...SNAPSHOT, approval: 'allow' })[0].text, /自动同意/)
-  assert.match(verdictClauses({ ...SNAPSHOT, approval: 'deny' })[0].text, /自动回绝/)
-  assert.match(verdictClauses({ ...SNAPSHOT, approval: 'ask' })[0].text, /先问我/)
-  // 未知值回落到 ask，不抛
-  assert.equal(approvalOf('nonsense').word, '先问我')
-})
+// ───────────────────────────────────────────── 语义
 
-test('审批三档：radiogroup + radio + aria-checked + roving tabindex + 方向键', () => {
-  // 抽取组件后 role/aria 落在组件定义里，所以按「组件定义里有没有」查，不按调用点写法查。
-  assert.ok(source.includes('role: "radiogroup"'), '缺 role=radiogroup')
-  assert.ok(source.includes('role: "radio"'), '缺 role=radio')
-  assert.ok(source.includes('"aria-checked": props.checked === true'), '缺 aria-checked')
-  assert.ok(source.includes('tabIndex: props.checked === true ? 0 : -1'), '缺 roving tabindex（整组不该都能 Tab 到）')
-  assert.ok(source.includes('ArrowRight') && source.includes('ArrowLeft'), '缺方向键处理')
-  // 旧的 <select> 必须已经不在
-  assert.ok(!/h\("select"/.test(source), '还在用 <select> 做三档')
+test('结论：Enhanced 档四种状态各自说对话，且只在能做事的两种状态给按钮', () => {
+  const { presetStatusOf } = loadBundle().__testing
+
+  assert.deepEqual(presetStatusOf(null), { kind: 'unknown', word: '—', tone: 'mute' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: null } }), { kind: 'noprofile', word: '不可用', tone: 'mute' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', unreadable: true } }), { kind: 'unreadable', word: '改不动', tone: 'bad' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', present: true } }), { kind: 'written', word: '已写入', tone: 'ok' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', present: false } }), { kind: 'absent', word: '未写入', tone: 'mute' })
+
+  assert.match(source, /presetStatus\.kind === "absent"/, '缺「未写入」才给写入按钮的分支')
+  assert.match(source, /presetStatus\.kind === "written"/, '缺「已写入」才给移除按钮的分支')
+  assert.ok(source.includes('写入 Enhanced 档'), '缺写入按钮文案')
+  assert.ok(source.includes('移除 Enhanced 档'), '缺移除按钮文案')
+  assert.ok(source.includes('再点一次确认移除'), '移除缺少二次确认')
+  assert.ok(source.includes('action: "add"') && source.includes('action: "remove"'), '缺 preset op 的两种动作')
+
+  // 「写进去只是多一个可选档；当前用哪个档仍由菜单决定」——这条边界不能随横幅一起消失
+  assert.match(source, /当前用哪个档仍由菜单决定/, '缺「当前档位归谁管」的边界句')
+  assert.ok(source.includes('没有图标'), '缺「为什么没有图标」的说明')
 })
 
 test('检查节：四项以 API 的 name 为键、标题是本地映射、pass 一律取服务端值', () => {
@@ -284,36 +274,35 @@ test('检查节：四项以 API 的 name 为键、标题是本地映射、pass �
   assert.deepEqual(checkRows(null), [])
 })
 
-test('Enhanced 档：四种状态各自说对话，且只在能做事的两种状态给按钮', () => {
-  const { presetStatusOf } = loadBundle().__testing
-
-  assert.deepEqual(presetStatusOf(null), { kind: 'unknown', word: '—', tone: 'mute' })
-  assert.deepEqual(presetStatusOf({ preset: { patchPath: null } }), { kind: 'noprofile', word: '不可用', tone: 'mute' })
-  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', unreadable: true } }), { kind: 'unreadable', word: '改不动', tone: 'bad' })
-  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', present: true } }), { kind: 'written', word: '已写入', tone: 'ok' })
-  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', present: false } }), { kind: 'absent', word: '未写入', tone: 'mute' })
-
-  // 「写不进去」和「管不了」这两种情况不许给操作按钮——按了也只会报错
-  assert.match(source, /presetStatus\.kind === "absent"/, '缺「未写入」才给写入按钮的分支')
-  assert.match(source, /presetStatus\.kind === "written"/, '缺「已写入」才给移除按钮的分支')
-  assert.ok(source.includes('写入 Enhanced 档'), '缺写入按钮文案')
-  assert.ok(source.includes('移除 Enhanced 档'), '缺移除按钮文案')
-  // 移除要二次确认：第一次点变文案，第二次才发请求
-  assert.ok(source.includes('再点一次确认移除'), '移除缺少二次确认')
-  assert.ok(source.includes('action: "add"') && source.includes('action: "remove"'), '缺 preset op 的两种动作')
+test('审批三档：radiogroup + radio + aria-checked + roving tabindex + 方向键', () => {
+  // 抽取组件后 role/aria 落在组件定义里，所以按「组件定义里有没有」查，不按调用点写法查。
+  assert.ok(source.includes('role: "radiogroup"'), '缺 role=radiogroup')
+  assert.ok(source.includes('role: "radio"'), '缺 role=radio')
+  assert.ok(source.includes('"aria-checked": props.checked === true'), '缺 aria-checked')
+  assert.ok(source.includes('tabIndex: props.checked === true ? 0 : -1'), '缺 roving tabindex（整组不该都能 Tab 到）')
+  assert.ok(source.includes('ArrowRight') && source.includes('ArrowLeft'), '缺方向键处理')
+  // 旧的 <select> 必须已经不在
+  assert.ok(!/h\("select"/.test(source), '还在用 <select> 做三档')
 })
 
-test('升级与卸载节：只说明、不画按钮，命令照实写', () => {
-  const at = source.indexOf('// 06 升级与卸载')
-  assert.ok(at > 0, '找不到 06 节的注释锚点')
-  const block = source.slice(at, source.indexOf('// 页面', at) > 0 ? source.indexOf('// 页面', at) : at + 4000)
-  assert.ok(!block.includes('h(Button'), '06 节不该有按钮——页内卸载能力已经不存在')
-  assert.ok(block.includes('dsh plugin --profile'), '缺卸载命令')
-  assert.ok(block.includes('remove dsh-enhance'), '缺卸载动词与包名')
-  assert.ok(block.includes('docs/compatibility.md'), '缺例行核验的指引')
-  assert.ok(block.includes('零操作'), '缺「升级零操作」这一句')
-  assert.ok(block.includes('.bak 备份都会留着'), '缺「数据会保留」这一句')
+test('APG：方向键四个方向都处理，且两端回绕', () => {
+  for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp']) {
+    assert.ok(source.includes(key), `缺 ${key}：APG 要求 Right/Down 前进、Left/Up 后退`)
+  }
+  assert.ok(/\(at \+ 1\) % APPROVAL_ORDER\.length/.test(source), '前进方向必须取模回绕')
+  assert.ok(/\(at \+ APPROVAL_ORDER\.length - 1\) % APPROVAL_ORDER\.length/.test(source), '后退方向必须取模回绕')
 })
+
+test('审批词随三档变化，且用的是与宿主菜单错开的词', () => {
+  const { approvalOf } = loadBundle().__testing
+  assert.equal(approvalOf('allow').word, '自动同意')
+  assert.equal(approvalOf('deny').word, '自动回绝')
+  assert.equal(approvalOf('ask').word, '先问我')
+  // 未知值回落到 ask，不抛
+  assert.equal(approvalOf('nonsense').word, '先问我')
+})
+
+// ───────────────────────────────────────────── 样式与规范
 
 test('按钮：禁用态的样式必须排在 data-kind 之后（否则禁用仍显示危险色）', () => {
   const disabled = source.indexOf('.enh-btn:disabled,.enh-btn[data-kind]:disabled')
@@ -323,129 +312,68 @@ test('按钮：禁用态的样式必须排在 data-kind 之后（否则禁用仍
   assert.ok(disabled > danger, '禁用态规则必须写在 data-kind 之后，同特异性下后写的赢')
 })
 
-test('路径：按 home 自己的分隔符拼，不混用 \\ 和 /', () => {
-  assert.ok(source.includes('function homePath'), '缺 homePath')
-  const { homePath } = (() => {
-    const bundle = loadBundle()
-    // homePath 没有导出，直接读源码里那一段来跑，避免为一个纯函数扩大 __testing 的暴露面
-    const m = source.match(/function homePath\(state\) \{[\s\S]*?\n\t\t\}/)
-    assert.ok(m !== null, '源码里找不到 homePath 实现')
-    // eslint-disable-next-line no-new-func
-    const fn = new Function('return (' + m[0].replace('function homePath(state)', 'function (state)') + ')')()
-    void bundle
-    return { homePath: fn }
-  })()
-  assert.equal(homePath({ home: 'C:\\Users\\x\\.dsh' }), 'C:\\Users\\x\\.dsh\\enhance\\')
-  assert.equal(homePath({ home: 'C:\\Users\\x\\.dsh\\' }), 'C:\\Users\\x\\.dsh\\enhance\\')
-  assert.equal(homePath({ home: '/home/x/.dsh' }), '/home/x/.dsh/enhance/')
-  assert.equal(homePath(null), '~/.dsh/enhance/')
-})
-
-test('术语说明是可折叠的，不是常驻正文', () => {
-  // 常驻会在用户选「先问我」时原地解释「自动同意」，读起来像状态没更新
-  assert.ok(source.includes('h("details"'), '术语说明应放在 details 里')
-  assert.ok(source.includes('为什么这三个词和主菜单不一样'), '缺折叠区的标题')
-  assert.ok(!/h\("p", \{ className: "enh-hint" \}, "为什么叫「自动同意」/.test(source), '不该再有常驻的「为什么叫自动同意」正文')
-})
-
-// ──────────────── 规范符合性（WCAG / APG / 一致性）────────────────
-
-test('APG：方向键四个方向都处理，且两端回绕', () => {
-  // 键盘逻辑挂在 Segmented 的 onKeyDown 上；按整份源码查，不按邻近位置查。
-  for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp']) {
-    assert.ok(source.includes(key), `缺 ${key}：APG 要求 Right/Down 前进、Left/Up 后退`)
+test('焦点可见：所有可交互元素都有 :focus-visible 焦点环，且用宿主 token', () => {
+  for (const cls of ['.enh-btn', '.enh-switch', '.enh-seg-btn', '.enh-textarea', '.enh-term>summary']) {
+    assert.ok(source.includes(`${cls}:focus-visible`), `缺 ${cls} 的 focus-visible`)
   }
-  assert.ok(/\(at \+ 1\) % APPROVAL_ORDER\.length/.test(source), '前进方向必须取模回绕')
-  assert.ok(/\(at \+ APPROVAL_ORDER\.length - 1\) % APPROVAL_ORDER\.length/.test(source), '后退方向必须取模回绕')
+  const at = source.indexOf('.enh-btn:focus-visible')
+  const rule = source.slice(at, at + 400)
+  assert.ok(rule.includes('--dsw-focus-ring-width'), '焦点环宽度应走宿主 token')
+  assert.ok(rule.includes('--dsw-focus-ring-color'), '焦点环颜色应走宿主 token')
+  assert.ok(rule.includes('outline-offset:2px'), '焦点环要有偏移，别贴着边框')
+  assert.ok(!/outline:\s*none/.test(source), '不许出现 outline:none（会吃掉键盘焦点）')
 })
 
-test('APG：radiogroup 与每个 radio 都有可判定的名字', () => {
-  assert.match(source, /role: "radiogroup",\s*\n\s*"aria-label":/, 'radiogroup 需要 aria-label')
-  assert.ok(source.includes('h(Option'), '三档必须走 Option 组件')
-  // radio 的名字来自按钮文本（APG 允许「由其内容标名」）
-  assert.ok(source.includes('}, APPROVAL[value].word)'), 'radio 的文本即其名字')
+test('减少动效：prefers-reduced-motion 下关掉过渡', () => {
+  assert.match(source, /@media \(prefers-reduced-motion: reduce\)/, '缺 prefers-reduced-motion 分支')
+  const at = source.indexOf('@media (prefers-reduced-motion: reduce)')
+  const block = source.slice(at, at + 200)
+  assert.match(block, /transition:none/, '该分支里应把过渡关掉')
+  // 不许 transition: all
+  assert.ok(!/transition:\s*all/.test(source), 'transition: all 会连带布局属性，列具体属性')
 })
 
-test('WCAG 3.3.1 + 3.3.3：错误行指明哪一节，并给一句怎么改', () => {
-  assert.ok(source.includes('SECTION_LABELS'), '缺节名映射：3.3.1 要求指明哪一项出错')
-  assert.ok(source.includes('function sectionLabel'), '缺 sectionLabel')
-  assert.ok(source.includes('function errorHint'), '缺 errorHint：3.3.3 要求给建议')
-  // 五个 code 至少覆盖最常撞的三个
-  for (const code of ['ETOOLARGE', 'EBADOP', 'EIO']) {
-    assert.ok(source.includes(`code === "${code}"`), `缺 ${code} 的建议文案`)
-  }
-  // 错误行现在必须包含节名
-  assert.match(source, /text: sectionLabel\(section\) \+ "没成："/, '错误行应把节名放在最前')
+test('排版：按宿主设置页的刻度（16/24 标题、14/22 行标题、12/18 辅助）', () => {
+  assert.match(source, /\.enh-title\{[^}]*font-size:16px;line-height:24px;font-weight:500/, '页面标题应是 16/24 500')
+  assert.match(source, /\.enh-h3\{[^}]*font-size:14px;line-height:22px/, '行标题应是 14/22')
+  assert.match(source, /\.enh-hint\{[^}]*font-size:12px;line-height:18px/, '辅助文字应是 12/18')
+  assert.ok(source.includes('max-width:720px'), '宽度上限应对齐宿主设置页（720）')
+  assert.ok(!source.includes('max-width:760px'), '旧的 760 上限应已去掉')
+  assert.match(source, /\.enh-group\+\.enh-group\{border-top:\.5px solid var\(--enh-rule\);padding-top:16px\}/, '组之间应是 0.5px 发丝线 + 16px 内距')
 })
 
-test('一致性：每类控件只在一个组件里定义，调用点不许写 className', () => {
-  // 各组件各自是唯一的裸标签出处
-  for (const [tag, component] of [['button', 'Button'], ['textarea', 'TextArea']]) {
-    const count = (source.match(new RegExp(`h\\("${tag}"`, 'g')) ?? []).length
-    assert.ok(count >= 1, `缺 ${tag} 的定义`)
+test('排版：字号只用宿主 token 的七个台阶，不自造中间档', () => {
+  const allowed = new Set(['11px', '12px', '13px', '14px', '16px', '20px', '24px'])
+  const seen = new Set()
+  for (const rule of cssRules()) {
+    for (const m of rule.matchAll(/font-size:(\d+px)/g)) seen.add(m[1])
+    for (const m of rule.matchAll(/(?<!-)font:(\d+px)\/\d+px/g)) seen.add(m[1])
   }
-  // 每个裸 button/textarea 都必须紧跟在某个 function Xxx(props) 里
-  const sites = [...source.matchAll(/h\("(button|textarea)"/g)].map((m) => m.index)
-  for (const at of sites) {
-    const head = source.slice(Math.max(0, at - 400), at)
-    assert.match(head, /function (Button|Switch|Option|Clause|TextArea)\(props\)/, `裸标签出现在组件定义之外（offset ${at}）`)
-  }
-  // 调用点改用组件后，不应再有 className: "enh-btn" 之类的直接赋值
-  // 类名清单必须覆盖**所有**有独立组件的样式类；漏一个，那个组件就会退化成死代码。`enh-tag` 就是这样漏掉的。
-  for (const cls of ['enh-btn', 'enh-switch', 'enh-seg-btn', 'enh-textarea', 'enh-tag', 'enh-clause']) {
-    const occurrences = (source.match(new RegExp(`className: "${cls}"`, 'g')) ?? []).length
-    assert.equal(occurrences, 1, `${cls} 应只在一个组件定义里出现，实际 ${occurrences} 处`)
+  for (const size of seen) {
+    assert.ok(allowed.has(size), `字号 ${size} 不在宿主刻度上（--dsw-font-* 只有 11/12/13/14/16/20/24）`)
   }
 })
 
-test('错误行：就地、role=alert、每个来源各一处', () => {
-  const alerts = source.match(/role: "alert"/g) ?? []
-  assert.equal(alerts.length, 1, '错误行应当只有一处实现（复用同一个 helper）')
-  const sections = [...source.matchAll(/errorLine\("([a-z]+)"\)/g)].map((m) => m[1])
-  assert.deepEqual(sections.sort(), ['approval', 'check', 'page', 'preset', 'scope'])
-  assert.ok(source.includes('没成：'), '错误行缺统一前缀')
-  // 写档这条路上三个错误码各有「怎么改」的一句话
-  for (const code of ['EPROFILE', 'EBADSHAPE', 'ERECORD']) {
-    assert.ok(source.includes(`code === "${code}"`), `缺 ${code} 的建议文案`)
-  }
+test('排版：不用大写变形与字距（宿主设置页零使用）', () => {
+  assert.ok(!/text-transform:\s*uppercase/.test(source), '宿主设置页不用 uppercase，别自造')
+  assert.ok(!/letter-spacing/.test(source), '宿主设置页不用 letter-spacing，别自造')
 })
 
-test('字节口径：与服务端 normalizeText 同一套，再数 UTF-8', () => {
-  const { normalizeText, draftBytes } = loadBundle().__testing
-  // 去 BOM
-  assert.equal(normalizeText('\uFEFFhello'), 'hello')
-  // CRLF 与裸 CR 都折成 LF
-  assert.equal(normalizeText('a\r\nb\rc'), 'a\nb\nc')
-  // 控制字符去掉，\n 与 \t 保留
-  assert.equal(normalizeText('a\u0000b\u001fc'), 'abc')
-  assert.equal(normalizeText('a\tb\nc'), 'a\tb\nc')
-  // trim
-  assert.equal(normalizeText('  x  '), 'x')
-  // 字节：ASCII、CJK、emoji（代理对算 4 字节）
-  assert.equal(draftBytes('hello'), 5)
-  assert.equal(draftBytes('中文'), 6)
-  assert.equal(draftBytes('😀'), 4)
-  // CRLF 归一后只算 1 字节
-  assert.equal(draftBytes('a\r\nb'), 3)
-})
-
-test('深色：宿主属性钩子存在，且本地变量在两种模式下都有定义、都被消费', () => {
-  // 之前这里是一条恒真断言（两侧都不存在 → 永远通过），等于门禁空转。现在要求：
-  // 1) 用属性钩子，不用 class；
-  assert.ok(source.includes('body[data-ds-dark-theme]'), '缺深色属性钩子')
-  assert.ok(!/\.dark-theme\b/.test(source), '深色不该用 class 钩子')
-
-  // 2) 深色与浅色两个分支都要给本地变量赋值；
-  assert.ok(source.includes('body[data-ds-dark-theme] .enh{'), '深色分支没定义本地变量')
-  assert.ok(source.includes('body:not([data-ds-dark-theme]) .enh{'), '浅色分支没定义本地变量')
-
-  // 3) 定义出来的变量必须真被消费，否则就是「定义了没进判定」的空转。
-  for (const name of ['--enh-rule', '--enh-mark-pass', '--enh-mark-fail']) {
-    const defined = source.includes(name + ':')
-    const consumed = (source.match(new RegExp('var\\(' + name + '\\)', 'g')) ?? []).length
-    assert.ok(defined, `${name} 没有定义`)
-    assert.ok(consumed > 0, `${name} 定义了却没人用（空转）`)
+test('布局：间距只用 8/12/16/24 四档，允许 2/4px 的微调', () => {
+  const allowed = new Set([2, 4, 8, 12, 16, 24])
+  const offenders = []
+  for (const rule of cssRules()) {
+    const sel = rule.split('{')[0]
+    const body = rule.slice(rule.indexOf('{'))
+    for (const m of body.matchAll(/(?:^|[;{])(gap|margin|margin-top|margin-bottom|padding|padding-top|padding-bottom|padding-left|padding-right):([^;}]+)/g)) {
+      for (const v of m[2].trim().split(/\s+/)) {
+        if (!/^\d+px$/.test(v)) continue
+        const n = parseInt(v, 10)
+        if (n !== 0 && !allowed.has(n)) offenders.push(`${sel} ${m[1]}:${v}`)
+      }
+    }
   }
+  assert.deepEqual(offenders, [], `间距值不在刻度上：${offenders.join('; ')}`)
 })
 
 test('字体：显式继承宿主字体族，等宽只用在代码位', () => {
@@ -458,6 +386,142 @@ test('CSS：颜色只用宿主 token，没有自带色板', () => {
   assert.deepEqual(hex, [], `不该出现硬编码颜色：${hex.join(', ')}`)
   assert.ok(source.includes('--dsw-alias-label-primary'), '缺宿主文字色 token')
   assert.ok(source.includes('--ds-ease-in-out') || source.includes('--ds-transition-duration'), '缺宿主动效 token')
+})
+
+test('深色：宿主属性钩子存在，且本地变量在两种模式下都有定义、都被消费', () => {
+  assert.ok(source.includes('body[data-ds-dark-theme]'), '缺深色属性钩子')
+  assert.ok(!/\.dark-theme\b/.test(source), '深色不该用 class 钩子')
+  assert.ok(source.includes('body[data-ds-dark-theme] .enh{'), '深色分支没定义本地变量')
+  assert.ok(source.includes('body:not([data-ds-dark-theme]) .enh{'), '浅色分支没定义本地变量')
+
+  for (const name of ['--enh-rule', '--enh-mark-pass', '--enh-mark-fail']) {
+    const defined = source.includes(name + ':')
+    const consumed = (source.match(new RegExp('var\\(' + name + '\\)', 'g')) ?? []).length
+    assert.ok(defined, `${name} 没有定义`)
+    assert.ok(consumed > 0, `${name} 定义了却没人用（空转）`)
+  }
+})
+
+test('错误行：就地、role=alert、每个来源各一处，写档三个错误码各有建议', () => {
+  const alerts = source.match(/role: "alert"/g) ?? []
+  assert.equal(alerts.length, 1, '错误行应当只有一处实现（复用同一个 helper）')
+  const sections = [...source.matchAll(/errorLine\("([a-z]+)"\)/g)].map((m) => m[1])
+  assert.deepEqual(sections.sort(), ['approval', 'check', 'page', 'preset', 'scope'])
+  assert.ok(source.includes('没成：'), '错误行缺统一前缀')
+  for (const code of ['EPROFILE', 'EBADSHAPE', 'ERECORD', 'ETOOLARGE', 'EBADOP', 'EIO']) {
+    assert.ok(source.includes(`code === "${code}"`), `缺 ${code} 的建议文案`)
+  }
+})
+
+test('一致性：每类控件只在一个组件里定义，调用点不许写 className', () => {
+  for (const tag of ['button', 'textarea']) {
+    const count = (source.match(new RegExp(`h\\("${tag}"`, 'g')) ?? []).length
+    assert.ok(count >= 1, `缺 ${tag} 的定义`)
+  }
+  const sites = [...source.matchAll(/h\("(button|textarea)"/g)].map((m) => m.index)
+  for (const at of sites) {
+    const head = source.slice(Math.max(0, at - 400), at)
+    assert.match(head, /function (Button|Switch|Option|TextArea)\(props\)/, `裸标签出现在组件定义之外（offset ${at}）`)
+  }
+  for (const cls of ['enh-btn', 'enh-switch', 'enh-seg-btn', 'enh-textarea']) {
+    const occurrences = (source.match(new RegExp(`className: "${cls}"`, 'g')) ?? []).length
+    assert.equal(occurrences, 1, `${cls} 应只在一个组件定义里出现，实际 ${occurrences} 处`)
+  }
+})
+
+test('字节口径：与服务端 normalizeText 同一套，再数 UTF-8', () => {
+  const { normalizeText, draftBytes } = loadBundle().__testing
+  assert.equal(normalizeText('\uFEFFhello'), 'hello')
+  assert.equal(normalizeText('a\r\nb\rc'), 'a\nb\nc')
+  assert.equal(normalizeText('a\u0000b\u001fc'), 'abc')
+  assert.equal(normalizeText('a\tb\nc'), 'a\tb\nc')
+  assert.equal(normalizeText('  x  '), 'x')
+  assert.equal(draftBytes('hello'), 5)
+  assert.equal(draftBytes('中文'), 6)
+  assert.equal(draftBytes('😀'), 4)
+  assert.equal(draftBytes('a\r\nb'), 3)
+})
+
+test('状态：服务端 active / degraded 必须被用上，降级原因要有一行说明', () => {
+  assert.ok(source.includes('state.active === false'), '插件未激活必须能显示出来')
+  assert.ok(source.includes('state.degraded'), '降级必须能显示出来')
+  assert.ok(source.includes('state.degradedReason === "missing"'), 'missing 与 corrupt 必须分开说')
+})
+
+// ───────────────────────────────────────────── 回归闸
+
+test('状态显示看已保存文本，不看未保存草稿（否则清空草稿时自相矛盾）', () => {
+  assert.ok(source.includes('var savedEmpty = '), '缺 savedEmpty：内容边界右上角必须基于已保存文本')
+  // 右上角现状由 scopeNow 算出来；它必须用 savedEmpty，而不是草稿
+  const at = source.indexOf('var scopeNow =')
+  assert.ok(at > 0, '找不到内容边界右上角的现状计算')
+  const line = source.slice(at, source.indexOf('\n', at))
+  assert.match(line, /savedEmpty \? "空文本"/, '右上角的「空文本」判定必须基于 savedEmpty')
+  assert.ok(!/normalizeText\(draft\)/.test(line), '右上角不该直接读草稿')
+})
+
+test('渲染：用真实快照首帧渲染出四组 + 头部，且不带已删除的两节', async () => {
+  const module = loadBundle()
+  let component
+  module.apply({
+    slots: {
+      inject: (_name, run) => run(),
+      register: (_spec, registered) => { component = registered; return () => {} },
+    },
+  })
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => SNAPSHOT })
+
+  const tree = component({})
+  await new Promise((resolve) => setImmediate(resolve))
+
+  /** 收集整棵树里的 className 与 id（假 React 的节点形如 { type, props, children }）。 */
+  const classes = new Set()
+  const ids = new Set()
+  const walk = (node) => {
+    if (node === null || node === undefined || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    const props = node.props ?? {}
+    if (typeof props.className === 'string') classes.add(props.className)
+    if (typeof props.id === 'string') ids.add(props.id)
+    for (const child of node.children ?? []) walk(child)
+  }
+  walk(tree)
+
+  for (const id of ['enh-block-scope', 'enh-block-approval', 'enh-block-preset', 'enh-block-check']) {
+    assert.ok(ids.has(id), `渲染树里缺 ${id}`)
+  }
+  assert.equal(ids.size, 4, '渲染树里只该有四组')
+  // 组件节点（Switch/Button）的 className 在组件内部，假 React 不会展开它们；
+  // 这里只验宿主可渲染的真实 DOM 节点上的类名。
+  for (const cls of ['enh', 'enh-head', 'enh-title', 'enh-pill', 'enh-group', 'enh-row-head', 'enh-note']) {
+    assert.ok(classes.has(cls), `渲染树里缺 .${cls}`)
+  }
+  // 旧结构（编号列 / 结论句 / 卸载节）不该出现在渲染树里
+  for (const cls of ['enh-rail', 'enh-idx', 'enh-verdict', 'enh-banner', 'enh-rows']) {
+    assert.ok(!classes.has(cls), `渲染树里残留旧结构 .${cls}`)
+  }
+
+  delete globalThis.fetch
+})
+
+test('首帧读不到状态时必须给重试入口，不能锁死', () => {
+  assert.ok(source.includes('state === null && error !== null && error.section === "page"'), '缺重试条件')
+  assert.ok(/\}, "重试"\)/.test(source), '缺重试按钮')
+  assert.ok(source.includes('总开关'), '缺页级总开关')
+  assert.ok(source.includes('props.checked === "mixed"'), '未知态应允许 aria-checked=mixed')
+})
+
+test('切开关不能静默丢弃未保存的草稿', () => {
+  assert.ok(source.includes('previous !== next.text'), 'adopt 应先比较旧文本是否变化再覆盖草稿')
+})
+
+test('一个请求只清自己那一组的错误', () => {
+  assert.match(source, /setError\(function \(current\) \{[\s\S]{0,200}current\.section === section \? null : current/, 'run() 应只清同组错误')
+})
+
+test('写档结果要能被屏幕阅读器念出来（role=status + aria-live）', () => {
+  assert.match(source, /role: "status"/, '缺 role=status')
+  assert.match(source, /"aria-live": "polite"/, '缺 aria-live=polite')
 })
 
 test('守卫：ctx 没有 effect 时页面仍能注册（假 ctx 只有 slots）', () => {
@@ -487,55 +551,36 @@ test('守卫：ctx 有 effect 且无 document 时不抛（Node 环境）', () =>
       },
     })
   })
-  // 没有 document 就不该往 effect 里塞东西
   assert.equal(effects.length, 0)
 })
 
 test('CSS 分支真被执行：有 document 时 effect 被注册，style 标签被插入且卸载时移除', () => {
   const module = loadBundle()
 
-  // 最小化的 document 替身：够 querySelector / createElement / head.appendChild 用
   const inserted = []
   const removed = []
-  const fakeTag = {
-    dataset: {},
-    textContent: '',
-    parentNode: null,
-  }
+  const fakeTag = { dataset: {}, textContent: '', parentNode: null }
   const head = {
     appendChild(node) { node.parentNode = head; inserted.push(node) },
     removeChild(node) { removed.push(node); node.parentNode = null },
   }
   const previous = globalThis.document
-  globalThis.document = {
-    head,
-    querySelector: () => null,
-    createElement: () => fakeTag,
-  }
+  globalThis.document = { head, querySelector: () => null, createElement: () => fakeTag }
 
   try {
     const effects = []
-    const cleanups = []
     module.apply({
       effect(run) { effects.push(run); return () => {} },
-      slots: {
-        inject: (_name, run) => run(),
-        register: () => () => {},
-      },
+      slots: { inject: (_name, run) => run(), register: () => () => {} },
     })
-
-    // 有 document + 有 effect → 必须注册一个 effect
     assert.equal(effects.length, 1, '有 document 时应注册 CSS effect')
 
-    // 跑这个 effect：应插入一个 <style>
     const cleanup = effects[0]()
     assert.equal(inserted.length, 1, '应插入一个 style 标签')
     assert.ok(inserted[0].textContent.includes('.enh'), 'style 内容应是我们的 CSS')
     assert.equal(inserted[0].dataset.pluginCss, 'dsh-enhance-ui/settings.css')
     assert.equal(typeof cleanup, 'function', 'effect 应返回清理函数')
 
-    // 清理：应移除同一个标签
-    cleanups.push(cleanup)
     cleanup()
     assert.equal(removed.length, 1, '清理时应移除 style 标签')
   } finally {
@@ -544,146 +589,9 @@ test('CSS 分支真被执行：有 document 时 effect 被注册，style 标签�
   }
 })
 
-test('静态：不含已退役的说法，也不再把「范围」做成控件', () => {
-  assert.doesNotMatch(source, /改文件/, '出现了已退役的说法')
-  assert.doesNotMatch(source, /fence/i, '出现了已退役模块名')
-  assert.doesNotMatch(source, /先读后写|读后写/, '出现了已退役的概念')
-  // 「范围」只作为结论句里的静态分句出现，不提供控件
-  assert.doesNotMatch(source, /kind: "jump", text: "范围/, '「范围」不该做成可跳转入口')
-})
-
-test('静态：三个问题都在，但不以问句行形式排列', () => {
-  // 旧实现用三行问句；新实现把它们变成各节的标题与结论句
-  assert.ok(!/row\("/.test(source), '还在用问句行')
-  assert.ok(source.includes('越界时'), '缺越界那一问')
-  assert.ok(source.includes('提示词末尾'), '缺边界那一问')
-  assert.ok(source.includes('Enhanced 权限档'), '缺档位那一问')
-  // 「当前会话在哪个档」这一句必须留给宿主选择器，本页只解释边界
-  assert.ok(source.includes('当前会话在哪个档由左下角菜单决定'), '缺「当前档位归谁管」的边界说明')
-})
-
-test('静态：真实能力之外不画假按钮（卸载只给命令）', () => {
-  assert.ok(!/op: "restore"/.test(source), '页面不该有 restore 的 op')
-  assert.ok(!/op: "archive"/.test(source), '页面不该有 archive 的 op')
-  assert.ok(!/op: "uninstall"/.test(source), '页面不该有 uninstall 的 op')
-  // 已删掉的完整安装/派生件语境一个字都不许回来
-  for (const gone of ['install.mjs', 'uninstall.mjs', 'enhance-permissions', 'build-client', 'planGroups']) {
-    assert.ok(!source.includes(gone), `残留了已退役的东西：${gone}`)
-  }
-  assert.ok(source.includes('dsh plugin --profile'), '卸载指引必须给命令文本')
-})
-
-// ──────────────── 复核发现的回归闸 ────────────────
-
-test('状态显示看已保存文本，不看未保存草稿（否则清空草稿时自相矛盾）', () => {
-  assert.ok(source.includes('var savedEmpty = '), '缺 savedEmpty：03 右上角必须基于已保存文本')
-
-  // 定位 03 的 section() 调用，取它前 4 个参数（标题/副行/右上/色调）
-  const at = source.indexOf('section("03"')
-  assert.ok(at > 0, '找不到 03 节')
-  const head = source.slice(at, at + 700)
-  // 必须由 savedEmpty 决定「空文本」这一支；由草稿决定就会与结论句自相矛盾
-  assert.match(head, /savedEmpty \? "空文本"/, '03 的「空文本」判定必须基于 savedEmpty')
-  assert.ok(!/normalizeText\(draft\)/.test(head), '03 的右上角不该直接读草稿')
-})
-
-test('首帧读不到状态时必须给重试入口，不能锁死', () => {
-  assert.ok(source.includes('state === null && error !== null && error.section === "page"'), '缺重试条件')
-  assert.ok(/\}, "重试"\)/.test(source), '缺重试按钮')
-  assert.ok(source.includes('总开关：读取中'), '首帧总开关不该显示「关」')
-  assert.ok(source.includes('props.checked === "mixed"'), '未知态应允许 aria-checked=mixed')
-})
-
-test('切开关不能静默丢弃未保存的草稿', () => {
-  assert.ok(source.includes('previous !== next.text'), 'adopt 应先比较旧文本是否变化再覆盖草稿')
-})
-
-test('一个请求只清自己那一节的错误', () => {
-  assert.match(source, /setError\(function \(current\) \{[\s\S]{0,200}current\.section === section \? null : current/, 'run() 应只清同节错误')
-})
-
-test('A2：API 返回的 active 与 degradedReason 必须被用上', () => {
-  assert.ok(source.includes('state.active === false'), '插件未激活必须能显示出来')
-  assert.ok(source.includes('state.degradedReason === "missing"'), 'missing 与 corrupt 必须分开说')
-})
-
-test('不留死规则，也不给不可点的分句画下划线', () => {
-  assert.ok(!/\.enh-body \.enh-group\+\.enh-group,\.enh-body \.enh-actions/.test(source), '两条规则合写会让 14px 永不生效')
-  assert.ok(source.includes('.enh-body .enh-group+.enh-group{margin-top:16px}'), '分组间距要写在能生效的位置')
-  const at = source.indexOf('.enh-static{')
-  const staticRule = source.slice(at, at + 120)
-  assert.ok(!staticRule.includes('underline'), '不可点的分句不该画成链接')
-})
-
-test('意图 2：同一件事不说两遍（sha 只出现一次；never caveat 只在一处）', () => {
-  assert.equal((source.match(/sha " \+/g) ?? []).length, 1, 'sha 应只在 03 里显示一次')
-  assert.equal((source.match(/完全权限（never）下宿主不发请求/g) ?? []).length, 1, '「never 下三档轮不到」只该在 02 说一次')
-})
-
-// ──────────────── 排版与间距的刻度（防止再次漂移）────────────────
-
 /** 把 CSS 数组拆成规则，供刻度断言使用。 */
 function cssRules() {
   const start = source.indexOf('var CSS = [')
   const end = source.indexOf('].join("\\n")')
   return [...source.slice(start, end).matchAll(/"([^"]+)"/g)].map((m) => m[1])
 }
-
-test('排版：字号只用宿主 token 的七个台阶，不自造中间档', () => {
-  const allowed = new Set(['11px', '12px', '13px', '14px', '16px', '20px', '24px'])
-  const seen = new Set()
-  for (const rule of cssRules()) {
-    for (const m of rule.matchAll(/font-size:(\d+px)/g)) seen.add(m[1])
-    for (const m of rule.matchAll(/(?<!-)font:(\d+px)\/\d+px/g)) seen.add(m[1])
-  }
-  for (const size of seen) {
-    assert.ok(allowed.has(size), `字号 ${size} 不在宿主刻度上（--dsw-font-* 只有 11/12/13/14/16/20/24）`)
-  }
-})
-
-test('排版：同一字号只有一种行高（等宽区不再 17/18 混用）', () => {
-  const bySize = new Map()
-  for (const rule of cssRules()) {
-    for (const m of rule.matchAll(/(?<!-)font:(\d+px)\/(\d+px)/g)) {
-      const [, size, lh] = m
-      if (!bySize.has(size)) bySize.set(size, new Set())
-      bySize.get(size).add(lh)
-    }
-    const fs = rule.match(/font-size:(\d+px)/)
-    const lh = rule.match(/line-height:(\d+px)/)
-    if (fs && lh) {
-      if (!bySize.has(fs[1])) bySize.set(fs[1], new Set())
-      bySize.get(fs[1]).add(lh[1])
-    }
-  }
-  for (const [size, heights] of bySize) {
-    assert.ok(heights.size <= 2, `${size} 配了 ${heights.size} 种行高（${[...heights].join('/')}），应尽量统一`)
-  }
-})
-
-test('排版：不用大写变形与字距（宿主设置页零使用）', () => {
-  assert.ok(!/text-transform:\s*uppercase/.test(source), '宿主设置页不用 uppercase，别自造')
-  assert.ok(!/letter-spacing/.test(source), '宿主设置页不用 letter-spacing，别自造')
-})
-
-test('布局：section() 已经包了 .enh-body，节里不许再嵌一层（会把间距加倍）', () => {
-  const occurrences = (source.match(/className: "enh-body"/g) ?? []).length
-  assert.equal(occurrences, 1, `.enh-body 应只由 section() 生成一次，实际 ${occurrences} 处`)
-})
-
-test('布局：间距只用 8/12/16/24 四档，允许 2/4px 的微调', () => {
-  const allowed = new Set([2, 4, 8, 12, 16, 24])
-  const offenders = []
-  for (const rule of cssRules()) {
-    const sel = rule.split('{')[0]
-    const body = rule.slice(rule.indexOf('{'))
-    for (const m of body.matchAll(/(?:^|[;{])(gap|margin|margin-top|margin-bottom|padding|padding-top|padding-left):([^;}]+)/g)) {
-      for (const v of m[2].trim().split(/\s+/)) {
-        if (!/^\d+px$/.test(v)) continue
-        const n = parseInt(v, 10)
-        if (n !== 0 && !allowed.has(n)) offenders.push(`${sel} ${m[1]}:${v}`)
-      }
-    }
-  }
-  assert.deepEqual(offenders, [], `间距值不在刻度上：${offenders.join('; ')}`)
-})
