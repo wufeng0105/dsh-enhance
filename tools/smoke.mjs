@@ -1,12 +1,12 @@
 /**
- * WP7 端到端冒烟（真机装载 + 进程内跑真实的 op 处理链路）。
+ * 端到端冒烟（真机装载 + 进程内跑真实的 op 处理链路）。
  *
  * 前置：由一个隔离的 DSH_HOME 里已经用 `dsh plugin --profile smoke add <本仓库>` 装好；
  * 这个脚本自己不做安装，只做验证——安装步骤在 smoke.ps1 里，两者都落盘成证据。
  *
  * 为什么不用 `dsh headless "..."` 跑真会话：那需要模型凭据，而凭据在用户的
  * `~/.dsh/.credentials.yaml` 里。为了冒烟去复制用户凭据是不可接受的，所以
- * 「注入是否真的进提示词」这一条用**进程内捕获 section 文本**来验：宿主拿到的就是
+ * 「注入是否真的进系统提示」这一条用**进程内捕获 section 文本**来验：宿主拿到的就是
  * 同一个 `spec.text()` 的返回值，这条路径与真会话完全同源。
  */
 import { spawnSync } from 'node:child_process'
@@ -136,6 +136,7 @@ const stateBefore = await api({ op: 'state' })
 check('3.1 state 快照含 preset 段', stateBefore.status === 200 && stateBefore.json.preset !== undefined)
 check('3.2 快照定位到当前 profile 的 patch', stateBefore.json.preset.patchPath === patchPath, stateBefore.json.preset.patchPath)
 check('3.3 初始状态：patch 里没有 enhanced 档', stateBefore.json.preset.present === false)
+// ↑ 断言名里的小写 enhanced 指 patch 字面键；档位展示名是 Enhanced。
 
 const checkResult = await api({ op: 'check' })
 const names = (checkResult.json?.checks ?? []).map((item) => item.name)

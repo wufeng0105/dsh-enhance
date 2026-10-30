@@ -3,7 +3,8 @@
  *
  * 三件事：
  *   1. `package.json` 声明 `dsh.bundle.patch`，根 patch 里的 insert 名都能解析到文件；
- *   2. 包内默认文本与仓库根的 `content-scope.txt` 逐字节一致（防止两条安装路径的种子漂移）；
+ *   2. 包内默认文本与仓库根的 `content-scope.txt` 逐字节一致——种子只有一处来源，
+ *      两份文件谁也不许先漂；
  *   3. 插件首次加载用的 `ensureEnhanceData()` 是幂等的：缺文件才种，已有不覆盖，
  *      审批按宿主默认档位（`never` → `ask`，否则 `allow`）。
  */

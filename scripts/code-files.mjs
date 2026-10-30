@@ -13,7 +13,7 @@
  * 注意走盘与 git 的口径**本来就不完全相等**：走盘看得见未跟踪的新文件，git 不会。
  * 所以「等于 tracked」这条只在 git 路径上成立；走盘路径的不变量是「跳过忽略目录」。
  *
- * @module enhance/scripts/code-files
+ * @module scripts/code-files
  */
 
 import { spawnSync } from 'node:child_process'

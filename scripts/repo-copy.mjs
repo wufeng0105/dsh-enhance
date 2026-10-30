@@ -11,7 +11,7 @@
  * 在 120 秒超时处误报「0 tests ran, floor is 50」。**慢本身就是一种坏**：
  * 它把「门禁红了」和「门禁没跑完」混成同一个信号。
  *
- * @module enhance/scripts/repo-copy
+ * @module scripts/repo-copy
  */
 
 import { cpSync, mkdirSync } from 'node:fs'

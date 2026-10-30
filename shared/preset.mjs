@@ -20,7 +20,7 @@
  * 摘的时候按记录办；记录缺失就报错并给手工指引。宁可让用户手删三行，
  * 也不去猜一份同名档位是不是我们写的。
  *
- * @module enhance/shared/preset
+ * @module shared/preset
  */
 
 import { readFileSync, unlinkSync } from 'node:fs'
@@ -338,7 +338,7 @@ export function ensureEnhancedPreset(text) {
     const rewritten = `${' '.repeat(map.indent)}presets: {${map.body ?? ''}${separator}${ENHANCED_NAME}: ${spec}}${map.tail ?? ''}`
     const next = [...lines]
     next[map.index] = rewritten
-    return { text: joinLines(next, eol), changed: '写 enhanced 档（flow 映射）', action: 'inserted' }
+    return { text: joinLines(next, eol), changed: '写 Enhanced 档（flow 映射）', action: 'inserted' }
   }
 
   // 块风格：插在 `presets:` 下这张表的末尾（保持用户已有顺序）。
@@ -351,7 +351,7 @@ export function ensureEnhancedPreset(text) {
   }
   const next = [...lines]
   next.splice(insertAt, 0, ...enhancedBlock(map.indent + 2))
-  return { text: joinLines(next, eol), changed: '写 enhanced 档（块映射）', action: 'inserted' }
+  return { text: joinLines(next, eol), changed: '写 Enhanced 档（块映射）', action: 'inserted' }
 }
 
 /**
@@ -368,6 +368,10 @@ export function ensureEnhancedPreset(text) {
  *
  * 认不出形态、或没有归属记录，一律原样返回并给原因——**不猜**。
  * 「逐字节认领」那套取证被拿掉了：宁可让用户手删三行，也不去猜一份同名档位是不是我们写的。
+ *
+ * 文案口径：`changed` / 错误消息里出现的 `enhanced` 指的是 patch 里的字面键名
+ * （`enhanced:` 三行）；档位在用户面前的名字是 **Enhanced 档**。两处并存是有意的，
+ * 别「统一」掉。
  *
  * @param {string} text
  * @param {{ action?: 'added' | 'inserted' | 'unchanged', emptyArray?: boolean, original?: string } | undefined} [record]
@@ -410,7 +414,7 @@ export function removeEnhancedPreset(text, record) {
     const rewritten = `${' '.repeat(map.indent)}presets: {${kept.map((entry) => entry.trim()).join(', ')}}${map.tail ?? ''}`
     lines = [...lines]
     lines[map.index] = rewritten
-    return { text: joinLines(lines, eol), changed: '摘掉 enhanced 档（flow 映射）' }
+    return { text: joinLines(lines, eol), changed: '移除 Enhanced 档（flow 映射）' }
   }
 
   // ② 块风格：摘 enhanced: 及其子键。
@@ -426,7 +430,7 @@ export function removeEnhancedPreset(text, record) {
     }
     lines = [...lines]
     lines.splice(index, end - index)
-    return { text: joinLines(lines, eol), changed: '摘掉 enhanced 档（块映射）' }
+    return { text: joinLines(lines, eol), changed: '移除 Enhanced 档（块映射）' }
   }
 
   return { text: source, error: '能找到 enhanced 档，但没法安全定位它那几行；请手工删掉' }

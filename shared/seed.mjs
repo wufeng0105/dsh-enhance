@@ -1,14 +1,14 @@
 /**
  * 首次数据目录的种子。
  *
- * bundle 安装（`dsh plugin --profile <p> add …`）时 installer 不存在，host 直接加载包里的插件；
+ * bundle 安装（`dsh plugin --profile <p> add …`）没有安装器阶段，host 直接加载包里的插件；
  * 插件第一次 `apply()` 时把 `<home>/enhance/` 的两份文件补齐。
  *
  * 所以这里只做两件事：复用「审批种子规则」，以及一个**幂等**的补文件函数。
  * 已有内容一律不覆盖；任何 IO 失败都吞掉并回报，让插件继续走「读不到」的诊断路径，
  * 而不是启动即崩。
  *
- * @module enhance/shared/seed
+ * @module shared/seed
  */
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'

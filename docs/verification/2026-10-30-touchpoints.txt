@@ -3,7 +3,9 @@
 # exit: 0
 # env: Windows + pwsh 7 + gh（已登录 github.com），HTTPS_PROXY=http://127.0.0.1:7897
 # input: repos/deepseek-ai/deepseek-harness，tags dsh-v0.2.1-rc.1 … dsh-v0.2.1-rc.5
-# repro: 见 docs/compatibility.md 的「方法」第 1、2 节（逐包 tree SHA + blob diff）
+# repro: 见 docs/compatibility.md 的「例行核验」一节（逐包 tree-diff 与有变更时读 diff）
+# 注意：本文件取自 2026-10-30 那轮核验，当时的包清单含 ui-settings-models / ui-settings-plugins；
+# 后来判定两者是 settings.section 槽位的兄弟消费方（非触点上游），现行清单见 compatibility.md。
 #
 # 说明：第一次跑时未加重试，rc.2 若干包报了 MISSING——那是代理瞬时失败，
 # 不是路径消失。带 4 次退避重试复跑后全部 IDENTICAL。两次输出都留在仓库历史里，

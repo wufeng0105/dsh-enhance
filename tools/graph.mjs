@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 /**
- * 代码 → 图。唯一图源是 `enhance/code-map.json`；本脚本负责两件事：
+ * 代码 → 图。唯一图源是 `code-map.json`；本脚本负责两件事：
  *
  *   --check  把模型和真实源码比对：模块文件是否存在、import 边是否都声明了、
  *            接缝（ctx.on / systemPrompt.section / webServer）是否都登记了。
  *            `--strict` 再渲染一遍并与仓库里的 SVG 逐字节比对；不带 strict 不碰图。
  *   --emit   把 `diagrams` 渲染成 SVG，写到 `docs/generated/`。
  *
- * 为什么要有 --check：手画的图会漂移，漂移的图比没有图更坏。核心仓（没有 docs/）用默认模式，
- * 只守结构；带图产物的树用 `--check --strict`，产物是纯输出，改代码不重新生成就过不了门。
+ * 为什么要有 --check：手画的图会漂移，漂移的图比没有图更坏。没有 `docs/generated/`
+ * 时用默认模式，只守结构；带图产物的树用 `--check --strict`，产物是纯输出，
+ * 改代码不重新生成就过不了门。
  *
  * 用法：
- *   node enhance/tools/graph.mjs --check [--strict] [--root <项目根>]
- *   node enhance/tools/graph.mjs --emit   [--root <项目根>]
+ *   node tools/graph.mjs --check [--strict] [--root <项目根>]
+ *   node tools/graph.mjs --emit   [--root <项目根>]
  */
 
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -315,6 +316,6 @@ if (cli.emit) {
   }
   console.log(`[graph] OK：${map.modules.length} 个模块 / ${map.edges.length} 条边${strict ? ` / ${map.diagrams.length} 张图与模型一致` : '（结构检查；加 --strict 才逐字节比图）'}`)
 } else {
-  console.error('graph: 用法：node enhance/tools/graph.mjs --check [--strict] | --emit [--root <项目根>]')
+  console.error('graph: 用法：node tools/graph.mjs --check [--strict] | --emit [--root <项目根>]')
   process.exit(1)
 }

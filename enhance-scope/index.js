@@ -431,9 +431,12 @@ export function apply(ctx, config = {}) {
   const home = resolveHome()
   const p = paths(home)
   const file = typeof config.file === 'string' && config.file.trim() !== '' ? config.file : p.text
+  // `onMissing` 是留给配置方的开关（读不到文本文件时 fail 还是 warn）——本仓的
+  // bundle patch 不配置它，宿主侧也没有已知使用方；留着是因为删掉分支即行为变化
+  // （配置了 warn 的假想部署会突然启动失败），零行为红线下先挂账，不删。
   const onMissing = config.onMissing === 'warn' ? 'warn' : 'fail'
 
-  // bundle 安装没有 installer 参与：首次加载时补齐 <home>/enhance/
+  // 没有安装器阶段：首次加载时补齐 <home>/enhance/
   ensureEnhanceData(home, fileURLToPath(new URL('../shared/content-scope.default.txt', import.meta.url)))
 
 
@@ -559,7 +562,7 @@ export function apply(ctx, config = {}) {
         }
       }
       if (preset.present) {
-        return { name: 'preset', pass: true, detail: `已写入 enhanced 档（profile: ${preset.profile ?? '?'}，重启后出现在档位菜单）` }
+        return { name: 'preset', pass: true, detail: `已写入 Enhanced 档（profile: ${preset.profile ?? '?'}，重启后出现在档位菜单）` }
       }
       return {
         name: 'preset',
@@ -572,7 +575,7 @@ export function apply(ctx, config = {}) {
     /**
      * 写/摘 enhanced 档。
      *
-     * 写盘前先备份（`.bak-enhance-<时间>`，与原安装器同一命名风格），再用
+     * 写盘前先备份（`.bak-enhance-<时间>`，沿用既有命名风格），再用
      * `writeFileAtomic` 落盘——写坏的 patch 会让宿主整份 profile 解析失败，
      * 所以宁可多一份备份文件。`dryRun` 只算不改，供测试与预览。
      *

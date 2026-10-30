@@ -23,7 +23,7 @@ export const name = 'auto-approve'
 
 /** @param {import('@deepseek-ai/cordis').Context} ctx */
 export function apply(ctx) {
-  // bundle 安装没有 installer 参与：首次加载时补齐 <home>/enhance/
+  // 没有安装器阶段：首次加载时补齐 <home>/enhance/
   ensureEnhanceData(resolveHome(), fileURLToPath(new URL('../shared/content-scope.default.txt', import.meta.url)))
 
   ctx.on(

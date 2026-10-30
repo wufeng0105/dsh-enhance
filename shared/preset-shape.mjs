@@ -8,7 +8,7 @@
  * 只做行级解析，不引 YAML：patch 的键顺序不是我们该假设的（生成的 patch 会把
  * `defaultPreset` 排在 `presets` 前面），所以两个键各自独立定位。
  *
- * @module enhance/shared/preset-shape
+ * @module shared/preset-shape
  */
 
 /**

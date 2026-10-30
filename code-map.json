@@ -22,7 +22,7 @@
       "id": "plugin.approve",
       "layer": "plugin",
       "path": "auto-approve/index.js",
-      "owns": "审批放行（三态）"
+      "owns": "审批三态应答（allow / ask / deny）"
     },
     {
       "id": "core.session-probe",
@@ -40,7 +40,7 @@
       "id": "plugin.ui-client",
       "layer": "plugin",
       "path": "ui/client.js",
-      "owns": "设置页：浏览器半，四组设置（内容边界 / 越界审批 / Enhanced 档 / 检查）+ 就地错误行，注册 settings.section 并调 /enhance/api"
+      "owns": "设置页：浏览器半，四组设置（内容边界 / 越界时怎么办 / Enhanced 权限档 / 检查）+ 就地错误行，注册 settings.section 并调 /enhance/api"
     },
     {
       "id": "tool.docs-check",
@@ -58,7 +58,7 @@
       "id": "core.text-lines",
       "layer": "core",
       "path": "shared/text-lines.mjs",
-      "owns": "行级 patch 手术：换行安全、删块、还尾换行"
+      "owns": "换行安全与按行切拼"
     },
     {
       "id": "core.preset-shape",
@@ -88,7 +88,7 @@
       "id": "core.seed",
       "layer": "core",
       "path": "shared/seed.mjs",
-      "owns": "首装种子：审批档位规则 + <home>/enhance 目录的幂等补齐（bundle 安装没有 installer 参与）"
+      "owns": "首装种子：审批档位规则 + <home>/enhance 目录的幂等补齐（没有安装器阶段，apply() 时补齐）"
     },
     {
       "id": "core.compat",
@@ -377,7 +377,7 @@
         },
         {
           "id": "options",
-          "label": "可选：写 enhanced 档"
+          "label": "可选：写 Enhanced 档"
         }
       ],
       "edges": [

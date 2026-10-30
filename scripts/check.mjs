@@ -360,7 +360,7 @@ function runSelfTest() {
 
   cases.push(withCopy(
     'docs red',
-    // 仓库已没有 docs/，门禁扫的是 README.md：正文里点名一个不存在的仓内路径必须判红
+    // 门禁扫 README 与 docs/ 下的 markdown：正文里点名一个不存在的仓内路径必须判红
     (copy) => appendFileSync(join(copy, 'README.md'), '\n临时负例：`docs/nope.md`\n'),
     (copy) => expectRed('不存在的路径')(gateDocs(copy)),
   ))

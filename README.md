@@ -8,7 +8,7 @@
 
 **它是一条纯插件**：安装只往你 profile 的依赖清单里加一行，不碰 DSH 的程序，不碰宿主配置。唯一会写宿主配置的动作是设置页里「写入 Enhanced 档」那个按钮，而那只在你点它的时候发生。
 
-**适用版本**：dsh-enhance `1.1.0` · DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.3 实测，全系源码级核验）。这句由 `package.json` 的 `dsh.compatibility` 派生；理由、触点与核验流程见 [docs/compatibility.md](docs/compatibility.md)。
+**适用版本**：dsh-enhance `1.1.0` · DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.3 实测，全系源码级核验）。这句由 `package.json` 的 `engines.dsh` 派生，宿主自己也执行同一条声明（装时拒、载时禁）；理由、触点与核验流程见 [docs/compatibility.md](docs/compatibility.md)。
 
 ## 安装
 
@@ -20,11 +20,11 @@ dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 
 装完，设置页里多出「增强」一节，四组各管一件事：内容边界、越界时怎么办、Enhanced 权限档、检查。
 
-**权限菜单图标**：没有，也不会有。宿主只为内置四个档位名准备了字形，表外的档位名渲染成纯文字行——这是宿主的显示契约，不是这个包缺了什么。
+**档位菜单图标**：没有，也不会有。宿主只为内置四个档位名准备了字形，表外的档位名渲染成纯文字行——这是宿主的显示契约，不是这个包缺了什么。
 
 ## 内容边界
 
-你写的那段文本在 `<DSH_HOME>/enhance/content-scope.txt`。存盘即生效，下一条消息带上；最多 8 KB（写入时去 BOM、统一换行、去控制字符、去首尾空白）。仓库根目录的 `content-scope.txt` 只是首次加载时抄进去的默认内容，你的文件已经存在就不会被覆盖。
+你写的这段文字放在 `<DSH_HOME>/enhance/content-scope.txt`。存盘即生效，下一条消息带上；最多 8 KB（写入时去 BOM、统一换行、去控制字符、去首尾空白）。仓库根目录的 `content-scope.txt` 只是首次加载时抄进去的默认内容，你的文件已经存在就不会被覆盖。
 
 同一件事也可以直接在设置页做：「内容边界」一组里能改、能存、能还原。
 
@@ -62,9 +62,9 @@ dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 
 ## 检查
 
-设置页的「检查」翻最新一份会话日志，把系统提示读回来，证明那段文本确实在末尾。四项：插件在进程里、文字合规、真的进了系统提示、Enhanced 档状态明确。只读，不改任何东西。
+设置页的「检查」扫最近的会话日志（按修改时间倒序取 10 份，任一命中即过），把系统提示读回来，证明这段文字确实在末尾。四项：插件在进程里、文字合规、真的进了系统提示、Enhanced 档状态明确。只读，不改任何东西。
 
-多工作区并行时，它可能读到别的工作区的日志——这是唯一的口径偏移。
+多工作区并行时，最近 10 份里可能混着别的工作区的日志——扫「最近若干份、任一命中」正是为此，但没扫到的那次仍可能给出误导性的「未命中」；这是唯一的口径偏移。
 
 ## 卸载
 
@@ -90,16 +90,16 @@ DSH 的程序和自带系统提示一个字节都不动。装和用加起来只�
 
 升级 DSH 是零操作：这个包不碰宿主配置、不派生任何产物；唯一读宿主安装目录的地方是设置页顶部那行版本号，而且只读元数据，不解包、不写、不改。
 
-那行版本号长这样：`增强 1.1.0 · DSH 0.2.1-rc.5 · 已验 0.2.1-rc.1–0.2.1-rc.5`。超出已验范围时变黄，只提示、不拦控件；读不到本机版本就照实写「读不到」，不猜。探测顺序与 rc.5 上的实测结果见 [docs/compatibility.md](docs/compatibility.md)。
+那行版本号长这样：`增强 1.1.0 · DSH 0.2.1-rc.5 · 已验 0.2.1-rc.1–0.2.1-rc.5`。超出已验范围时变黄，只提示、不拦控件；读不到本机版本就照实写「读不到本机版本」，不猜。探测顺序与 rc.5 上的实测结果见 [docs/compatibility.md](docs/compatibility.md)。
 
-要做的只是「声明还算不算数」：新 rc 发布后跑一遍例行核验（约 15 分钟），过了就把版本号加进 `package.json` 的 `dsh.compatibility`，README 那句由门禁盯着一起改。
+要做的只是「声明还算不算数」：新 rc 发布后跑一遍例行核验（约 15 分钟），过了就扩 `package.json` 的 `engines.dsh` 区间，README 那句由门禁盯着一起改。
 
 如果本机 DSH 超出声明范围，`node scripts/check.mjs` 会直接告诉你：
 
 ```
-FAIL  version  本机 DSH <版本> 不在声明范围 [0.2.1-rc.1…0.2.1-rc.5]：
+FAIL  version  本机 DSH <版本> 不在声明范围 0.2.1-rc.1–0.2.1-rc.5：
       先按 docs/compatibility.md 的例行核验跑一遍（约 15 分钟），
-      核验过了再把该版本加进 package.json 的 dsh.compatibility.versions
+      核验过了再扩 package.json 的 engines.dsh 区间
 ```
 
 ## 让 AI 帮你装

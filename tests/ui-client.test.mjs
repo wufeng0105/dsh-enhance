@@ -230,7 +230,6 @@ test('结构：越界审批组的最后一行是适用范围说明（宿主中�
   }
   assert.match(hint, /不会产生需要审批的请求/, '要说明全开档下为什么用不上')
 })
-
 test('结构：四组的说明都走 .enh-note，且每组至多一行后果 + 需要时的额外说明', () => {
   const noteCount = (source.match(/className: "enh-note"/g) ?? []).length
   assert.equal(noteCount, 1, '说明行只有一处实现（group() 里统一渲染）')
@@ -305,7 +304,7 @@ test('APG：方向键四个方向都处理，且两端回绕', () => {
   assert.ok(/\(at \+ APPROVAL_ORDER\.length - 1\) % APPROVAL_ORDER\.length/.test(source), '后退方向必须取模回绕')
 })
 
-test('审批词随三档变化，且用的是与宿主菜单错开的词', () => {
+test('审批词随三档变化，且用的是与档位菜单错开的词', () => {
   const { approvalOf } = loadBundle().__testing
   assert.equal(approvalOf('allow').word, '自动同意')
   assert.equal(approvalOf('deny').word, '自动回绝')

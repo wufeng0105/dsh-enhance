@@ -1,4 +1,4 @@
-# WP7 冒烟：在一次性 DSH_HOME + 一次性 profile 上真装、真组合、真调用。
+# 端到端冒烟：在一次性 DSH_HOME + 一次性 profile 上真装、真组合、真调用。
 # 不碰用户的 ~/.dsh，也不动你日常在用的 desktop profile。
 $ErrorActionPreference = 'Stop'
 $repo = (Get-Location).Path

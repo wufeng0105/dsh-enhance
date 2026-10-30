@@ -13,8 +13,8 @@
 //   5. 只画真实能力：CLI 或市场才能做的事只给说明，不做假按钮。
 //
 // 语义边界（这一页最容易做错的地方）：
-//   本页能改「档位**存在与否**」——点一下就往当前 profile 的 patch 里写 enhanced 档；
-//   但改不了「这一轮用哪个档」——那永远归宿主的档位选择器，04 的说明里保留了这一句。
+//   本页能改「档位**存在与否**」——点一下就往当前 profile 的 patch 里写 Enhanced 档；
+//   但改不了「这一轮用哪个档」——那永远归宿主的档位菜单。
 window.__ModuleLoader__.load({
 	id: "dsh-enhance-ui",
 	factory: (require) => {
@@ -46,7 +46,7 @@ window.__ModuleLoader__.load({
 
 		// ---------------------------------------------------------------- 文案
 
-		// 三档说的是「拿到审批请求之后怎么回」，与主菜单里那个叫「直接放行」的档位不是一回事，
+		// 三档说的是「拿到审批请求之后怎么回」，与档位菜单里那个叫「直接放行」的档位不是一回事，
 		// 同名不同义，所以这里的词与菜单错开。
 		var APPROVAL = {
 			allow: {
@@ -481,7 +481,6 @@ window.__ModuleLoader__.load({
 
 			var intro = h("p", { className: "enh-intro" },
 				"这一页管四件事：写一段文字接到系统提示末尾、越界时怎么答、要不要多一个档位、以及它有没有真的生效。");
-
 			// 版本行：本包版本 + 本机 DSH 版本 + 已验范围。
 			// 「超出已验范围」只变黄、不拦人——拦人是宿主 engines.dsh 门禁的职责（装时拒、载时禁），这一页只负责把事实说清。
 			function compatLine(compat) {
@@ -664,7 +663,7 @@ window.__ModuleLoader__.load({
 
 			// ---- 04 检查 ----
 			var blockCheck = group("enh-block-check", "检查",
-				"翻最新一份会话日志读回系统提示，看这段文字在不在末尾。只读，不改任何东西。",
+				"扫最近的会话日志（一次 10 份，任一命中即过）读回系统提示，看这段文字在不在末尾。只读，不改任何东西。",
 				checks === null ? "还没查过" : (allPass ? "全部通过" : "有失败项"),
 				checks === null ? "mute" : (allPass ? "ok" : "bad"),
 				h("div", { className: "enh-stack" },
@@ -672,7 +671,7 @@ window.__ModuleLoader__.load({
 						h(Button, { disabled: busy || state === null, onClick: function () {
 								run("check", call({ op: "check" }), function (result) { setChecks(result); });
 							} }, checks === null ? "开始检查" : "再查一次"),
-						h("span", { className: "enh-hint" }, "读最新一份会话日志；多个工作区并行时，可能读到别的工作区的日志。"),
+						h("span", { className: "enh-hint" }, "读最近的会话日志（一次 10 份）；多个工作区并行时，可能混着别的工作区的日志。"),
 					),
 					checks === null
 						? h("p", { className: "enh-hint" }, "还没有结果。")

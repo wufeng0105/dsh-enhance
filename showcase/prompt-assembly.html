@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>提示词是怎么拼起来的 · 原版 DSH 与 dsh-enhance</title>
+<title>系统提示是怎么拼起来的 · 原版 DSH 与 dsh-enhance</title>
 <meta name="description" content="DeepSeek Harness 的系统提示是一张有序注册表，每次请求前现场排序、求值、拼接。这页讲清原版怎么拼、dsh-enhance 怎么在最后一档多注册一段，以及怎么用会话日志证明它真的进去了。">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
@@ -985,11 +985,11 @@
 
   <header class="masthead">
     <p class="eyebrow">dsh-enhance · 机制说明 · 2026-10-29</p>
-    <h1 class="title">提示词是<br><em>怎么拼起来的</em></h1>
+    <h1 class="title">系统提示是<br><em>怎么拼起来的</em></h1>
     <p class="lede">DeepSeek Harness 不会把一段写死的长文发给模型。它每次请求前，把注册表里的若干段现场排序、求值、拼接。理解这条装配线，才能理解 dsh-enhance 做的唯一一件事：在最后一档多注册一段，而那段文本来自一个你随时能改的文件。</p>
     <ul class="chips">
       <li class="chip">DSH 0.2.1-rc.3</li>
-      <li class="chip">dsh-enhance 1.0.0</li>
+      <li class="chip">dsh-enhance 1.1.0</li>
       <li class="chip">宿主源码 + 本机真实会话</li>
       <li class="chip">单文件 · 无外部依赖</li>
     </ul>
@@ -1019,7 +1019,7 @@
     <div class="act-head">
       <span class="act-num">Act I</span>
       <h2 class="act-title">原版：一张每次现场拼的注册表<span class="tag">@deepseek-ai/dsh-system-prompt</span></h2>
-      <p class="act-lede">先看 DSH 自己怎么拼。它的拼法，决定了「改一句提示词」在原版里有多贵。</p>
+      <p class="act-lede">先看 DSH 自己怎么拼。它的拼法，决定了「改一句系统提示」在原版里有多贵。</p>
     </div>
 
     <div class="body">
@@ -1130,7 +1130,7 @@
         <summary>顺序表 · SECTION_ORDERS</summary>
         <ul class="band-list">
           <li><button class="band-row" type="button" data-note="固定的第一方开场白：模型是谁在做这件事。可以由部署配置关掉。"><span class="band-val">−1000</span><span class="band-name">HARNESS_IDENTITY</span></button></li>
-          <li><button class="band-row" type="button" data-note="部署方写在配置里的人格前缀，位于第一方指导之前。最近的一个「官方可配置提示词」入口。"><span class="band-val">0</span><span class="band-name">DEPLOYMENT_PERSONA_PREFIX</span></button></li>
+          <li><button class="band-row" type="button" data-note="部署方写在配置里的人格前缀，位于第一方指导之前。最近的一个「官方可配置系统提示」入口。"><span class="band-val">0</span><span class="band-name">DEPLOYMENT_PERSONA_PREFIX</span></button></li>
           <li><button class="band-row" type="button" data-note="Plan 模式的政策：什么时候该先出计划、计划怎么算结束。"><span class="band-val">500</span><span class="band-name">PLAN_POLICY</span></button></li>
           <li><button class="band-row" type="button" data-note="Agent Teams 的协作规则：谁改哪些文件、任务怎么认领、Lead 什么时候才能收尾。"><span class="band-val">600</span><span class="band-name">TEAM_POLICY</span></button></li>
           <li><button class="band-row" type="button" data-note="按需加载（PTC）相关：工具怎么分页、什么时候才把 schema 拉进来。"><span class="band-val">800</span><span class="band-name">PTC_ONLY</span></button></li>
@@ -1173,7 +1173,7 @@
         <cite>@deepseek-ai/dsh-system-prompt · README.zh.md「已知限制」</cite>
       </blockquote>
 
-      <p>原版里想动提示词，只有三条路，每条都带着代价：</p>
+      <p>原版里想动系统提示，只有三条路，每条都带着代价：</p>
       <ol>
         <li><strong>改部署配置</strong>（<code>personaPrefix</code> / <code>personaSuffix</code>）。写在 profile patch 的 config 里，宿主启动时读。改完要重启；而且只有一个全局槽位，写进去就改不了形状。</li>
         <li><strong>写一个插件注册一段</strong>。要有代码、要重装、要重启；段名不能撞、顺序要自己算。想改一句话，先改一个包。</li>
@@ -1188,7 +1188,7 @@
     <div class="act-head">
       <span class="act-num">Act II</span>
       <h2 class="act-title">我们的接法：在最后一档，贴一页纸<span class="tag">enhance-scope</span></h2>
-      <p class="act-lede">不改宿主、不替换提示词、不接管渲染。只多注册一段；那段文本从一个文件里读。</p>
+      <p class="act-lede">不改宿主、不替换系统提示、不接管渲染。只多注册一段；那段文本从一个文件里读。</p>
     </div>
 
     <div class="body">
@@ -1196,7 +1196,7 @@
       <p>全部接入就是这个调用。逐行拆开看，每一行的选择都对应第一幕里的一个约束。</p>
 
       <div class="code-pair reveal">
-        <pre class="code"><code><span class="c">// enhance-scope/index.js — 提示词侧</span>
+        <pre class="code"><code><span class="c">// enhance-scope/index.js — 系统提示侧</span>
 <span class="f">ctx.effect</span>(() =&gt; <span class="f">ctx.systemPrompt.section</span>({
   <span class="k">name</span>: SECTION_NAME,
   <span class="k">order</span>: ctx.systemPrompt.<span class="f">getSectionOrder</span>(<span class="s">'DEPLOYMENT_PERSONA_SUFFIX'</span>),
@@ -1247,12 +1247,12 @@
       </div>
 
       <h3>四道门，外加两条前提</h3>
-      <p>一段文本想真的进提示词，要过四道门；任何一道不过就不注入，而且给出人话理由。判定集中在 <code>shared/state.mjs</code> 的 <code>derive()</code> 一处，设置页的检查、路由快照用的是同一份判据。</p>
+      <p>一段文本想真的进系统提示，要过四道门；任何一道不过就不注入，而且给出人话理由。判定集中在 <code>shared/state.mjs</code> 的 <code>derive()</code> 一处，设置页的检查、路由快照用的是同一份判据。</p>
 
       <div class="gates">
         <div class="gate">
           <span class="led on" aria-hidden="true"></span>
-          <div><b>前提一：插件真的注册上了</b><br><span class="cond">markPluginActive('enhance-scope')</span> — patch 里写了，不等于这个进程里跑起来了。这一条由进程内的登记表回答。</div>
+          <div><b>前提一：插件在进程里</b><br><span class="cond">markPluginActive('enhance-scope')</span> — patch 里写了，不等于这个进程里跑起来了。这一条由进程内的登记表回答。</div>
         </div>
         <div class="gate">
           <span class="led on" aria-hidden="true"></span>
@@ -1264,11 +1264,11 @@
         </div>
         <div class="gate">
           <span class="led on" aria-hidden="true"></span>
-          <div><b>门二：注入开关</b><br><span class="cond">state.json → contentScope</span> — 默认 <code>true</code>。只停这一段，别的照常。</div>
+          <div><b>门二：内容边界开关</b><br><span class="cond">state.json → contentScope</span> — 默认 <code>true</code>。只停这一段，别的照常。</div>
         </div>
         <div class="gate">
           <span class="led on" aria-hidden="true"></span>
-          <div><b>门三：文本非空</b><br><span class="cond">text.length === 0 → reason「文本为空」</span> — 空段会被渲染器丢弃，提示词逐字回原样。</div>
+          <div><b>门三：文本非空</b><br><span class="cond">text.length === 0 → reason「文本为空」</span> — 空段会被渲染器丢弃，系统提示逐字回原样。</div>
         </div>
         <div class="gate">
           <span class="led on" aria-hidden="true"></span>
@@ -1286,7 +1286,7 @@
           <div class="demo-controls">
             <div class="switch-row">
               <button class="switch" type="button" role="switch" aria-checked="true" data-key="active" aria-label="插件已注册"></button>
-              <span class="switch-label"><span class="k">前提一</span> 插件已注册（markPluginActive）</span>
+              <span class="switch-label"><span class="k">前提一</span> 插件在进程里（markPluginActive）</span>
             </div>
             <div class="switch-row">
               <button class="switch" type="button" role="switch" aria-checked="true" data-key="enabled" aria-label="总开关"></button>
@@ -1294,7 +1294,7 @@
             </div>
             <div class="switch-row">
               <button class="switch" type="button" role="switch" aria-checked="true" data-key="contentScope" aria-label="注入开关"></button>
-              <span class="switch-label"><span class="k">门二</span> 注入开关 contentScope</span>
+              <span class="switch-label"><span class="k">门二</span> 内容边界开关 contentScope</span>
             </div>
 
             <label class="pv-label" for="demo-text" style="display:block; margin: 14px 0 6px;">content-scope.txt</label>
@@ -1362,11 +1362,11 @@
         </figcaption>
       </figure>
 
-      <p>它仍然是「一段」，不是往字符串尾巴上 append。它参与排序、参与作用域遮蔽、参与装配 waterfall，所以不会把提示词结构搞坏——它能被单独丢弃，也能被单独看见。</p>
+      <p>它仍然是「一段」，不是往字符串尾巴上 append。它参与排序、参与作用域遮蔽、参与装配 waterfall，所以不会把系统提示结构搞坏——它能被单独丢弃，也能被单独看见。</p>
 
-      <h3>不接管整份提示词</h3>
-      <p>原版允许某一段声明 <code>complete: true</code>，成为完整提示词（且只允许一段存在）。我们没用这条：用了它，20 多个工具说明和默认人格会被整份顶掉。我们只做加法。</p>
-      <p>关掉、清空、超限——段变空，渲染器丢弃它，提示词逐字回到原样，连空行都不留。这是「可退出」在提示词层面的样子。</p>
+      <h3>不接管整份系统提示</h3>
+      <p>原版允许某一段声明 <code>complete: true</code>，成为完整系统提示（且只允许一段存在）。我们没用这条：用了它，20 多个工具说明和默认人格会被整份顶掉。我们只做加法。</p>
+      <p>关掉、清空、超限——段变空，渲染器丢弃它，系统提示逐字回到原样，连空行都不留。这是「可退出」在系统提示层面的样子。</p>
 
     </div>
   </section>
@@ -1400,7 +1400,7 @@
         <div class="exhibit-foot">末尾两段之间只有一个空行——渲染器用 <span class="mono">"\n\n"</span> 连接非空段。</div>
       </div>
 
-      <p>设置页的「开始检查」做的就是这件事：找到最新一份会话日志，解压它，在含 <code>"system-prompt"</code> 的行里找这段文本。找到 = 这一次装配真的带上了它。</p>
+      <p>设置页的「开始检查」做的就是这件事：取最近的会话日志（按修改时间倒序，一次最多 10 份），解压它们，在含 <code>"system-prompt"</code> 的行里找这段文字。任一份命中 = 这一次装配真的带上了它。</p>
 
       <div class="note">
         <span class="k">为什么只认那一行</span>
@@ -1409,8 +1409,8 @@
 
       <h3>它会骗你的地方，先说清楚</h3>
       <ul>
-        <li><strong>只读最新一份会话文件。</strong>多工作区并行时，最新那份可能不是你想验证的那个会话。</li>
-        <li><strong>它回答「有没有进提示词」，不回答「模型有没有照做」。</strong>后者只能看回复。</li>
+        <li><strong>扫的是最近 10 份会话文件，任一命中即过。</strong>多工作区并行时它们可能属于别的工作区——这是探针一次扫 10 份的原因，但没扫到的那次仍可能给出误导性的「未命中」。</li>
+        <li><strong>它回答「有没有进系统提示」，不回答「模型有没有照做」。</strong>后者只能看回复。</li>
         <li><strong>日志是多帧追加的 zstd。</strong>宿主自带的 Node 24.21 流式解压只解第一帧（30 KB 只回 179 字符），所以探针按魔数切帧、逐帧解再拼起来。</li>
         <li><strong>字符数会随宿主版本和会话内容变。</strong>不变的是位置结论：它仍然落在整份提示的最后。</li>
       </ul>
@@ -1422,11 +1422,11 @@
     <h2>边界与代价</h2>
     <ul>
       <li><b>不是变量系统。</b>默认 <code>interpolate: false</code>，<code>{{…}}</code> 保持字面。要做变量，那是宿主插件 API 的事，不是这个插件的承诺。</li>
-      <li><b>不替换整份提示词。</b>没有 <code>complete: true</code>。它只做加法，所以也不能靠它改掉工具说明或人格。</li>
+      <li><b>不替换整份系统提示。</b>没有 <code>complete: true</code>。它只做加法，所以也不能靠它改掉工具说明或人格。</li>
       <li><b>上限 8 KB，读写两侧都拦。</b>直接编辑文件写超限不会注入，设置页检查判红；设置页写入超限返回 413。</li>
       <li><b>patch 只做行级追加，不解析整份 YAML。</b>结构坏要靠人看；<code>shared/preset.mjs</code> 能抓「形态认不出」，抓不了「行在但语义不对」。</li>
       <li><b>生效有一条消息的时延。</b>没有文件监听：改完不会立刻有任何事发生，下一次装配才读。</li>
-      <li><b>这一页只讲提示词。</b>审批三态与设置页是同一套接入方式的另外两件事，不在这一页的范围内。</li>
+      <li><b>这一页只讲系统提示。</b>越界审批与设置页是同一套接入方式的另外两件事，不在这一页的范围内。</li>
     </ul>
   </section>
 
@@ -1435,10 +1435,10 @@
       <h2>怎么自己核一遍</h2>
       <ol>
         <li>原版实现：<code>app.asar</code> 内 <code>dsh/node_modules/@deepseek-ai/dsh-system-prompt/lib/index.js</code>——<code>SECTION_ORDERS</code> 在文件头，<code>renderPrompt</code> 在中间。</li>
-        <li>我们的注册：<code>enhance-scope/index.js</code> 第 181–192 行。</li>
+        <li>我们的注册：<code>enhance-scope/index.js</code> 的 <code>apply()</code>——<code>ctx.systemPrompt.section</code> 那一处（按符号找，别按行号，行会漂）。</li>
         <li>判定逻辑：<code>shared/state.mjs</code> 的 <code>derive()</code>。</li>
-        <li>落盘核对：设置页「检查」一节，或 <code>node scripts/check.mjs</code> 的 6 道门禁。</li>
-        <li>运行时核对：DSH 设置页 enhance →「开始检查」，读的是会话日志原文。</li>
+        <li>运行时核对：DSH 设置页「增强」→「检查」组，读的是会话日志原文。</li>
+        <li>仓库门禁：<code>node scripts/check.mjs</code> 的 6 道门禁——它检的是仓库本身，和上面那件事不是一回事。</li>
       </ol>
     </div>
     <div class="foot-meta">
@@ -1550,7 +1550,7 @@
     meterFill.style.width = Math.min(100, (bytes / LIMIT) * 100) + '%';
     meterEl.classList.toggle('over', over);
 
-    oursText.textContent = result.injecting ? result.text : '（空段：渲染器丢弃，提示词回原样）';
+    oursText.textContent = result.injecting ? result.text : '（空段：渲染器丢弃，系统提示回原样）';
     ours.classList.toggle('pv-off', !result.injecting);
 
     pill.textContent = result.injecting ? '注入中' : '未注入';

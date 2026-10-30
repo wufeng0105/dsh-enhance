@@ -4,19 +4,19 @@
  *
  * 为什么要有它：代码侧的门禁（`node --check` / `--test` / `graph --check` / `bundle`）
  * 都只管代码与结构，文档侧一条都没有——`graph` 只比 SVG，`bundle` 只看 patch 声明。
- * 于是 `design.md` 里能躺一整行字面反斜杠 n、能用死链接、
- * 能把用例数写成三个版本，而所有闸都绿。
+ * 于是文档里能躺一整行字面反斜杠 n、能用死链接、能把同一件事写出三个版本，
+ * 而所有闸都绿（历史上真实发生过，才有了这道门）。
  *
  * 三条检查，都只读：
  *   1. 正文（代码块与行内代码之外）里的字面 `反斜杠+n` / `反斜杠+t`——写盘转义没生效的痕迹
  *   2. 相对链接指向的文件必须存在
- *   3. 反引号里点名的仓库路径必须存在（`docs/...` / `enhance/...` / `.zhll/...`）；
+ *   3. 反引号里点名的仓库路径必须存在（`docs/...` / `.zhll/...`）；
  *      只扫正文（代码块里的命令不按路径查），带 `<...>` 或 `*` 占位的不查，
- *      带 `:行号` 的按路径查，历史件（audit/repair/archive）不查
+ *      带 `:行号` 的按路径查
  *
  * 退出码：0 全过；1 有问题或用法错（用法错只打一行消息，不吐栈）。
  *
- * 用法：node enhance/tools/docs-check.mjs [--root <项目根>]
+ * 用法：node tools/docs-check.mjs [--root <项目根>]
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -66,15 +66,8 @@ function collectDocs() {
   }
   if (existsSync(join(projectRoot, 'README.md'))) out.push(join(projectRoot, 'README.md'))
   if (existsSync(join(projectRoot, 'docs'))) add(join(projectRoot, 'docs'))
-  if (existsSync(join(projectRoot, 'enhance'))) add(join(projectRoot, 'enhance'))
-  if (existsSync(join(projectRoot, '_artifacts'))) add(join(projectRoot, '_artifacts'))
   // .zhll 是草稿区：里面的调研件会引用宿主仓库的相对路径，不纳入死路径检查
   return out
-}
-
-/** 历史件：里面的旧路径是有意的。 */
-function isHistorical(relative) {
-  return /^docs\/(audit|repair|archive)\//.test(relative) || /^docs\/(audit-|repair-)/.test(relative)
 }
 
 /** 去掉代码块，返回正文行与行号。 */
@@ -113,16 +106,14 @@ for (const file of collectDocs()) {
   }
 
   // 3 反引号里的仓库路径（只扫正文：代码块里的命令按命令看，不按路径看）
-  if (!isHistorical(relative)) {
-    for (const { line } of proseLines(text)) {
-      for (const match of line.matchAll(/`([^`]+)`/g)) {
-        const token = match[1].trim()
-        if (!/^(docs|enhance|\.zhll|_artifacts|deepseek-harness)\//.test(token)) continue
-        if (/[<>*{}]/.test(token)) continue
-        if (!token.includes('.') && !token.endsWith('/')) continue
-        const bare = token.split('#')[0].replace(/(:\d+(-\d+)?(,\d+)*)+$/, '')
-        if (!existsSync(join(projectRoot, bare))) problems.push(`${relative} 提到不存在的路径：${token}`)
-      }
+  for (const { line } of proseLines(text)) {
+    for (const match of line.matchAll(/`([^`]+)`/g)) {
+      const token = match[1].trim()
+      if (!/^(docs|\.zhll)/.test(token)) continue
+      if (/[<>*{}]/.test(token)) continue
+      if (!token.includes('.') && !token.endsWith('/')) continue
+      const bare = token.split('#')[0].replace(/(:\d+(-\d+)?(,\d+)*)+$/, '')
+      if (!existsSync(join(projectRoot, bare))) problems.push(`${relative} 提到不存在的路径：${token}`)
     }
   }
 }
