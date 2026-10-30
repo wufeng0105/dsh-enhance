@@ -15,10 +15,6 @@
 - **Enhanced 权限档**（可选）——往档位菜单里添一个「沙箱全开、越界仍问你」的档
 - **检查**——读最近的会话日志，证明这段文字真的进了系统提示
 
-![运行期架构：纯插件身份，装的时候只动 profile 的依赖清单](docs/images/01-runtime-architecture.png)
-
-*运行期架构：一条纯插件。装的时候只改你这份 profile 的依赖清单；宿主配置只在你点「写入 Enhanced 档」时才被碰。*
-
 **适用版本**：dsh-enhance `1.1.0` · DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）。这句由 `package.json` 的 `engines.dsh` 派生，宿主自己也执行同一条声明（装时拒、载时禁）；理由、触点与核验流程见 [docs/compatibility.md](docs/compatibility.md)。
 
 ## 快速开始
@@ -133,18 +129,6 @@ FAIL  version  本机 DSH <版本> 不在声明范围 0.2.1-rc.1–0.2.1-rc.5：
 ```
 
 ## 深入了解
-
-![一条消息的一生](docs/images/02-message-lifecycle.png)
-
-*一条消息的一生：内容边界怎么进到系统提示里，以及怎么用会话日志证明它真的进去了。*
-
-![四道门：为什么这次没有注入](docs/images/04-injection-gates.png)
-
-*四道门：总开关、内容边界开关、文本非空、文本不超过 8 KB——哪道没通过、原因是什么。*
-
-![审批三态](docs/images/05-approval-three-states.png)
-
-*越界审批三态：自动同意 / 先问我 / 自动回绝分别是什么结果，以及开关文件坏了为什么回落到「先问我」。*
 
 还有一页把 DSH 的系统提示怎么一层层拼起来、dsh-enhance 接在哪一档讲清楚：`showcase/prompt-assembly.html`（下载后用浏览器打开）。
 

@@ -164,9 +164,9 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 | `packages/client/ui-settings-general/src` | rc.1≡rc.2；rc.3 起变，rc.3≡rc.4≡rc.5 | `e0ad312f5ae2b026c986ef908fda668016d6dd64` | `22c42682ba5fb15014c86caaabfeb4bb4c86bb58` |
 | `packages/client/ui-permission-presets/src` | 全同 | `71cf0cb4204e166c8dec3434681a9a52a0221966` | 同左 |
 | `packages/boot/app-boot/src` | 全同 | `14016c958ce4f6006933056a4863c5bebb348daf` | 同左 |
-| `packages/boot/plugin-manager/src` | 全同 | （blob 级对照，见 `docs/verification/2026-10-30-touchpoints.txt`） | 同左 |
+| `packages/boot/plugin-manager/src` | 全同 | （blob 级对照，2026-10-30 核验） | 同左 |
 
-逐文件比对 `ui-settings-general/src`：只有 `client/index.ts` 变了，diff 是新增 `productAnalytics.track('code_work_view_toggle', …)` 埋点与一行 `import type {}`，**`settings.section` 的槽位机制未动**。原始输出见 `docs/verification/2026-10-30-touchpoints.txt`。
+逐文件比对 `ui-settings-general/src`：只有 `client/index.ts` 变了，diff 是新增 `productAnalytics.track('code_work_view_toggle', …)` 埋点与一行 `import type {}`，**`settings.section` 的槽位机制未动**。
 
 rc.5 上还做了一轮**干净环境终验**（2026-10-30，远端机重置后）：静默重装 `0.2.1-rc.5` → 按现行装法 `dsh plugin add` 装最终包（`engines.dsh` 区间在装载 preflight 下直接通过，exit 0）→ `--dump-config` 三个入口齐全、profile patch 保持 `[]` → 隔离 home 冒烟 30 条断言全过 → GUI 侧 `/enhance/api` 注入命中真实会话系统提示、写档/重启/组合/摘除闭环 → 真启动一次只报余额不足（`QUOTA`），没有插件相关报错。
 
