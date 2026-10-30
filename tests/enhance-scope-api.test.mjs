@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { apply, resolveProfilePatch } from '../enhance-scope/index.js'
+import { apply, readAsarManifestVersion, resolveProfilePatch } from '../enhance-scope/index.js'
 
 /** 一个够 `apply()` 用的假 cordis 上下文；`profile` 为 undefined 时模拟「没有 profile 上下文」。 */
 function fakeCtx({ profile, home } = {}) {
@@ -157,6 +157,32 @@ test('state 快照带 preset 段；没有 profile 上下文时 patchPath 为 nul
   }
 })
 
+test('readAsarManifestVersion：只读 asar 头里的 package.json（不解包、不写盘）', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'enhance-asar-'))
+  try {
+    const asarPath = join(dir, 'app.asar')
+    const manifest = Buffer.from(JSON.stringify({ name: '@deepseek-ai/dsh-desktop', version: '0.2.1-rc.5' }), 'utf8')
+    const index = Buffer.from(JSON.stringify({ files: { 'package.json': { size: manifest.length, offset: '0' } } }), 'utf8')
+    const headerSize = 8 + index.length
+    const header = Buffer.alloc(headerSize)
+    header.writeUInt32LE(headerSize - 4, 0)
+    header.writeUInt32LE(index.length, 4)
+    index.copy(header, 8)
+    const preamble = Buffer.alloc(8)
+    preamble.writeUInt32LE(4, 0)
+    preamble.writeUInt32LE(headerSize, 4)
+    writeFileSync(asarPath, Buffer.concat([preamble, header, manifest]))
+
+    assert.deepEqual(readAsarManifestVersion(asarPath), { name: '@deepseek-ai/dsh-desktop', version: '0.2.1-rc.5' })
+
+    const junk = join(dir, 'junk.bin')
+    writeFileSync(junk, 'not an asar')
+    assert.equal(readAsarManifestVersion(junk), undefined)
+    assert.equal(readAsarManifestVersion(join(dir, 'missing.asar')), undefined)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 test('state 快照带 compat：本包版本取自 package.json，本机版本用于核对已验范围', async () => {
   const pkg = JSON.parse(readFileSync(join(fileURLToPath(new URL('../package.json', import.meta.url)) ), 'utf8'))
   const previous = process.env.DSH_VERSION

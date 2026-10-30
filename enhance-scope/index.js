@@ -21,8 +21,8 @@
  *      scheme 放行；其余必须与 Host 严格同源（scheme + host + port）。`Origin: null` 拒绝。
  */
 
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { closeSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   APPROVALS, TEXT_LIMIT, derive, isPluginActive, markPluginActive, paths,
@@ -185,42 +185,177 @@ const COMPATIBILITY = {
 }
 
 /**
- * 本机 DSH 版本。三种来源按可靠性排序，都拿不到就返回 null（页面上只说「读不到」）：
- *   1. 宿主的 `@deepseek-ai/dsh-package-manifest` → `getDshRuntimeVersion()`
- *      —— 宿主自己就用它做插件兼容闸，读的是 app-boot 的 package.json；
- *   2. `DSH_VERSION` 环境变量（脚本与测试用）；
- *   3. `<home>/dsh-runtimes/<runtime>/runtime.json` 的 `desktopVersion`。
- * 不猜版本号：读不到就老实说读不到。
+ * 从 Electron 的 `app.asar` 头里读出宿主版本（**只读**：读头 + 一个文件条目，不解包、不写、不派生任何产物）。
+ *
+ * 为什么需要它：桌面版宿主是打包进 asar 的，profile 插件实测既 import 不到
+ * `@deepseek-ai/dsh-package-manifest`（ERR_MODULE_NOT_FOUND），也解析不到安装作用域里的
+ * 核心包（MODULE_NOT_FOUND），`dsh-runtimes/runtime.json` 又不一定存在。asar 根
+ * `package.json` 里的 `version` 就是产品版本（`@deepseek-ai/dsh-desktop`），读它最稳。
+ *
+ * asar 布局：[uint32 4][uint32 headerSize][headerSize 字节的头]，头里是
+ * [uint32 总长][uint32 jsonLength][JSON][padding]；文件数据从 `8 + headerSize` 起，
+ * 每个条目的 `offset` 相对数据区。
+ *
+ * @param {string} asarPath
+ * @returns {{ name?: string, version?: string } | undefined}
+ */
+export function readAsarManifestVersion(asarPath) {
+  let fd
+  try {
+    fd = openSync(asarPath, 'r')
+    const preamble = Buffer.alloc(16)
+    if (readSync(fd, preamble, 0, 16, 0) < 16) return undefined
+    const headerSize = preamble.readUInt32LE(4)
+    if (headerSize <= 16 || headerSize > 64 * 1024 * 1024) return undefined
+    const header = Buffer.alloc(headerSize)
+    if (readSync(fd, header, 0, headerSize, 8) < headerSize) return undefined
+    const jsonLength = header.readUInt32LE(4)
+    if (jsonLength <= 0 || jsonLength > headerSize - 8) return undefined
+    let index
+    try {
+      index = JSON.parse(header.slice(8, 8 + jsonLength).toString('utf8'))
+    } catch {
+      return undefined
+    }
+    const entry = index?.files?.['package.json']
+    if (entry === undefined || entry === null || typeof entry !== 'object') return undefined
+    const size = typeof entry.size === 'number' ? entry.size : Number(entry.size)
+    const offset = typeof entry.offset === 'number' ? entry.offset : Number(entry.offset)
+    if (!Number.isFinite(size) || !Number.isFinite(offset) || size <= 0 || size > 1024 * 1024) return undefined
+    const data = Buffer.alloc(size)
+    if (readSync(fd, data, 0, size, 8 + headerSize + offset) < size) return undefined
+    let manifest
+    try {
+      manifest = JSON.parse(data.toString('utf8'))
+    } catch {
+      return undefined
+    }
+    const version = typeof manifest?.version === 'string' ? manifest.version.trim() : ''
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) return undefined
+    return { name: typeof manifest.name === 'string' ? manifest.name : undefined, version }
+  } catch {
+    return undefined
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd)
+      } catch {
+        // 关不上不影响返回值
+      }
+    }
+  }
+}
+
+/**
+ * 从「解析到的入口路径」往上找最近的 package.json，读出 name/version。
+ * 只读，不执行被解析的模块。
+ * @param {string} entry 已解析的绝对路径
+ * @param {(path: string) => string} [read] 读文件函数（测试可注入）
+ * @returns {{ name?: string, version?: string } | undefined}
+ */
+function packageManifestNear(entry, read = (path) => readFileSync(path, 'utf8')) {
+  let current = dirname(entry)
+  for (let depth = 0; depth < 6; depth += 1) {
+    const candidate = join(current, 'package.json')
+    try {
+      const parsed = JSON.parse(read(join(candidate)))
+      if (parsed !== null && typeof parsed === 'object') return parsed
+    } catch {
+      // 这个目录没有 package.json，继续往上
+    }
+    const parent = dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+  return undefined
+}
+
+/**
+ * 本机 DSH 版本。五种来源，都拿不到就返回 null（页面上只说「读不到」）：
+ *   1. `DSH_VERSION` 环境变量——显式覆盖，脚本与测试用它把结果钉住；
+ *   2. 宿主的 `@deepseek-ai/dsh-package-manifest` → `getDshRuntimeVersion()`
+ *      —— 宿主自己就用它做插件兼容闸；实测桌面版的 profile 插件 import 不到；
+ *   3. **安装作用域里的核心包**的版本（`@deepseek-ai/dsh-base` 等，版本号与产品同号）
+ *      —— 实测在 rc.5 的 profile 插件里也解析不到；
+ *   4. **桌面版安装根的 `app.asar` 清单**（只读一个文件条目，不解包、不写盘）
+ *      —— rc.5 上唯一稳定可用的来源；
+ *   5. `<home>/dsh-runtimes/<runtime>/runtime.json` 的 `desktopVersion`——桌面版跑过
+ *      一次带工具的会话后才会出现。
+ * 不猜版本号：读不到就老实说读不到，并把每次失败的原因放进 `attempts`（只在接口里，不上页面）。
  *
  * @param {string} home
- * @returns {Promise<{ host: string | null, source: 'package-manifest' | 'env' | 'runtime-json' | null }>}
+ * @returns {Promise<{ host: string | null, source: 'package-manifest' | 'installation-package' | 'asar-manifest' | 'env' | 'runtime-json' | null, attempts: string[] }>}
  */
 export async function readHostVersion(home) {
+  const attempts = []
+  /** 只认形如 x.y.z 或带预发布后缀的版本串。 */
+  const accept = (value, source) => {
+    if (typeof value !== 'string') return undefined
+    const trimmed = value.trim()
+    return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(trimmed) ? { host: trimmed, source, attempts } : undefined
+  }
+
+  const env = typeof process.env.DSH_VERSION === 'string' ? process.env.DSH_VERSION.trim() : ''
+  const fromEnv = accept(env, 'env')
+  if (fromEnv !== undefined) return fromEnv
   try {
     const manifest = await import('@deepseek-ai/dsh-package-manifest')
     const value = typeof manifest.getDshRuntimeVersion === 'function' ? manifest.getDshRuntimeVersion() : undefined
-    if (typeof value === 'string' && value.trim() !== '') return { host: value.trim(), source: 'package-manifest' }
-  } catch {
-    // 不在宿主进程里（Node 测试），或这个宿主没暴露该包：落到下一种来源
+    const hit = accept(value, 'package-manifest')
+    if (hit !== undefined) return hit
+    attempts.push('package-manifest: 没有可用的 getDshRuntimeVersion()')
+  } catch (error) {
+    attempts.push('package-manifest: ' + String(error?.code ?? error?.message ?? error).slice(0, 60))
   }
-  const env = typeof process.env.DSH_VERSION === 'string' ? process.env.DSH_VERSION.trim() : ''
-  if (env !== '') return { host: env, source: 'env' }
+
+  try {
+    const { createRequire } = await import('node:module')
+    const resolveFromPlugin = createRequire(import.meta.url)
+    for (const name of ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-settings']) {
+      try {
+        const entry = resolveFromPlugin.resolve(name)
+        const manifest = packageManifestNear(entry)
+        const hit = accept(manifest?.version, 'installation-package')
+        if (hit !== undefined) return hit
+        attempts.push(name + ': 解析到 ' + entry + ' 但没有版本号')
+      } catch (error) {
+        attempts.push(name + ': ' + String(error?.code ?? error?.message ?? error).slice(0, 40))
+      }
+    }
+  } catch (error) {
+    attempts.push('createRequire: ' + String(error?.message ?? error).slice(0, 60))
+  }
+
+  // 桌面版：读安装根里 app.asar 的清单版本（只读一个条目，不解包、不写盘）
+  const installRoots = []
+  if (typeof process.execPath === 'string' && process.execPath !== '') installRoots.push(dirname(process.execPath))
+  const localAppData = typeof process.env.LOCALAPPDATA === 'string' ? process.env.LOCALAPPDATA : ''
+  if (localAppData !== '') installRoots.push(join(localAppData, 'Programs', 'DeepSeek Harness'))
+  for (const root of installRoots) {
+    const manifest = readAsarManifestVersion(join(root, 'resources', 'app.asar'))
+    const hit = accept(manifest?.version, 'asar-manifest')
+    if (hit !== undefined) return hit
+  }
+  attempts.push('asar-manifest: 读不到 resources/app.asar 里的 package.json 版本')
+
+
   try {
     for (const entry of readdirSync(join(home, 'dsh-runtimes'), { withFileTypes: true })) {
       if (!entry.isDirectory()) continue
       try {
         const parsed = JSON.parse(readFileSync(join(home, 'dsh-runtimes', entry.name, 'runtime.json'), 'utf8'))
-        if (typeof parsed.desktopVersion === 'string' && parsed.desktopVersion.trim() !== '') {
-          return { host: parsed.desktopVersion.trim(), source: 'runtime-json' }
-        }
+        const hit = accept(parsed?.desktopVersion, 'runtime-json')
+        if (hit !== undefined) return hit
       } catch {
         // 换下一个 runtime 目录
       }
     }
-  } catch {
-    // 没有 dsh-runtimes 目录
+    attempts.push('runtime-json: 没有可读的 desktopVersion')
+  } catch (error) {
+    attempts.push('runtime-json: ' + String(error?.code ?? '').slice(0, 40))
   }
-  return { host: null, source: null }
+
+  return { host: null, source: null, attempts }
 }
 
 /**
@@ -230,7 +365,7 @@ export async function readHostVersion(home) {
  * @param {string} home
  */
 export async function compatSnapshot(home) {
-  const { host, source } = await readHostVersion(home)
+  const { host, source, attempts } = await readHostVersion(home)
   return {
     tool: COMPATIBILITY.tool,
     host,
@@ -238,6 +373,8 @@ export async function compatSnapshot(home) {
     versions: COMPATIBILITY.versions,
     tested: COMPATIBILITY.tested,
     inRange: host === null || COMPATIBILITY.versions.length === 0 ? null : COMPATIBILITY.versions.includes(host),
+    // 读不到时把每次尝试的失败原因带出来，方便在接口上定位是哪一层断了（不上页面）
+    attempts,
   }
 }
 
@@ -291,6 +428,7 @@ export function apply(ctx, config = {}) {
 
   // bundle 安装没有 installer 参与：首次加载时补齐 <home>/enhance/
   ensureEnhanceData(home, fileURLToPath(new URL('../shared/content-scope.default.txt', import.meta.url)))
+
 
   let lastGood = readText({ ...p, text: file })
   if (!lastGood.ok && onMissing === 'fail') {

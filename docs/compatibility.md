@@ -151,6 +151,24 @@ diff 是新增 `productAnalytics.track('code_work_view_toggle', …)` 埋点与�
    `approval: ask` 合法；未知 kebab-case 档名在档位菜单里渲染成 Title Case 纯文字行，
    字形表里没有它 —— 这不是缺陷，是宿主的显示契约。
 
+## 设置页那行版本号怎么读本机版本
+
+设置页顶部显示 `增强 <本包版本> · DSH <本机版本> · 已验 <范围>`。本包版本与范围读自
+`package.json` 的 `version` 与 `dsh.compatibility`；本机版本按下面顺序探测，**读不到就写
+「读不到本机版本」，不猜**：
+
+1. `DSH_VERSION` 环境变量（显式覆盖，脚本与测试用）；
+2. 宿主的 `@deepseek-ai/dsh-package-manifest` → `getDshRuntimeVersion()`；
+3. 安装作用域里的核心包（`@deepseek-ai/dsh-base` 等，版本号与产品同号）；
+4. 桌面版安装根的 `resources/app.asar` 清单（**只读**头里的 `package.json` 条目——
+   不解包、不写盘、不派生任何产物）；
+5. `<home>/dsh-runtimes/<runtime>/runtime.json` 的 `desktopVersion`。
+
+**rc.5 上的实测**（2026-10-30，Windows 桌面版）：第 2、3 条在 profile 插件里分别报
+`ERR_MODULE_NOT_FOUND` / `MODULE_NOT_FOUND`，第 5 条的目录在没跑过带工具的会话时不出现，
+**只有第 4 条稳定可用**。这条只读路径是 1.1.0 唯一新增的宿主耦合，若哪天宿主改掉
+asar 头布局，它会自动退化成「读不到」，不会影响注入、审批与写档。
+
 ## 已知边界（非目标，写明防扩展）
 
 - 不碰宿主 `app.asar`、不做图标、不做派生件——永久。
