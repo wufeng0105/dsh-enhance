@@ -246,9 +246,12 @@ test('结论：Enhanced 档四种状态各自说对话，且只在能做事的�
   assert.ok(source.includes('再点一次确认移除'), '移除缺少二次确认')
   assert.ok(source.includes('action: "add"') && source.includes('action: "remove"'), '缺 preset op 的两种动作')
 
-  // 「写进去只是多一个可选档；当前用哪个档仍由菜单决定」——这条边界不能随横幅一起消失
-  assert.match(source, /当前用哪个档仍由菜单决定/, '缺「当前档位归谁管」的边界句')
-  assert.ok(source.includes('没有图标'), '缺「为什么没有图标」的说明')
+  // 04 节只留「用户确认过的那一句话」+ 右上状态 + 按钮 + 折叠区；
+  // 其余解释性句子（档位归属、图标契约、写入后的路径说明）已按用户要求删除。
+  assert.ok(source.includes('档位菜单里可以通过 profile 增加一个「全开沙箱、保留审批」的可选档'), '缺 04 的副行')
+  for (const gone of ['当前用哪个档仍由菜单决定', '没有图标', '已写进 profile', '显示契约']) {
+    assert.ok(!source.includes(gone), `04 节又长回去了：${gone}`)
+  }
 })
 
 test('检查节：四项以 API 的 name 为键、标题是本地映射、pass 一律取服务端值', () => {

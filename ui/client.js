@@ -586,12 +586,10 @@ window.__ModuleLoader__.load({
 				]);
 
 			// ---- 03 Enhanced 权限档 ----
+			// 已写入时不再多写一句确认：右上角的状态标签已经是结论，
+			// 多写一行落盘位置只是把同一件事说第二遍。
 			var presetDetail = [];
-			if (presetStatus.kind === "written") {
-				presetDetail.push(h("p", { className: "enh-hint", key: "w" },
-					"已写进" + (preset && preset.profile ? " profile「" + preset.profile + "」" : "当前 profile") + " 的 cordis.patch.yml；重启后出现在档位菜单、/permission 与设置页默认档下拉里。",
-				));
-			} else if (presetStatus.kind === "noprofile") {
+			if (presetStatus.kind === "noprofile") {
 				presetDetail.push(h("p", { className: "enh-hint", key: "n" },
 					"这一页没拿到 profile 上下文（不是从 profile 启动的），所以不知道往哪写。在桌面版或 dsh --profile <名字> 里打开设置页。",
 				));
@@ -645,8 +643,6 @@ window.__ModuleLoader__.load({
 				state === null ? "—" : presetStatus.word,
 				state === null ? "mute" : presetStatus.tone,
 				h("div", { className: "enh-stack" },
-					h("p", { className: "enh-hint" }, "写进去之后，它只是档位菜单里多出来的一个可选档；当前用哪个档仍由菜单决定。"),
-					h("p", { className: "enh-hint" }, "没有图标——宿主只为内置四个档位名准备了图标，表外的名字只渲染文字行。这是宿主的显示契约，不是这里缺了什么。"),
 					presetDetail.length === 0 ? null : h("div", null, presetDetail),
 					presetActions.length === 0 ? null : h("div", { className: "enh-actions" }, presetActions),
 					h("details", { className: "enh-term" },
