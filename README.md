@@ -8,9 +8,20 @@
 
 **它是一条纯插件**：安装只往你 profile 的依赖清单里加一行，不碰 DSH 的程序，不碰宿主配置。唯一会写宿主配置的动作是设置页里「写入 Enhanced 档」那个按钮，而那只在你点它的时候发生。
 
+装完之后，设置页里多出「增强」一节，四件事各管一样：
+
+- **内容边界**——一段你自己写的文字，接到系统提示末尾，存盘即生效
+- **越界审批**——动作超出档位时怎么回：自动同意 / 先问我 / 自动回绝
+- **Enhanced 权限档**（可选）——往档位菜单里添一个「沙箱全开、越界仍问你」的档
+- **检查**——读最近的会话日志，证明这段文字真的进了系统提示
+
+![运行期架构：纯插件身份，装的时候只动 profile 的依赖清单](docs/images/01-runtime-architecture.png)
+
+*运行期架构：一条纯插件。装的时候只改你这份 profile 的依赖清单；宿主配置只在你点「写入 Enhanced 档」时才被碰。*
+
 **适用版本**：dsh-enhance `1.1.0` · DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）。这句由 `package.json` 的 `engines.dsh` 派生，宿主自己也执行同一条声明（装时拒、载时禁）；理由、触点与核验流程见 [docs/compatibility.md](docs/compatibility.md)。
 
-## 安装
+## 快速开始
 
 一条命令，装完重启 DeepSeek Harness：
 
@@ -18,11 +29,25 @@
 dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 ```
 
-装完，设置页里多出「增强」一节，四组各管一件事：内容边界、越界时怎么办、Enhanced 权限档、检查。
-
 **档位菜单图标**：没有，也不会有。宿主只为内置四个档位名准备了字形，表外的档位名渲染成纯文字行——这是宿主的显示契约，不是这个包缺了什么。
 
-## 内容边界
+**让 AI 帮你装**：不想自己动手，把下面整段发给任意 AI（Claude / Codex / 你自己的 DSH 会话都行），它会照做。
+
+```text
+帮我在这台机器上安装 dsh-enhance —— 一个 DeepSeek Harness 的本地插件。
+
+要求：
+1. 先确认本机已装 DeepSeek Harness，并找到它的 dsh 命令
+   （桌面版通常在 resources\runtime\cli\bin\dsh.cmd）。
+2. 跑：dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
+   如果它报错，把原始输出贴给我，不要自己换别的装法、不要改 DSH 的源码或配置。
+3. 装完只告诉我「请重启 DeepSeek Harness」。不要自动重启。
+4. 如果找不到 dsh 命令，先告诉我，不要猜路径。
+```
+
+## 功能详解
+
+### 内容边界
 
 你写的这段文字放在 `<DSH_HOME>/enhance/content-scope.txt`。存盘即生效，下一条消息带上；最多 8 KB（写入时去 BOM、统一换行、去控制字符、去首尾空白）。仓库根目录的 `content-scope.txt` 只是首次加载时抄进去的默认内容，你的文件已经存在就不会被覆盖。
 
@@ -38,7 +63,7 @@ dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 
 `approval` 的初始值不是硬编码：它读你 profile 的默认档位——默认档位是 `approval: never`（沙箱全开、不问人）时种「先问我」，否则种「自动同意」。因为 `never` 的档位下宿主在分发前就拒了，种「自动同意」永远轮不到。
 
-## 越界审批
+### 越界审批
 
 宿主会在动作超出当前档位时发审批请求。这一段只决定拿到请求之后怎么回：
 
@@ -48,7 +73,7 @@ dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 
 这三项只对「仅可查看」和「工作区内修改」两个档位起作用。档位是「完全权限」或 Enhanced 时，宿主不会产生需要审批的请求，这三项也就用不上。
 
-## Enhanced 权限档（可选）
+### Enhanced 权限档（可选）
 
 宿主内置的 `danger-full-access` 是「沙箱全开 **并且** 审批不问人」。想要「沙箱全开、越界仍问你」，得有一个自定义档；而宿主的档位表只认 profile 配置里定义的名字，所以只能写进你自己的 profile。
 
@@ -60,7 +85,7 @@ dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 - **怎么撤**：同一节点「移除 Enhanced 档」，或手工删掉 patch 里 `enhanced:` 那三行。
 - **什么时候生效**：重启 DeepSeek Harness。写档是这一页唯一需要重启的动作。
 
-## 检查
+### 检查
 
 设置页的「检查」扫最近的会话日志（按修改时间倒序取 10 份，任一命中即过），把系统提示读回来，证明这段文字确实在末尾。四项：插件在进程里、文字合规、真的进了系统提示、Enhanced 档状态明确。只读，不改任何东西。
 
@@ -107,27 +132,7 @@ FAIL  version  本机 DSH <版本> 不在声明范围 0.2.1-rc.1–0.2.1-rc.5：
       核验过了再扩 package.json 的 engines.dsh 区间
 ```
 
-## 让 AI 帮你装
-
-不想自己动手：把下面整段发给任意 AI（Claude / Codex / 你自己的 DSH 会话都行），它会照做。
-
-```text
-帮我在这台机器上安装 dsh-enhance —— 一个 DeepSeek Harness 的本地插件。
-
-要求：
-1. 先确认本机已装 DeepSeek Harness，并找到它的 dsh 命令
-   （桌面版通常在 resources\runtime\cli\bin\dsh.cmd）。
-2. 跑：dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
-   如果它报错，把原始输出贴给我，不要自己换别的装法、不要改 DSH 的源码或配置。
-3. 装完只告诉我「请重启 DeepSeek Harness」。不要自动重启。
-4. 如果找不到 dsh 命令，先告诉我，不要猜路径。
-```
-
-## 图
-
-![运行期架构：纯插件身份，装的时候只动 profile 的依赖清单](docs/images/01-runtime-architecture.png)
-
-*运行期架构：一条纯插件。装的时候只改你这份 profile 的依赖清单；宿主配置只在你点「写入 Enhanced 档」时才被碰。*
+## 深入了解
 
 ![一条消息的一生](docs/images/02-message-lifecycle.png)
 
@@ -142,6 +147,8 @@ FAIL  version  本机 DSH <版本> 不在声明范围 0.2.1-rc.1–0.2.1-rc.5：
 *越界审批三态：自动同意 / 先问我 / 自动回绝分别是什么结果，以及开关文件坏了为什么回落到「先问我」。*
 
 还有一页把 DSH 的系统提示怎么一层层拼起来、dsh-enhance 接在哪一档讲清楚：`showcase/prompt-assembly.html`（下载后用浏览器打开）。
+
+版本支持的全部技术细节——声明怎么被宿主执行、35 条宿主触点、例行核验的可重跑步骤——在 [docs/compatibility.md](docs/compatibility.md)。
 
 ## 许可
 
