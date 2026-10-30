@@ -518,7 +518,6 @@ window.__ModuleLoader__.load({
 						h("div", { className: "enh-actions" },
 							h(Button, { kind: "primary", disabled: locked || over || draft === (state === null ? "" : state.text), onClick: function () { run("scope", call({ op: "set", text: draft })); } }, "保存"),
 							h(Button, { disabled: locked || draft === (state === null ? "" : state.text), onClick: function () { setDraft(state === null ? "" : state.text || ""); } }, "还原"),
-							h(Button, { disabled: locked || draft === "", onClick: function () { setDraft(""); } }, "清空（= 不加）"),
 							over ? h("span", { className: "enh-hint" }, "超上限，删一点再存") : null,
 						),
 					),

@@ -453,6 +453,13 @@ test('内容边界：注入成立时给的是「能写什么」，不是把四�
   assert.ok(source.includes('现在没有注入，卡在：'), '缺「卡在哪」的诊断句')
 })
 
+test('内容边界只有「保存」「还原」两个动作（清空按钮已删）', () => {
+  assert.ok(source.includes('"保存"'), '缺保存按钮')
+  assert.ok(source.includes('"还原"'), '缺还原按钮')
+  // 清空文本不是必需动作：关掉开关就是不注入；真想清空，在文本框里删光再保存即可
+  assert.ok(!source.includes('清空（= 不加）'), '「清空」按钮不该回来')
+})
+
 test('状态：服务端 active / degraded 必须被用上，降级原因要有一行说明', () => {
   assert.ok(source.includes('state.active === false'), '插件未激活必须能显示出来')
   assert.ok(source.includes('state.degraded'), '降级必须能显示出来')
