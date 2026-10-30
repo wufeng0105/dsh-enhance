@@ -641,7 +641,7 @@ window.__ModuleLoader__.load({
 			}
 
 			var blockPreset = group("enh-block-preset", "Enhanced 权限档",
-				"沙箱全开（danger-full-access）+ 越界仍问人（ask）。宿主内置没有这个组合，要写进 profile 才会出现。",
+				"档位菜单里可以通过 profile 增加一个「全开沙箱、保留审批」的可选档；DSH 本身不直接提供该组合，按需添加。",
 				state === null ? "—" : presetStatus.word,
 				state === null ? "mute" : presetStatus.tone,
 				h("div", { className: "enh-stack" },
