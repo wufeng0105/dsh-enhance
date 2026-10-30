@@ -18,7 +18,7 @@
       "patch": "./cordis.patch.yml"
     },
     "compatibility": {
-      "tested": "0.2.1-rc.3",
+      "tested": "0.2.1-rc.5",
       "basis": "source-level",
       "verifiedAt": "2026-10-30",
       "doc": "docs/compatibility.md"

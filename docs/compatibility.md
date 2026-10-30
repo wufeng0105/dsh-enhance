@@ -1,6 +1,6 @@
 # DSH 版本支持
 
-**适用版本**：DeepSeek Harness `0.2.1-rc.1`–`0.2.1-rc.5`（`0.2.1-rc.3` 实测，全系源码级核验）。
+**适用版本**：DeepSeek Harness `0.2.1-rc.1`–`0.2.1-rc.5`（`0.2.1-rc.5` 实测——干净安装终验 2026-10-30 于远端机，全系源码级核验）。
 
 版本支持不是「尽量兼容」的承诺，而是一份有界、可复跑、由一处声明驱动的契约：声明写清我们核过哪些版本，宿主自己执行同一条声明，流程写清新版本来了怎么核，核验结果留档。这篇文档就是契约的全部内容。
 
@@ -20,7 +20,7 @@
 ```json
 "dsh": {
   "compatibility": {
-    "tested": "0.2.1-rc.3",
+    "tested": "0.2.1-rc.5",
     "basis": "source-level",
     "verifiedAt": "2026-10-30",
     "doc": "docs/compatibility.md"
@@ -168,7 +168,9 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 
 逐文件比对 `ui-settings-general/src`：只有 `client/index.ts` 变了，diff 是新增 `productAnalytics.track('code_work_view_toggle', …)` 埋点与一行 `import type {}`，**`settings.section` 的槽位机制未动**。原始输出见 `docs/verification/2026-10-30-touchpoints.txt`。
 
-rc.5 上还补了一次运行期实测：干净安装 `0.2.1-rc.5`，装包后 `--dump-config` 三个入口齐全，隔离 home 冒烟 30 条断言全过，真启动一次只报余额不足（`QUOTA`），没有插件相关报错。
+rc.5 上还做了一轮**干净环境终验**（2026-10-30，远端机重置后）：静默重装 `0.2.1-rc.5` → 按现行装法 `dsh plugin add` 装最终包（`engines.dsh` 区间在装载 preflight 下直接通过，exit 0）→ `--dump-config` 三个入口齐全、profile patch 保持 `[]` → 隔离 home 冒烟 30 条断言全过 → GUI 侧 `/enhance/api` 注入命中真实会话系统提示、写档/重启/组合/摘除闭环 → 真启动一次只报余额不足（`QUOTA`），没有插件相关报错。
+
+同一轮里确认的版本行已知边界：asar 清单读取在 CLI 进程（headless / 探针）稳定返回 `0.2.1-rc.5`，但在 GUI 的插件进程里六层探测全部退化为「读不到本机版本」——页面照实显示、不判红，注入、审批、写档不受影响；这就是「读不到就照实写」的实测样例。
 
 ## 两个与「写入 Enhanced 档」按钮直接相关的宿主事实
 

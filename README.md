@@ -8,7 +8,7 @@
 
 **它是一条纯插件**：安装只往你 profile 的依赖清单里加一行，不碰 DSH 的程序，不碰宿主配置。唯一会写宿主配置的动作是设置页里「写入 Enhanced 档」那个按钮，而那只在你点它的时候发生。
 
-**适用版本**：dsh-enhance `1.1.0` · DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.3 实测，全系源码级核验）。这句由 `package.json` 的 `engines.dsh` 派生，宿主自己也执行同一条声明（装时拒、载时禁）；理由、触点与核验流程见 [docs/compatibility.md](docs/compatibility.md)。
+**适用版本**：dsh-enhance `1.1.0` · DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）。这句由 `package.json` 的 `engines.dsh` 派生，宿主自己也执行同一条声明（装时拒、载时禁）；理由、触点与核验流程见 [docs/compatibility.md](docs/compatibility.md)。
 
 ## 安装
 
