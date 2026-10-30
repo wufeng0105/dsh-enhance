@@ -187,7 +187,7 @@ test('结构：四组按顺序排列（内容边界 → 越界审批 → Enhance
   at.forEach((index, i) => assert.ok(index >= 0, `缺组：${ids[i]}`))
   assert.deepEqual(at, [...at].sort((a, b) => a - b), '四组的顺序变了')
 
-  const titles = ['提示词末尾的内容边界', '越界时怎么办', 'Enhanced 权限档', '检查']
+  const titles = ['内容边界', '越界时怎么办', 'Enhanced 权限档', '检查']
   titles.forEach((title, i) => {
     const slice = source.slice(at[i], i + 1 < at.length ? at[i + 1] : source.length)
     assert.ok(slice.includes(title), `第 ${i + 1} 组的标题不对：缺「${title}」`)
@@ -267,7 +267,7 @@ test('检查节：四项以 API 的 name 为键、标题是本地映射、pass �
     ],
   })
   assert.deepEqual(rows.map((r) => r.key), ['plugins', 'text', 'inject', 'preset'])
-  assert.deepEqual(rows.map((r) => r.title), ['插件在进程里', '文本合不合规', '真的进了系统提示', 'Enhanced 档'])
+  assert.deepEqual(rows.map((r) => r.title), ['插件在进程里', '文字合规', '真的进了系统提示', 'Enhanced 档'])
   // 关键：pass / na 来自服务端，页面不伪造通过
   assert.deepEqual(rows.map((r) => r.pass), [true, false, false, true])
   assert.deepEqual(rows.map((r) => r.na), [false, false, false, true])
@@ -450,7 +450,7 @@ test('内容边界：注入成立时给的是「能写什么」，不是把四�
   assert.ok(source.includes('写人设、写内容边界、写行为规矩都行'), '缺「能写什么」这句说明')
   assert.ok(!source.includes('四个条件都成立'), '不该再把注入的四个条件念一遍（上面已经说过了）')
   // 没注入时仍要给「卡在哪」的诊断，只换掉成立时那一句
-  assert.ok(source.includes('现在没有注入，卡在：'), '缺「卡在哪」的诊断句')
+  assert.ok(source.includes('没有生效，卡在：'), '缺「卡在哪」的诊断句')
 })
 
 test('内容边界只有「保存」「还原」两个动作（清空按钮已删）', () => {
@@ -474,7 +474,7 @@ test('状态显示看已保存文本，不看未保存草稿（否则清空草�
   const at = source.indexOf('var scopeNow =')
   assert.ok(at > 0, '找不到内容边界右上角的现状计算')
   const line = source.slice(at, source.indexOf('\n', at))
-  assert.match(line, /savedEmpty \? "空文本"/, '右上角的「空文本」判定必须基于 savedEmpty')
+  assert.match(line, /savedEmpty \? "文字为空"/, '右上角的「空文本」判定必须基于 savedEmpty')
   assert.ok(!/normalizeText\(draft\)/.test(line), '右上角不该直接读草稿')
 })
 

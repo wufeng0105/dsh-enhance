@@ -52,20 +52,17 @@ window.__ModuleLoader__.load({
 			allow: {
 				word: "自动同意",
 				tone: "warn",
-				detail: "越界的事直接做，不再打断你。省事，也等于把边界交出去。",
-				why: "回的是 allowed-once：这一次放行，不改档位。",
+				note: "越界的事直接做，不再打断你——回一次性的 allowed-once，只放行这一次，不改档位。",
 			},
 			ask: {
 				word: "先问我",
 				tone: "ok",
-				detail: "每次停下来等你点同意或回绝；你不在，它就停在那儿等。",
-				why: "把请求交还给宿主自己的审批界面，是默认值——状态说不清时也回落到这里。",
+				note: "每次停下来等你点同意或回绝，你不在就停在那儿等——把决定交还宿主自己的审批界面；状态说不清时也回落到这里。",
 			},
 			deny: {
 				word: "自动回绝",
 				tone: "mute",
-				detail: "越界的事直接回绝，不给你选择。要它做，先去菜单改档位。",
-				why: "回的是 rejected：不给一次性的放行通道。",
+				note: "越界的事直接回绝，不给你选择——回 rejected，不留一次性放行的通道。",
 			},
 		};
 
@@ -74,7 +71,7 @@ window.__ModuleLoader__.load({
 		// 检查项：API 的 name 是机读键，标题是这一侧的映射——不假设服务端会改文案。
 		var CHECK_TITLES = {
 			plugins: "插件在进程里",
-			text: "文本合不合规",
+			text: "文字合规",
 			inject: "真的进了系统提示",
 			preset: "Enhanced 档",
 		};
@@ -126,7 +123,7 @@ window.__ModuleLoader__.load({
 		var SECTION_LABELS = {
 			page: "页面：",
 			scope: "「内容边界」：",
-			approval: "「越界审批」：",
+			approval: "「越界时怎么办」：",
 			preset: "「Enhanced 权限档」：",
 			check: "「检查」：",
 		};
@@ -141,13 +138,13 @@ window.__ModuleLoader__.load({
 		 */
 		function errorHint(code) {
 			if (code === "ETOOLARGE") return " 删掉一些字再存，上限 8 KB。";
-			if (code === "EBADOP") return " 这一页发出了服务端不接受的字段，刷新后重试。";
-			if (code === "EIO") return " 写盘失败：检查 <home>/enhance/ 是否可写，然后再试一次。";
-			if (code === "EORIGIN") return " 请求来源不被接受：从本机页面操作，别用别的域名访问。";
+			if (code === "EBADOP") return " 页面发出了服务端不认的字段，刷新后重试。";
+			if (code === "EIO") return " 写盘失败：看看 <home>/enhance/ 能不能写，再试一次。";
+			if (code === "EORIGIN") return " 只接受本机页面的请求，换个地址访问不行。";
 			if (code === "EMETHOD") return " 请求方法不对，刷新页面重试。";
-			if (code === "EPROFILE") return " 这一页没拿到 profile 上下文：在桌面版或 dsh --profile <名字> 里打开它。";
-			if (code === "EBADSHAPE") return " profile 的档位表写法认不出：把 presets 改成块风格后重试，或者按下面的说明手工加那三行。";
-			if (code === "ERECORD") return " 没有「这一档是我们写的」的记录，不会替你猜：按下面的说明手工删掉那三行。";
+			if (code === "EPROFILE") return " 拿不到 profile 上下文：到桌面版或 dsh --profile <名字> 里打开这一页。";
+			if (code === "EBADSHAPE") return " profile 里的档位表写法认不出：把 presets 改成块风格后重试。";
+			if (code === "ERECORD") return " 没有「这一档是我们写的」记录，不替你猜：手工删掉那三行，或重新点一次写入。";
 			return "";
 		}
 
@@ -164,7 +161,7 @@ window.__ModuleLoader__.load({
 			if (state.active === false) return { text: "插件未激活", tone: "bad" };
 			if (state.degraded) return { text: "降级运行", tone: "warn" };
 			if (state.injecting) return { text: "正在生效", tone: "ok" };
-			return { text: "未注入", tone: "warn" };
+			return { text: "未生效", tone: "warn" };
 		}
 
 		/**
@@ -482,31 +479,31 @@ window.__ModuleLoader__.load({
 			);
 
 			var intro = h("p", { className: "enh-intro" },
-				"在系统提示末尾接上你写的那段字，并按你的选择处理越界审批。");
+				"这一页管四件事：写一段文字接到系统提示末尾、越界时怎么答、要不要多一个档位、以及它有没有真的生效。");
 
 			// 状态文件坏了不再有「元信息」块，用一行说清降级原因（这是唯一会丢的信息）
 			var degradedLine = state !== null && state.degraded
 				? h("p", { className: "enh-hint" },
 					state.degradedReason === "missing"
-						? "状态文件不存在，正在按默认值运行（开关与审批会按默认值处理）。"
-						: "状态文件损坏，正在按默认值运行（审批回落到「先问我」）。")
+						? "状态文件不存在，这一页按默认值运行。"
+						: "状态文件损坏，这一页按默认值运行；审批回落到「先问我」。")
 				: null;
 
 			// ---- 01 内容边界 ----
-			var scopeNow = state === null ? "—" : !on ? "不生效" : !state.contentScope ? "不带" : savedEmpty ? "空文本" : "带 · " + fmtBytes(bytes);
+			var scopeNow = state === null ? "—" : !on ? "不生效" : !state.contentScope ? "不接" : savedEmpty ? "文字为空" : "带 · " + fmtBytes(bytes);
 			var scopeNowTone = state === null ? "mute" : (!on || !state.contentScope || savedEmpty ? "mute" : "ok");
-			var blockScope = group("enh-block-scope", "提示词末尾的内容边界",
-				"挂在系统提示最后一段之后（persona-suffix 之后），每条消息都带。",
+			var blockScope = group("enh-block-scope", "内容边界",
+				"接在系统提示最后一段之后（persona-suffix 之后），每条消息都带。",
 				scopeNow, scopeNowTone,
 				h("div", { className: "enh-stack" },
 					h(Switch, {
 						checked: state !== null && state.contentScope === true,
 						disabled: locked,
 						onClick: function () { run("scope", call({ op: "set", contentScope: !(state !== null && state.contentScope) })); },
-					}, state !== null && state.contentScope === true ? "在末尾追加这段文字" : "不加这段文字"),
+					}, state !== null && state.contentScope === true ? "接在系统提示末尾" : "不接"),
 					h("div", { className: "enh-stack" },
 						h(TextArea, {
-							label: "内容边界",
+							label: "这段文字",
 							value: draft,
 							disabled: locked,
 							onChange: function (event) { setDraft(event.target.value); },
@@ -521,21 +518,21 @@ window.__ModuleLoader__.load({
 							over ? h("span", { className: "enh-hint" }, "超上限，删一点再存") : null,
 						),
 					),
-					h("p", { className: "enh-hint" }, "本包不会清空你配置里的 personaSuffix / suffix；它只在你那段之后追加。"),
+					h("p", { className: "enh-hint" }, "不会清空你配置里的 personaSuffix / suffix；这段文字接在它们之后。"),
 					errorLine("scope"),
 				),
 				[state === null
 					? null
 					: state.enabled === false
-						? "总开关关着，这一段不注入。"
+						? "总开关关着，这段文字不接进去。"
 						: state.injecting
-							? "写人设、写内容边界、写行为规矩都行；它只是追加在末尾，不改 DSH 自己的提示词。"
-							: "现在没有注入，卡在：" + (state.reason || "未知原因") + "。",
+							? "写人设、写内容边界、写行为规矩都行；它只是追加在末尾，不改 DSH 自己的系统提示。"
+							: "没有生效，卡在：" + (state.reason || "未知原因") + "。",
 				]);
 
 			// ---- 02 越界审批 ----
 			var blockApproval = group("enh-block-approval", "越界时怎么办",
-				"它想做的事，超出当前权限档位允许的范围时。",
+				"DSH 要做的事，超出当前档位允许的范围时。",
 				state === null ? "—" : (on ? ap.word : "不接管"),
 				state === null ? "mute" : (on ? ap.tone : "mute"),
 				h("div", { className: "enh-stack" },
@@ -572,15 +569,15 @@ window.__ModuleLoader__.load({
 					// 不是当前状态的一部分。常驻会在用户选「先问我」时原地讲「自动同意」，读起来像没更新。
 					h("details", { className: "enh-term" },
 						h("summary", { className: "enh-hint" }, "为什么这三个词和主菜单不一样"),
-						h("p", null, "主菜单里已经有一个叫「直接放行」的档位，那是权限范围；这里三档说的是拿到审批请求之后怎么回。同名不同义，所以这里用「自动同意」「自动回绝」。"),
+						h("p", null, "主菜单里那个「直接放行」说的是权限范围；这里三档说的是拿到审批请求之后怎么回。同名不同义，所以这里叫「自动同意」「自动回绝」。"),
 					),
 					errorLine("approval"),
 				),
 				[state === null
 					? null
 					: !on
-						? "总开关关着，这一段只是存下来的偏好，不生效；审批交回宿主策略——宿主说 never 就直接拒，说 ask 就弹给你，不是自动放行。"
-						: ap.detail + " 拿到审批请求之后回什么：" + ap.why,
+						? "总开关关着，这三项只是存下来的偏好；审批交回宿主——宿主设成 never 就直接拒，设成 ask 就弹给你。"
+						: ap.note,
 				APPROVAL_SCOPE_HINT,
 				]);
 
@@ -590,11 +587,11 @@ window.__ModuleLoader__.load({
 			var presetDetail = [];
 			if (presetStatus.kind === "noprofile") {
 				presetDetail.push(h("p", { className: "enh-hint", key: "n" },
-					"这一页没拿到 profile 上下文（不是从 profile 启动的），所以不知道往哪写。在桌面版或 dsh --profile <名字> 里打开设置页。",
+					"拿不到 profile 上下文（不是从 profile 启动的），不知道往哪写。到桌面版或 dsh --profile <名字> 里打开这一页。",
 				));
 			} else if (presetStatus.kind === "unreadable") {
 				presetDetail.push(h("p", { className: "enh-hint", key: "u" },
-					"profile 的档位表写法认不出（" + ((preset && preset.unreadableReason) || "未知形态") + "），为了不写坏宿主配置，这一页不动它。把 presets 改成块风格后重试，或按下面的说明手工加。",
+					"profile 里的档位表写法认不出（" + ((preset && preset.unreadableReason) || "未知形态") + "）。为了不写坏配置，这一页不动它；把 presets 改成块风格后重试。",
 				));
 			}
 			if (presetNote !== null) {
@@ -611,7 +608,7 @@ window.__ModuleLoader__.load({
 						setPresetNote(null);
 						run("preset", call({ op: "preset", action: "add" }), function (result) {
 							setConfirmRemove(false);
-							setPresetNote("已写入" + (result && result.backup ? "（备份：" + result.backup + "）" : "") + "，重启后生效。");
+							setPresetNote("已写入，重启后生效" + (result && result.backup ? "（备份：" + result.backup + "）" : "") + "。");
 							run("preset", call({ op: "state" }));
 						});
 					},
@@ -630,7 +627,7 @@ window.__ModuleLoader__.load({
 						setPresetNote(null);
 						run("preset", call({ op: "preset", action: "remove" }), function (result) {
 							setConfirmRemove(false);
-							setPresetNote((result && result.changed ? "已移除" : "本来就不在") + (result && result.backup ? "（备份：" + result.backup + "）" : "") + "，重启后生效。");
+							setPresetNote((result && result.changed ? "已移除，重启后生效" : "本来就不在") + (result && result.backup ? "（备份：" + result.backup + "）" : "") + "。");
 							run("preset", call({ op: "state" }));
 						});
 					},
@@ -649,7 +646,7 @@ window.__ModuleLoader__.load({
 
 			// ---- 04 检查 ----
 			var blockCheck = group("enh-block-check", "检查",
-				"翻最新一份会话日志读回系统提示，证明那段文字确实在末尾。只读，不改任何东西。",
+				"翻最新一份会话日志读回系统提示，看这段文字在不在末尾。只读，不改任何东西。",
 				checks === null ? "还没查过" : (allPass ? "全部通过" : "有失败项"),
 				checks === null ? "mute" : (allPass ? "ok" : "bad"),
 				h("div", { className: "enh-stack" },
@@ -657,7 +654,7 @@ window.__ModuleLoader__.load({
 						h(Button, { disabled: busy || state === null, onClick: function () {
 								run("check", call({ op: "check" }), function (result) { setChecks(result); });
 							} }, checks === null ? "开始检查" : "再查一次"),
-						h("span", { className: "enh-hint" }, "读最新一份会话日志；多工作区并行时可能读到别的工作区。"),
+						h("span", { className: "enh-hint" }, "读最新一份会话日志；多个工作区并行时，可能读到别的工作区的日志。"),
 					),
 					checks === null
 						? h("p", { className: "enh-hint" }, "还没有结果。")
@@ -674,8 +671,8 @@ window.__ModuleLoader__.load({
 				[checks === null
 					? null
 					: allPass
-						? "四项都过了：插件在、文本合规、会话日志里确实有那段文字、Enhanced 档的状态是明确的。"
-						: "有项没过，说明现在还不能确认它真的生效；上面的证据列写的是卡在哪。",
+						? "四项都过了：插件在、文字合规、会话日志里有这段文字、Enhanced 档状态明确。"
+						: "有项没过，现在还确认不了它真的生效；证据列写的是卡在哪。",
 				]);
 
 			// ---- 页面 ----
