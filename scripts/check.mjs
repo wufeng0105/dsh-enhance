@@ -22,6 +22,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { codeFiles as codeFilesIn } from './code-files.mjs'
 import { copyRepoTree } from './repo-copy.mjs'
+import { basisLabel, declarationOf, displayRange, inRange, parseEnginesDsh } from '../shared/compat.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -86,11 +87,14 @@ function testFiles(base = root) {
 /**
  * 版本身份与兼容声明。
  *
- * **唯一权威是 `package.json` 的 `dsh.compatibility`**：README 里那句适用版本是它的
- * 派生文本（门禁要求两处逐字一致），本机 DSH 版本超出声明范围时给可操作提示。
+ * **唯一权威是 `package.json` 的 `engines.dsh`**：README 里那句适用版本是它的
+ * 派生文本（门禁要求两处逐字一致），本机 DSH 版本超出区间时给可操作提示。
+ * 解析与成员判定在 `shared/compat.mjs`（唯一实现），这里只做门禁判断。
  *
  * 为什么 README 不是第二权威：README 是给人读的散文，它的那一句必须由声明生成，
  * 否则「改了声明忘了改 README」和「改了 README 忘了改声明」会各错一次。
+ * 为什么不是版本数组：宿主在装/载的三个时机读 engines.dsh 做 semver 匹配
+ * （详见 docs/compatibility.md「宿主怎么执行这条声明」），字段形状跟着宿主走。
  */
 function gateVersion(base = root, options = {}) {
   const problems = []
@@ -112,35 +116,26 @@ function gateVersion(base = root, options = {}) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) problems.push(`VERSION 不是 x.y.z：${version}`)
   if (pkg.version !== version) problems.push(`package.json version=${String(pkg.version)} != VERSION ${version}`)
 
-  // ---- 兼容声明 ----
-  const compatibility = pkg?.dsh?.compatibility
-  const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
-  let declared = null
-  if (compatibility === undefined || compatibility === null || typeof compatibility !== 'object' || Array.isArray(compatibility)) {
-    problems.push('缺兼容声明：package.json 的 dsh.compatibility（README 的适用版本句由它派生，本机超范围时的提示也靠它）')
+  // ---- 兼容声明（engines.dsh 区间 + dsh.compatibility 证据元数据） ----
+  const declared = declarationOf(pkg)
+  let parsed = null
+  if (declared.error !== undefined) {
+    problems.push(declared.error)
+    if (typeof pkg?.engines?.dsh === 'string') {
+      const attempt = parseEnginesDsh(pkg.engines.dsh)
+      if (attempt.error !== undefined) problems.push(attempt.error)
+    }
   } else {
-    const versions = compatibility.versions
-    if (!Array.isArray(versions) || versions.length === 0) {
-      problems.push('兼容声明的 versions 必须是非空数组')
+    if (!existsSync(join(base, declared.doc))) {
+      problems.push(`兼容元数据的 doc 指向不存在的文件：${declared.doc}`)
     } else {
-      const unique = new Set(versions)
-      if (unique.size !== versions.length) problems.push('兼容声明的 versions 有重复项')
-      const bad = versions.filter((item) => typeof item !== 'string' || !VERSION_RE.test(item))
-      if (bad.length > 0) problems.push(`兼容声明的 versions 有不合法版本号：${bad.map(String).join(', ')}`)
-      if (typeof compatibility.tested !== 'string' || !versions.includes(compatibility.tested)) {
-        problems.push(`兼容声明的 tested=${String(compatibility.tested)} 必须属于 versions 之一`)
-      }
-      if (typeof compatibility.basis !== 'string' || compatibility.basis.trim() === '') problems.push('兼容声明的 basis 必须是非空字符串')
-      if (typeof compatibility.verifiedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(compatibility.verifiedAt)) problems.push('兼容声明的 verifiedAt 必须是 YYYY-MM-DD')
-      if (typeof compatibility.doc !== 'string' || compatibility.doc.trim() === '') problems.push('兼容声明的 doc 必须是路径')
-      else if (!existsSync(join(base, compatibility.doc))) problems.push(`兼容声明的 doc 指向不存在的文件：${compatibility.doc}`)
-      if (problems.length === 0) declared = compatibility
+      parsed = parseEnginesDsh(declared.enginesDsh)
     }
   }
 
   // ---- README 派生句（声明是权威，README 是派生文本） ----
-  if (declared !== null) {
-    const sentence = compatibilitySentence(declared)
+  if (parsed !== null) {
+    const sentence = compatibilitySentence(declared, parsed)
     let readme = ''
     try {
       readme = readFileSync(join(base, 'README.md'), 'utf8')
@@ -153,7 +148,7 @@ function gateVersion(base = root, options = {}) {
   }
 
   // ---- 本机 DSH 版本超出声明范围 ----
-  if (declared !== null) {
+  if (parsed !== null) {
     const local = options.dshVersion ?? detectDshVersion()
     if (local === undefined) {
       return {
@@ -161,10 +156,10 @@ function gateVersion(base = root, options = {}) {
         detail: problems.length === 0 ? `${pkg.name}@${version}（未探测到本机 DSH 版本）` : problems.join(' | '),
       }
     }
-    if (!declared.versions.includes(local)) {
+    if (!inRange(parsed, local)) {
       problems.push(
-        `本机 DSH ${local} 不在声明范围 [${declared.versions[0]}…${declared.versions[declared.versions.length - 1]}]：`
-        + '先按 docs/compatibility.md 的例行核验跑一遍（约 15 分钟），核验过了再把该版本加进 package.json 的 dsh.compatibility.versions',
+        `本机 DSH ${local} 不在声明范围 ${displayRange(parsed)}：`
+        + '先按 docs/compatibility.md 的例行核验跑一遍（约 15 分钟），核验过了再扩 package.json 的 engines.dsh 区间',
       )
     }
     if (problems.length === 0) return { pass: true, detail: `${pkg.name}@${version} · DSH ${local}` }
@@ -178,12 +173,8 @@ function gateVersion(base = root, options = {}) {
 }
 
 /** 由声明拼出 README 必须逐字包含的那一句（`basis` → 中文口径）。 */
-function compatibilitySentence(compatibility) {
-  const versions = compatibility.versions
-  const first = versions[0]
-  const last = versions[versions.length - 1]
-  const basis = { 'source-level': '源码级核验', runtime: '运行期验证' }[compatibility.basis] ?? compatibility.basis
-  return `DeepSeek Harness ${first}–${last}（${compatibility.tested} 实测，全系${basis}）`
+function compatibilitySentence(declared, parsed) {
+  return `DeepSeek Harness ${displayRange(parsed)}（${declared.tested} 实测，全系${basisLabel(declared.basis)}）`
 }
 
 /**
@@ -472,7 +463,7 @@ function runSelfTest() {
 
   cases.push(withCopy(
     'compat declaration red',
-    // 兼容声明的 tested 必须是 versions 之一：改成一个不在表里的版本
+    // 兼容元数据的 tested 必须落在 engines.dsh 区间内：改成一个区间外的版本
     (copy) => {
       const file = join(copy, 'package.json')
       const pkg = JSON.parse(readFileSync(file, 'utf8'))
@@ -484,14 +475,26 @@ function runSelfTest() {
 
   cases.push(withCopy(
     'compat missing red',
-    // 第三证（空转检查）：整个声明删掉必须判红——挡「常量定义了、没进判定」
+    // 第三证（空转检查）：整个 engines.dsh 删掉必须判红——挡「常量定义了、没进判定」
     (copy) => {
       const file = join(copy, 'package.json')
       const pkg = JSON.parse(readFileSync(file, 'utf8'))
-      delete pkg.dsh.compatibility
+      delete pkg.engines.dsh
       writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
     },
     (copy) => expectRed('缺兼容声明')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
+  ))
+
+  cases.push(withCopy(
+    'engines malformed red',
+    // 区间形状写歪（单界、坏算符）必须判红——宽进等于把宿主已拒的写法放行
+    (copy) => {
+      const file = join(copy, 'package.json')
+      const pkg = JSON.parse(readFileSync(file, 'utf8'))
+      pkg.engines.dsh = '>=0.2.1'
+      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
+    },
+    (copy) => expectRed('区间形状不认')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
   ))
 
   cases.push(withCopy(

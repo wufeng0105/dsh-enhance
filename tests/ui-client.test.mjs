@@ -81,6 +81,14 @@ const SNAPSHOT = {
   degradedReason: null,
   home: 'C:/x',
   limit: 8192,
+  compat: {
+    tool: '1.1.0',
+    host: '0.2.1-rc.3',
+    source: 'env',
+    range: '0.2.1-rc.1–0.2.1-rc.5',
+    tested: '0.2.1-rc.3',
+    inRange: true,
+  },
   preset: {
     patchPath: 'C:/x/profiles/desktop/cordis.patch.yml',
     profile: 'desktop',
@@ -466,6 +474,7 @@ test('版本行：本包版本 + 本机 DSH 版本 + 已验范围，超范围只
     assert.ok(source.includes(text), `版本行缺文案：${text}`)
   }
   assert.ok(source.includes('state.compat'), '版本行数据应来自快照的 compat 段')
+  assert.ok(source.includes('typeof compat.range === "string"'), '版本行应直接消费服务端派生的 range 串')
   // 超范围是提示，不是拒绝：只给 data-tone=warn，不隐藏任何控件
   assert.match(source, /"data-tone": "warn" \}, head \+ " · DSH "/, '超范围应只变黄')
 })

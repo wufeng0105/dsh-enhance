@@ -6,7 +6,8 @@
   "type": "module",
   "description": "在 DeepSeek Harness 系统提示的末尾追加一段你自己写的文本：写破甲词、人设或内容规矩，存盘即生效，可开关、可检查；还可以一键把 Enhanced 权限档写进你的 profile。",
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "dsh": ">=0.2.1-rc.1 <0.2.1-rc.6"
   },
   "scripts": {
     "check": "node scripts/check.mjs",
@@ -17,13 +18,6 @@
       "patch": "./cordis.patch.yml"
     },
     "compatibility": {
-      "versions": [
-        "0.2.1-rc.1",
-        "0.2.1-rc.2",
-        "0.2.1-rc.3",
-        "0.2.1-rc.4",
-        "0.2.1-rc.5"
-      ],
       "tested": "0.2.1-rc.3",
       "basis": "source-level",
       "verifiedAt": "2026-10-30",

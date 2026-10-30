@@ -89,6 +89,12 @@
       "layer": "core",
       "path": "shared/seed.mjs",
       "owns": "首装种子：审批档位规则 + <home>/enhance 目录的幂等补齐（bundle 安装没有 installer 参与）"
+    },
+    {
+      "id": "core.compat",
+      "layer": "core",
+      "path": "shared/compat.mjs",
+      "owns": "兼容声明的唯一实现：engines.dsh 区间解析、semver 比较、成员判定与展示派生（门禁与版本行共用）"
     }
   ],
   "edges": [
@@ -169,6 +175,11 @@
     {
       "from": "plugin.approve",
       "to": "core.seed",
+      "kind": "import"
+    },
+    {
+      "from": "plugin.scope",
+      "to": "core.compat",
       "kind": "import"
     }
   ],

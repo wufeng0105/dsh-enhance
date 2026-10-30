@@ -482,12 +482,11 @@ window.__ModuleLoader__.load({
 			var intro = h("p", { className: "enh-intro" },
 				"这一页管四件事：写一段文字接到系统提示末尾、越界时怎么答、要不要多一个档位、以及它有没有真的生效。");
 
-			// 版本行：本包版本 + 本机 DSH 版本 + 已验证范围。
-			// 「超出已验范围」只变黄、不拦人——拦人是宿主兼容闸的职责，这一页只负责把事实说清。
+			// 版本行：本包版本 + 本机 DSH 版本 + 已验范围。
+			// 「超出已验范围」只变黄、不拦人——拦人是宿主 engines.dsh 门禁的职责（装时拒、载时禁），这一页只负责把事实说清。
 			function compatLine(compat) {
 				if (compat === null || compat === undefined || typeof compat.tool !== "string") return null;
-				var versions = Array.isArray(compat.versions) ? compat.versions : [];
-				var range = versions.length > 0 ? versions[0] + "–" + versions[versions.length - 1] : null;
+				var range = typeof compat.range === "string" && compat.range !== "" ? compat.range : null;
 				var head = "增强 " + compat.tool;
 				if (typeof compat.host !== "string" || compat.host === "") {
 					return h("p", { className: "enh-hint" }, head + (range === null ? "" : " · 已验 DSH " + range + "（读不到本机版本）"));

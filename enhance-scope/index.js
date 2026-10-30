@@ -34,6 +34,7 @@ import {
   clearPresetRecord, ensureEnhancedPreset, readPresetRecord, readPresetState,
   removeEnhancedPreset, writePresetRecord,
 } from '../shared/preset.mjs'
+import { declarationOf, displayRange, inRange, parseEnginesDsh } from '../shared/compat.mjs'
 
 /** Diagnostics label. */
 export const name = 'enhance-scope'
@@ -166,9 +167,9 @@ export function resolveProfilePatch(ctx) {
 }
 
 /**
- * 本包版本与已验证的 DSH 范围。**唯一来源是 package.json**：
+ * 本包版本与已验的 DSH 范围。**唯一来源是 package.json 的 `engines.dsh`**：
  * README 的适用版本句、`scripts/check.mjs` 的 version 门禁、这一页的版本行，
- * 三处都从它派生，改声明只需改一处。
+ * 三处都从 `shared/compat.mjs`（同一实现）派生，改声明只需改一处。
  */
 const PACKAGE = (() => {
   try {
@@ -178,11 +179,17 @@ const PACKAGE = (() => {
   }
 })()
 
-const COMPATIBILITY = {
-  tool: typeof PACKAGE.version === 'string' ? PACKAGE.version : null,
-  versions: Array.isArray(PACKAGE?.dsh?.compatibility?.versions) ? PACKAGE.dsh.compatibility.versions : [],
-  tested: typeof PACKAGE?.dsh?.compatibility?.tested === 'string' ? PACKAGE.dsh.compatibility.tested : null,
-}
+const COMPATIBILITY = (() => {
+  const declared = declarationOf(PACKAGE)
+  if (declared.error !== undefined) return { tool: null, range: null, tested: null, parsed: null }
+  const parsed = parseEnginesDsh(declared.enginesDsh)
+  return {
+    tool: typeof PACKAGE.version === 'string' ? PACKAGE.version : null,
+    range: parsed.error === undefined ? displayRange(parsed) : null,
+    tested: declared.tested,
+    parsed: parsed.error === undefined ? parsed : null,
+  }
+})()
 
 /**
  * 从 Electron 的 `app.asar` 头里读出宿主版本（**只读**：读头 + 一个文件条目，不解包、不写、不派生任何产物）。
@@ -359,7 +366,7 @@ export async function readHostVersion(home) {
 }
 
 /**
- * 版本行用的快照：本包版本 + 本机 DSH 版本 + 已验证范围。
+ * 版本行用的快照：本包版本 + 本机 DSH 版本 + 已验范围。
  * `inRange` 为 null 表示**读不到本机版本**——这时页面不判绿也不判红。
  *
  * @param {string} home
@@ -370,9 +377,9 @@ export async function compatSnapshot(home) {
     tool: COMPATIBILITY.tool,
     host,
     source,
-    versions: COMPATIBILITY.versions,
+    range: COMPATIBILITY.range,
     tested: COMPATIBILITY.tested,
-    inRange: host === null || COMPATIBILITY.versions.length === 0 ? null : COMPATIBILITY.versions.includes(host),
+    inRange: host === null || COMPATIBILITY.parsed === null ? null : inRange(COMPATIBILITY.parsed, host),
     // 读不到时把每次尝试的失败原因带出来，方便在接口上定位是哪一层断了（不上页面）
     attempts,
   }
