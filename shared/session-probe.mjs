@@ -73,15 +73,6 @@ export function recentSessionFiles(sessionsDir, limit = SCAN_LIMIT) {
 }
 
 /**
- * 找最新的一个会话文件（保留给需要单文件的调用方）。
- * @param {string} sessionsDir
- * @returns {{ file: string, mtimeMs: number } | undefined}
- */
-export function newestSessionFile(sessionsDir) {
-  return recentSessionFiles(sessionsDir, 1)[0]
-}
-
-/**
  * 解压一份可能含多帧的 zstd。假魔数（出现在压缩数据里）会让那一段解不开，跳过即可——
  * 只影响命中数，不影响「有没有」这个判断。
  * @param {Buffer} raw

@@ -48,9 +48,6 @@ const PERMISSION_ROW = /^([ \t]*)-[ \t]*id:[ \t]*permission[ \t]*$/
 const PRESETS_LINE = /^([ \t]*)presets[ \t]*:(.*)$/
 /** `config:` 那一行。 */
 const CONFIG_LINE = /^([ \t]*)config[ \t]*:(.*)$/
-/** patch 里 `- id:` 开新行。 */
-const ROW_START = /^([ \t]*)-[ \t]*(?:id|insert):/
-
 /** 行缩进宽度。@param {string} line */
 function indentOf(line) {
   return (line.match(/^[ \t]*/) ?? [''])[0].length
@@ -253,22 +250,6 @@ function enhancedBlock(indent) {
     `${pad}  sandbox: ${ENHANCED_SPEC.sandbox}`,
     `${pad}  approval: ${ENHANCED_SPEC.approval}`,
   ]
-}
-
-/**
- * 把「只剩注释」的 patch 补成合法顶层数组。
- *
- * profile patch 必须是顶层 YAML 数组。我们摘掉自己写进去的东西之后，如果里面只剩注释与空行，
- * 那就是一个 `null` 文档——宿主读它会失败。这种情况下补一行 `[]`；
- * 还有别的行（用户自己的条目）时原样返回，不画蛇添足。
- *
- * @param {string} text
- * @param {string} eol
- */
-export function withArrayTail(text, eol = '\n') {
-  const hasContent = splitLines(text).some((line) => line.trim() !== '' && !line.trim().startsWith('#'))
-  if (hasContent) return text === '' ? `[]${eol}` : text
-  return text === '' ? `[]${eol}` : `${text}${eol}[]${eol}`
 }
 
 /** 完整档位表（含 enhanced），按给定缩进。@param {number} indent @returns {string[]} */

@@ -11,27 +11,11 @@
  * 在 120 秒超时处误报「0 tests ran, floor is 50」。**慢本身就是一种坏**：
  * 它把「门禁红了」和「门禁没跑完」混成同一个信号。
  *
- * 正确口径：副本要的是「git 眼里的仓库」,不是「磁盘上恰好在这个目录里的一切」。
- * 所以按 `git ls-files` 复制——被跟踪的文件一定有，被忽略的目录天然不在里面，
- * 未跟踪的新文件（正是自检要造的那类）留给自检自己写。
- *
  * @module enhance/scripts/repo-copy
  */
 
-import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, readdirSync } from 'node:fs'
+import { cpSync, mkdirSync } from 'node:fs'
 import { relative, sep } from 'node:path'
-
-/**
- * 列出仓库里被跟踪的文件（相对路径，posix 分隔符）。
- * @param {string} repo
- * @returns {string[]}
- */
-function trackedFiles(repo) {
-  const result = spawnSync('git', ['ls-files', '-z'], { cwd: repo, encoding: 'utf8' })
-  if (result.status !== 0 || typeof result.stdout !== 'string') return []
-  return result.stdout.split('\u0000').filter(Boolean)
-}
 
 /**
  * 复制一份仓库副本。
@@ -75,18 +59,3 @@ export const IGNORED_TOP_LEVEL = new Set([
   '.dsh',
   'ZCode',
 ])
-
-/** 走盘兜底时用：数一遍符合语法门禁口径的文件。@param {string} dir @returns {string[]} */
-export function walkWithSkipDirs(dir, skipDirs) {
-  const out = []
-  const walk = (current) => {
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      if (skipDirs.has(entry.name)) continue
-      const path = join(current, entry.name)
-      if (entry.isDirectory()) walk(path)
-      else if (entry.isFile() && /\.(mjs|js)$/.test(entry.name)) out.push(path)
-    }
-  }
-  walk(dir)
-  return out
-}

@@ -88,16 +88,10 @@ function loadMap() {
 }
 
 /** 从源码里抽静态 import 目标、事件名与接缝标记。 */
-function scan(files, skip) {
+function scan(files) {
   const imports = new Map()
   const tokens = new Map()
   for (const file of files) {
-    // 生成的产物（派生 bundle）不参与 import 扫描：它没有可解析的模块边
-    if (skip.has(file)) {
-      imports.set(file, new Set())
-      tokens.set(file, new Set())
-      continue
-    }
     const text = readFileSync(join(enhanceRoot, file), 'utf8')
     const specs = new Set()
     for (const match of text.matchAll(/^\s*(?:import|export)[^'"\n]*from\s*['"]([^'"]+)['"]/gm)) specs.add(match[1])
@@ -140,8 +134,7 @@ function check(map, strict = false) {
     if (!byPath.has(file)) errors.push(`源码未登记进 code-map：${file}`)
   }
 
-  const generated = new Set(map.modules.filter((module) => module.generated === true).map((module) => module.path))
-  const { imports, tokens } = scan(files, generated)
+  const { imports, tokens } = scan(files)
   const declared = new Set(map.edges.filter((edge) => edge.kind === 'import').map((edge) => edge.from + '->' + edge.to))
 
   // 3. import 边：源码有的必须声明，声明的必须存在

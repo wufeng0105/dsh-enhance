@@ -5,7 +5,6 @@
 
 # Windows shells/launchers keep CRLF: cmd.exe and older PowerShell hosts are
 # most reliable that way.
-*.cmd text eol=crlf
 *.ps1 text eol=crlf
 
 *.png binary
@@ -13,4 +12,3 @@
 *.jpeg binary
 *.gif binary
 *.ico binary
-*.asar binary

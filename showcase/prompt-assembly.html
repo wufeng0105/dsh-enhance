@@ -1368,20 +1368,6 @@
       <p>原版允许某一段声明 <code>complete: true</code>，成为完整提示词（且只允许一段存在）。我们没用这条：用了它，20 多个工具说明和默认人格会被整份顶掉。我们只做加法。</p>
       <p>关掉、清空、超限——段变空，渲染器丢弃它，提示词逐字回到原样，连空行都不留。这是「可退出」在提示词层面的样子。</p>
 
-      <h3>装进来只是三行</h3>
-      <p>宿主启动时读 <code>profiles/&lt;profile&gt;/cordis.patch.yml</code>。安装只做行级追加：一个 <code>insert</code> 块三行，再加 desktop 的权限替换行；已有行一个字节不动。</p>
-
-      <pre class="patch"><code><span class="c"># enhance: 内容边界（enhance-scope）、审批（auto-approve）、设置页（enhance-ui）。</span>
-<span class="c"># 改行为请改 &lt;home&gt;/enhance/state.json 或 enhance/content-scope.txt，不要动这些 id。</span>
-- insert:
-    - id: <span class="id">enhance-scope</span>
-      name: <span class="s">'../../enhance/enhance-scope/index.js'</span>
-    - id: <span class="id">auto-approve</span>
-      name: <span class="s">'../../enhance/auto-approve/index.js'</span>
-    - id: <span class="id">enhance-ui</span>
-      name: <span class="s">'../../enhance/ui/index.js'</span></code></pre>
-
-      <p>卸载按安装清单认领那几行；认不出归属的行保持原样并告警。默认卸载把 patch 还原到安装前，干净路径逐字节一致。</p>
     </div>
   </section>
 
@@ -1439,7 +1425,6 @@
       <li><b>不替换整份提示词。</b>没有 <code>complete: true</code>。它只做加法，所以也不能靠它改掉工具说明或人格。</li>
       <li><b>上限 8 KB，读写两侧都拦。</b>直接编辑文件写超限不会注入，设置页检查判红；设置页写入超限返回 413。</li>
       <li><b>patch 只做行级追加，不解析整份 YAML。</b>结构坏要靠人看；<code>shared/preset.mjs</code> 能抓「形态认不出」，抓不了「行在但语义不对」。</li>
-      <li><b>派生件与宿主版本耦合。</b>权限菜单图标那份 <code>client.js</code> 升级后要按新 asar 重新派生，否则「同代」不成立。</li>
       <li><b>生效有一条消息的时延。</b>没有文件监听：改完不会立刻有任何事发生，下一次装配才读。</li>
       <li><b>这一页只讲提示词。</b>审批三态与设置页是同一套接入方式的另外两件事，不在这一页的范围内。</li>
     </ul>
