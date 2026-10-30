@@ -446,6 +446,13 @@ test('字节口径：与服务端 normalizeText 同一套，再数 UTF-8', () =>
   assert.equal(draftBytes('a\r\nb'), 3)
 })
 
+test('内容边界：注入成立时给的是「能写什么」，不是把四个条件再念一遍', () => {
+  assert.ok(source.includes('写人设、写内容边界、写行为规矩都行'), '缺「能写什么」这句说明')
+  assert.ok(!source.includes('四个条件都成立'), '不该再把注入的四个条件念一遍（上面已经说过了）')
+  // 没注入时仍要给「卡在哪」的诊断，只换掉成立时那一句
+  assert.ok(source.includes('现在没有注入，卡在：'), '缺「卡在哪」的诊断句')
+})
+
 test('状态：服务端 active / degraded 必须被用上，降级原因要有一行说明', () => {
   assert.ok(source.includes('state.active === false'), '插件未激活必须能显示出来')
   assert.ok(source.includes('state.degraded'), '降级必须能显示出来')
