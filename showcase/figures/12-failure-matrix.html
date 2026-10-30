@@ -72,18 +72,18 @@
   <div class="frame">
     <p class="eyebrow">自定义构图 · 失败矩阵</p>
     <h1>失败矩阵：每个坑由谁发现，或者只能人工核对</h1>
-    <p class="lede">门禁和 doctor 不是万能的。这张表把「可能坏在哪」和「谁会发现」放在一起；标出来的那一行合并了两条设计边界——没有自动检测，只能人工核对。</p>
+    <p class="lede">门禁和设置页检查不是万能的。这张表把「可能坏在哪」和「谁会发现」放在一起；标出来的那一行合并了两条设计边界——没有自动检测，只能人工核对。</p>
 
     <div class="diagram-container">
       <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="failure-matrix-title failure-matrix-desc">
         <title id="failure-matrix-title">失败矩阵：每个坑由谁发现，或者只能人工核对</title>
-        <desc id="failure-matrix-desc">五行失败形态分别对应 doctor、门禁与自检、设置页或人工三种发现方式；无 Origin 放行与会话探针读错会话只能人工核对。</desc>
+        <desc id="failure-matrix-desc">五行失败形态分别对应设置页检查、门禁与自检、人工三种发现方式；无 Origin 放行与会话探针读错会话只能人工核对。</desc>
 
         <rect width="1280" height="720" fill="#f5f5f5"/>
 
         <!-- 表头 -->
         <text x="64" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">失败形态</text>
-        <text x="480" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">doctor --home</text>
+        <text x="480" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist Mono', 'Noto Sans Mono CJK SC', monospace">check 门禁 / 设置页检查</text>
         <text x="736" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">门禁 / 自检</text>
         <text x="992" y="140" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">设置页 / 人工</text>
         <line x1="64" y1="160" x2="1216" y2="160" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>

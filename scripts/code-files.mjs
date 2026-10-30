@@ -20,8 +20,12 @@ import { spawnSync } from 'node:child_process'
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-/** 走盘时跳过的目录：`.git` 是仓库元数据，`node_modules` 是依赖，`design/` 被 gitignore。 */
-export const SKIP_DIRS = new Set(['.git', 'node_modules', 'design'])
+/**
+ * 走盘时跳过的目录：`.git` 是仓库元数据，`node_modules` 是依赖，其余是被 `.gitignore`
+ * 排除的本地件（`design/`、代码索引 `.codegraph/`、草稿区 `.zhll/`、本地克隆的 `ZCode/`、
+ * 临时件 `.tmp/`）——它们不属于核心仓，数进来会让门禁读数与 tracked 对不上。
+ */
+export const SKIP_DIRS = new Set(['.git', 'node_modules', 'design', '.codegraph', '.zhll', '.tmp', 'ZCode'])
 
 /**
  * @param {string} base 项目根

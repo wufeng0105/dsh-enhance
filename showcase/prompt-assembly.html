@@ -1247,7 +1247,7 @@
       </div>
 
       <h3>四道门，外加两条前提</h3>
-      <p>一段文本想真的进提示词，要过四道门；任何一道不过就不注入，而且给出人话理由。判定集中在 <code>shared/state.mjs</code> 的 <code>derive()</code> 一处，设置页的检查、<code>doctor</code>、路由快照用的是同一份判据。</p>
+      <p>一段文本想真的进提示词，要过四道门；任何一道不过就不注入，而且给出人话理由。判定集中在 <code>shared/state.mjs</code> 的 <code>derive()</code> 一处，设置页的检查、路由快照用的是同一份判据。</p>
 
       <div class="gates">
         <div class="gate">
@@ -1437,8 +1437,8 @@
     <ul>
       <li><b>不是变量系统。</b>默认 <code>interpolate: false</code>，<code>{{…}}</code> 保持字面。要做变量，那是宿主插件 API 的事，不是这个插件的承诺。</li>
       <li><b>不替换整份提示词。</b>没有 <code>complete: true</code>。它只做加法，所以也不能靠它改掉工具说明或人格。</li>
-      <li><b>上限 8 KB，读写两侧都拦。</b>直接编辑文件写超限不会注入，<code>doctor</code> 判红；设置页写入超限返回 413。</li>
-      <li><b>patch 只做行级追加，不解析整份 YAML。</b>结构坏要靠人看；<code>doctor</code> 能抓「行不在 / 半装 / 未接线」，抓不了「行在但结构坏」。</li>
+      <li><b>上限 8 KB，读写两侧都拦。</b>直接编辑文件写超限不会注入，设置页检查判红；设置页写入超限返回 413。</li>
+      <li><b>patch 只做行级追加，不解析整份 YAML。</b>结构坏要靠人看；<code>shared/preset.mjs</code> 能抓「形态认不出」，抓不了「行在但语义不对」。</li>
       <li><b>派生件与宿主版本耦合。</b>权限菜单图标那份 <code>client.js</code> 升级后要按新 asar 重新派生，否则「同代」不成立。</li>
       <li><b>生效有一条消息的时延。</b>没有文件监听：改完不会立刻有任何事发生，下一次装配才读。</li>
       <li><b>这一页只讲提示词。</b>审批三态与设置页是同一套接入方式的另外两件事，不在这一页的范围内。</li>
@@ -1452,7 +1452,7 @@
         <li>原版实现：<code>app.asar</code> 内 <code>dsh/node_modules/@deepseek-ai/dsh-system-prompt/lib/index.js</code>——<code>SECTION_ORDERS</code> 在文件头，<code>renderPrompt</code> 在中间。</li>
         <li>我们的注册：<code>enhance-scope/index.js</code> 第 181–192 行。</li>
         <li>判定逻辑：<code>shared/state.mjs</code> 的 <code>derive()</code>。</li>
-        <li>落盘核对：<code>node doctor.mjs --home &lt;DSH_HOME&gt;</code>。</li>
+        <li>落盘核对：设置页「检查」一节，或 <code>node scripts/check.mjs</code> 的 6 道门禁。</li>
         <li>运行时核对：DSH 设置页 enhance →「开始检查」，读的是会话日志原文。</li>
       </ol>
     </div>

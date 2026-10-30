@@ -23,7 +23,7 @@ export const name = 'auto-approve'
 
 /** @param {import('@deepseek-ai/cordis').Context} ctx */
 export function apply(ctx) {
-  // bundle 安装（dsh plugin add）没有 install.mjs 参与：首次加载时补齐 <home>/enhance/
+  // bundle 安装没有 installer 参与：首次加载时补齐 <home>/enhance/
   ensureEnhanceData(resolveHome(), fileURLToPath(new URL('../shared/content-scope.default.txt', import.meta.url)))
 
   ctx.on(

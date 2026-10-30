@@ -1,10 +1,8 @@
 /**
  * 首次数据目录的种子。
  *
- * 两条安装路径的落盘形态不同：
- *   - 完整安装（`install.mjs`）：把插件拷进 `<home>/enhance/`，自己种文本与状态；
- *   - bundle 安装（`dsh plugin --profile <p> add …`）：host 直接加载包里的插件，
- *     installer 不参与 —— 插件第一次 `apply()` 时把 `<home>/enhance/` 的两份文件补齐。
+ * bundle 安装（`dsh plugin --profile <p> add …`）时 installer 不存在，host 直接加载包里的插件；
+ * 插件第一次 `apply()` 时把 `<home>/enhance/` 的两份文件补齐。
  *
  * 所以这里只做两件事：复用「审批种子规则」，以及一个**幂等**的补文件函数。
  * 已有内容一律不覆盖；任何 IO 失败都吞掉并回报，让插件继续走「读不到」的诊断路径，
@@ -16,7 +14,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { paths, readState, writeState } from './state.mjs'
-import { defaultPresetApproval } from './patch-rows.mjs'
+import { defaultPresetApproval } from './preset-shape.mjs'
 
 /**
  * 首装该种哪一档审批。

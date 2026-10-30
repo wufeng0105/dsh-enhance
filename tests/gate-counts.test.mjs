@@ -12,28 +12,27 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SKIP_DIRS, codeFiles } from '../scripts/code-files.mjs'
+import { copyRepoTree } from '../scripts/repo-copy.mjs'
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const git = (args, cwd = repo) => spawnSync('git', args, { cwd, encoding: 'utf8' })
 
-/** 仓库副本：带上 `.git`，`git ls-files` 才有得比。 */
+/**
+ * 仓库副本：带上 `.git`，`git ls-files` 才有得比。
+ *
+ * 复制走 `copyRepoTree(..., { includeGit: true })`——按 `git ls-files` 复制，不是
+ * 整目录 `cpSync`。原先那种写法会把本地克隆的 `ZCode/`（3 GB / 3.6 万文件）一起搬，
+ * 这一条测试因此要跑 200 s+，连带 tests 门禁在 120 s 超时处误报。
+ */
 function copyRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'enhance-counts-'))
-  cpSync(repo, dir, {
-    recursive: true,
-    filter: (src) => {
-      const rel = relative(repo, src)
-      if (rel === '') return true
-      return !rel.split(sep).includes('node_modules')
-    },
-  })
-  return dir
+  return copyRepoTree(repo, dir, { includeGit: true })
 }
 
 /** 走盘数一遍（独立于被测实现，用来做交叉核对）。 */
@@ -50,7 +49,6 @@ function walkCount(base) {
   walk(base)
   return out
 }
-
 test('codeFiles == git ls-files 的 .mjs/.js 数（门禁报的就是这个数）', () => {
   const tracked = git(['ls-files', '*.mjs', '*.js'], repo)
   assert.equal(tracked.status, 0, tracked.stderr)

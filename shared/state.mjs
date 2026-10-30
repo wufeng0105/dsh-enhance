@@ -1,13 +1,13 @@
 /**
  * enhance 的共享状态层：状态与文本的唯一读写口。
  *
- * 三个消费方（`enhance-scope`、`auto-approve`、CLI `doctor.mjs`）都从这里读，
+ * 两个消费方（`enhance-scope`、`auto-approve`）都从这里读，
  * 谁也不各自解析一遍。文件是唯一真相：`state.json` 存开关，`content-scope.txt` 存文本。
  *
  * 三条纪律：
  *   - 写文件一律 temp + rename（进程被杀不会留下半个 JSON），目录先建。
  *   - 坏文件不抛：`state.json` 缺失/损坏都按默认值并标 `degraded`，
- *     理由放在 `degradedReason`，页面与 doctor 靠它说话。
+ *     理由放在 `degradedReason`，设置页靠它说话。
  *   - 文本按「去 BOM → 去控制字符 → trim」归一，落盘与上报字节数用同一个口径。
  *
  * 状态里只有 `enabled` / `contentScope` / `approval` 三个字段，审批是三态
@@ -36,14 +36,13 @@ export function resolveHome() {
   return typeof home === 'string' && home.trim() !== '' ? home.trim() : join(homedir(), '.dsh')
 }
 
-/** @param {string} [home] @returns {{ dir: string, state: string, text: string, manifest: string }} */
+/** @param {string} [home] @returns {{ dir: string, state: string, text: string }} */
 export function paths(home = resolveHome()) {
   const dir = join(home, 'enhance')
   return {
     dir,
     state: join(dir, 'state.json'),
     text: join(dir, 'content-scope.txt'),
-    manifest: join(dir, 'install-manifest.json'),
   }
 }
 
@@ -84,7 +83,7 @@ export function writeFileAtomic(file, data) {
 
 /**
  * 默认值：文本注入与总开关默认开（宁可多注入一句），审批默认 `ask`（状态说不清时问人，
- * 不静默放行）。首装的 `allow` 由 `install.mjs` 显式种下，不由这里兜底。
+ * 不静默放行）。首装播种的审批值见 `shared/seed.mjs`，不由这里兜底。
  */
 const DEFAULTS = Object.freeze({ enabled: true, contentScope: true, approval: 'ask' })
 
@@ -156,26 +155,6 @@ export function writeState(p, next) {
   }
   writeFileAtomic(p.state, `${JSON.stringify(body, null, 2)}\n`)
   return body
-}
-
-/**
- * 读安装清单。读不到 / 不是对象 / 没有 `profiles` 对象 → 从空清单开始。
- *
- * 语义：`profiles` 的键集合就是「我们写过的 profile」。`uninstall.mjs` 的默认集
- * 直接取它，所以**任何**改了 patch 的入口都必须记一笔（现在是 install.mjs），
- * 否则默认卸载会漏掉那个 profile，把它指向已经删掉的 `<home>/enhance`。
- *
- * @param {{ manifest: string }} p
- * @returns {{ version: number, installedAt?: string, updatedAt?: string, files?: string[], fileHashes?: Record<string, string>, profiles: Record<string, unknown> }}
- */
-export function readManifest(p) {
-  try {
-    const parsed = JSON.parse(readFileSync(p.manifest, 'utf8'))
-    if (parsed !== null && typeof parsed === 'object' && typeof parsed.profiles === 'object' && parsed.profiles !== null) return parsed
-  } catch {
-    // 首次安装或文件坏了：从空的开始，下一次写盘整份重建
-  }
-  return { version: 1, installedAt: undefined, files: [], profiles: {} }
 }
 
 /**

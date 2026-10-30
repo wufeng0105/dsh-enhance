@@ -159,7 +159,7 @@ test('总开关写盘：只认 true/false，写回后读得到', () => {
 
 test('derive：超过 8 KB 上限就不注入（与设置页 check 同一口径）', () => {
   // README 让用户直接编辑 content-scope.txt；写路径之外的这份文件没人拦，
-  // 若读路径也不判上限，一份超限文本会在 doctor 全绿的情况下被整段注入。
+  // 若读路径也不判上限，一份超限文本会在设置页检查全绿的情况下被整段注入。
   const on = { contentScope: true, approval: 'ask' }
   assert.equal(derive(on, { text: 'x'.repeat(TEXT_LIMIT), ok: true }).injecting, true, '恰好到上限仍然注入')
   const over = derive(on, { text: 'x'.repeat(TEXT_LIMIT + 1), ok: true })

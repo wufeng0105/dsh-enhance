@@ -25,43 +25,6 @@
       "owns": "审批放行（三态）"
     },
     {
-      "id": "plugin.permissions",
-      "layer": "plugin",
-      "path": "enhance-permissions/index.js",
-      "owns": "权限菜单图标（host 半空壳）"
-    },
-    {
-      "id": "tool.permissions-build",
-      "layer": "cli",
-      "path": "enhance-permissions/build-client.mjs",
-      "owns": "从官方产物派生 client.js（--check 漂移检测）"
-    },
-    {
-      "id": "cli.install",
-      "layer": "cli",
-      "path": "install.mjs",
-      "owns": "幂等安装"
-    },
-    {
-      "id": "cli.uninstall",
-      "layer": "cli",
-      "path": "uninstall.mjs",
-      "owns": "行级卸载 / 显式整份回滚（--to）"
-    },
-    {
-      "id": "cli.doctor",
-      "layer": "cli",
-      "path": "doctor.mjs",
-      "owns": "预检：源文件、落盘、insert 行目标、派生件戳"
-    },
-    {
-      "id": "plugin.permissions-client",
-      "layer": "plugin",
-      "path": "enhance-permissions/client.js",
-      "owns": "权限菜单派生产物（由 build-client 生成，勿手改）",
-      "generated": true
-    },
-    {
       "id": "core.session-probe",
       "layer": "core",
       "path": "shared/session-probe.mjs",
@@ -77,7 +40,7 @@
       "id": "plugin.ui-client",
       "layer": "plugin",
       "path": "ui/client.js",
-      "owns": "设置页：浏览器半，五节结构 + 结论句 + 就地错误行，注册 settings.section 并调 /enhance/api"
+      "owns": "设置页：浏览器半，结论句 + 就地错误行，注册 settings.section 并调 /enhance/api"
     },
     {
       "id": "tool.docs-check",
@@ -86,16 +49,28 @@
       "owns": "文档门禁：字面转义 / 死链 / 死路径"
     },
     {
+      "id": "tool.smoke",
+      "layer": "cli",
+      "path": "tools/smoke.mjs",
+      "owns": "端到端冒烟：隔离 home 真装 bundle、组合树、三态、写档/摘档后宿主重新组合"
+    },
+    {
       "id": "core.text-lines",
       "layer": "core",
       "path": "shared/text-lines.mjs",
       "owns": "行级 patch 手术：换行安全、删块、还尾换行"
     },
     {
-      "id": "core.patch-rows",
+      "id": "core.preset-shape",
       "layer": "core",
-      "path": "shared/patch-rows.mjs",
-      "owns": "权限选择器接线：停用官方行、插入派生行（install 与 wire 共用）"
+      "path": "shared/preset-shape.mjs",
+      "owns": "从 profile patch 读默认档位与 approval（首装审批种子用）"
+    },
+    {
+      "id": "core.preset",
+      "layer": "core",
+      "path": "shared/preset.mjs",
+      "owns": "写/摘 enhanced 权限档：块与 flow 两种形态的安全改写、归属记录、不猜"
     },
     {
       "id": "tool.code-files",
@@ -104,10 +79,10 @@
       "owns": "语法门禁的文件集合：git ls-files 优先，无 git 时走盘并跳过忽略目录"
     },
     {
-      "id": "core.version",
-      "layer": "core",
-      "path": "shared/tool-version.mjs",
-      "owns": "当前工具版本：读仓库根的 VERSION（package.json 与它由 version 门禁守住一致）"
+      "id": "tool.repo-copy",
+      "layer": "cli",
+      "path": "scripts/repo-copy.mjs",
+      "owns": "门禁自检的仓库副本：跳过被 .gitignore 排除的本地件（ZCode 有 3 GB / 3.6 万文件）"
     },
     {
       "id": "core.seed",
@@ -124,21 +99,6 @@
     },
     {
       "from": "plugin.approve",
-      "to": "core.state",
-      "kind": "import"
-    },
-    {
-      "from": "cli.doctor",
-      "to": "core.state",
-      "kind": "import"
-    },
-    {
-      "from": "cli.doctor",
-      "to": "core.patch-rows",
-      "kind": "import"
-    },
-    {
-      "from": "cli.install",
       "to": "core.state",
       "kind": "import"
     },
@@ -161,58 +121,39 @@
       "via": "ctx.on('approval/request')"
     },
     {
+      "from": "tool.smoke",
+      "to": "host.webServer",
+      "kind": "seam",
+      "via": "冒烟里用假 ctx 捕获 webServer.register 拿到真实 handler"
+    },
+    {
       "from": "plugin.scope",
       "to": "core.session-probe",
       "kind": "import"
     },
     {
-      "from": "cli.install",
-      "to": "core.text-lines",
-      "kind": "import"
-    },
-    {
-      "from": "cli.install",
-      "to": "core.patch-rows",
-      "kind": "import"
-    },
-    {
-      "from": "cli.uninstall",
-      "to": "core.patch-rows",
-      "kind": "import"
-    },
-    {
-      "from": "core.patch-rows",
-      "to": "core.text-lines",
-      "kind": "import"
-    },
-    {
-      "from": "cli.uninstall",
-      "to": "core.text-lines",
-      "kind": "import"
-    },
-    {
-      "from": "cli.uninstall",
-      "to": "core.state",
-      "kind": "import"
-    },
-    {
-      "from": "cli.install",
-      "to": "core.version",
-      "kind": "import"
-    },
-    {
-      "from": "cli.doctor",
-      "to": "core.version",
-      "kind": "import"
-    },
-    {
       "from": "core.seed",
       "to": "core.state",
       "kind": "import"
     },
     {
       "from": "core.seed",
-      "to": "core.patch-rows",
+      "to": "core.preset-shape",
+      "kind": "import"
+    },
+    {
+      "from": "core.preset",
+      "to": "core.text-lines",
+      "kind": "import"
+    },
+    {
+      "from": "core.preset",
+      "to": "core.preset-shape",
+      "kind": "import"
+    },
+    {
+      "from": "core.preset",
+      "to": "core.state",
       "kind": "import"
     },
     {
@@ -221,12 +162,12 @@
       "kind": "import"
     },
     {
-      "from": "plugin.approve",
-      "to": "core.seed",
+      "from": "plugin.scope",
+      "to": "core.preset",
       "kind": "import"
     },
     {
-      "from": "cli.install",
+      "from": "plugin.approve",
       "to": "core.seed",
       "kind": "import"
     }
@@ -272,11 +213,6 @@
         {
           "id": "plugin.approve",
           "label": "auto-approve",
-          "group": 1
-        },
-        {
-          "id": "plugin.permissions",
-          "label": "enhance-permissions",
           "group": 1
         },
         {
@@ -409,12 +345,12 @@
     {
       "id": "lifecycle",
       "title": "一件增强件的生命周期",
-      "subtitle": "每一步都有回退点：装前备份、卸后提示重启。",
+      "subtitle": "装是一次性的；之后是升级、核验、可选写档。",
       "layout": "row",
       "nodes": [
         {
           "id": "install",
-          "label": "安装"
+          "label": "dsh plugin add"
         },
         {
           "id": "boot",
@@ -426,11 +362,11 @@
         },
         {
           "id": "upgrade",
-          "label": "宿主升级"
+          "label": "宿主升级（零操作）"
         },
         {
-          "id": "uninstall",
-          "label": "卸载 / 回滚"
+          "id": "options",
+          "label": "可选：写 enhanced 档"
         }
       ],
       "edges": [
@@ -447,8 +383,8 @@
           "to": "upgrade"
         },
         {
-          "from": "upgrade",
-          "to": "uninstall"
+          "from": "run",
+          "to": "options"
         }
       ]
     },

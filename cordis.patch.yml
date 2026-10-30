@@ -1,5 +1,5 @@
 # dsh-enhance bundle patch —— `dsh plugin add` 安装后由 host 叠加进 profile。
-# 只插三个入口；桌面权限菜单图标要按宿主 asar 派生，仍由 enhance-install.cmd 负责。
+# 只插三个入口，装时零碰宿主配置；`enhanced` 档由设置页显式写入（用户 opt-in）。
 #
 # 两条解析规则（实测 DSH 0.2.1-rc.3）：
 #   - bundle patch 的 entry name 相对**本包目录**解析（不是 profile 目录）；

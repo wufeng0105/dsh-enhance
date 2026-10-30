@@ -1,11 +1,12 @@
-// dsh-enhance-ui — 设置页：五节，先给结论再给旋钮。
+// dsh-enhance-ui — 设置页：六节，先给结论再给旋钮，最后一节只说明不操作。
 //
 // 装载协议与官方 bundle 相同：window.__ModuleLoader__.load({ id, factory })。
-// 数据只走 /enhance/api 的四个 op：state / check / set / uninstall(dryRun)。
+// 数据只走 /enhance/api 的四个 op：state / check / set / preset。
 //
-// 页面回答两个问题，其余都是注脚：
+// 页面回答三件事，其余都是注脚：
 //   · 越界时谁说了算
 //   · 提示词末尾带不带内容边界
+//   · 档位菜单里有没有 Enhanced 这个档
 //
 // 页面纪律：
 //   1. 先结论再旋钮：第一节是「现在会怎么做事」，结论里的分句可跳到对应设置。
@@ -13,6 +14,12 @@
 //   3. 不用内部指代：「那句话」「尾段」这类词离开上下文就没意义。
 //   4. 纯宿主：颜色/圆角/动效全走宿主 token，不画页面底色、不换字体族。
 //   5. 只画真实能力：CLI 才能做的事只给命令文本，不做假按钮。
+//
+// 语义边界（这一条是这一页最容易做错的地方）：
+//   本页能改「档位**存在与否**」——点一下就往当前 profile 的 patch 里写 enhanced 档；
+//   但改不了「当前会话在哪个档」——那永远归宿主的档位选择器。
+//   所以 01 的第三分句指向 04（能真做事的那一节），而不是做一个假按钮；
+//   04 里也不出现「当前档位」这种它答不出来的词。
 window.__ModuleLoader__.load({
 	id: "dsh-enhance-ui",
 	factory: (require) => {
@@ -74,8 +81,7 @@ window.__ModuleLoader__.load({
 			plugins: "插件在进程里",
 			text: "文本合不合规",
 			inject: "真的进了系统提示",
-			// 完整安装才有的派生件；bundle 安装里这一项是「不适用」，见 checkRows 的 na。
-			client: "权限菜单图标",
+			preset: "Enhanced 档",
 		};
 
 		function approvalOf(value) {
@@ -123,8 +129,8 @@ window.__ModuleLoader__.load({
 			page: "总开关：",
 			approval: "「越界时怎么办」：",
 			scope: "「提示词末尾的内容边界」：",
-			check: "「检查它真的进去了」：",
-			uninstall: "「卸载这一层」：",
+			preset: "「Enhanced 权限档」：",
+			check: "「检查」：",
 		};
 
 		function sectionLabel(section) {
@@ -141,6 +147,9 @@ window.__ModuleLoader__.load({
 			if (code === "EIO") return " 写盘失败：检查 <home>/enhance/ 是否可写，然后再试一次。";
 			if (code === "EORIGIN") return " 请求来源不被接受：从本机页面操作，别用别的域名访问。";
 			if (code === "EMETHOD") return " 请求方法不对，刷新页面重试。";
+			if (code === "EPROFILE") return " 这一页没拿到 profile 上下文：在桌面版或 dsh --profile <名字> 里打开它。";
+			if (code === "EBADSHAPE") return " profile 的档位表写法认不出：把 presets 改成块风格后重试，或者按下面的说明手工加那三行。";
+			if (code === "ERECORD") return " 没有「这一档是我们写的」的记录，不会替你猜：按下面的说明手工删掉那三行。";
 			return "";
 		}
 
@@ -187,8 +196,28 @@ window.__ModuleLoader__.load({
 		}
 
 		/**
-		 * 结论句的分句。关闭态只有一句静态文本；开启态三句，前两句可跳到对应节。
-		 * 第三句「范围」不可点——这一页改不了档位，给它做入口就是假按钮。
+		 * Enhanced 档的四种状态。判定顺序就是这张表从上到下：
+		 * 「不知道在哪写」和「写法认不出」都排在「有没有写」前面——
+		 * 这两种情况下「已写入」这个结论根本不成立。
+		 */
+		function presetStatusOf(state) {
+			var preset = state === null || state.preset === undefined ? null : state.preset;
+			if (preset === null) return { kind: "unknown", word: "—", tone: "mute" };
+			if (preset.patchPath === null || preset.patchPath === undefined) {
+				return { kind: "noprofile", word: "不可用", tone: "mute" };
+			}
+			if (preset.unreadable === true) return { kind: "unreadable", word: "改不动", tone: "bad" };
+			if (preset.present === true) return { kind: "written", word: "已写入", tone: "ok" };
+			return { kind: "absent", word: "未写入", tone: "mute" };
+		}
+
+		/**
+		 * 结论句的分句。关闭态只有一句静态文本；开启态三句，三句都可跳到对应节。
+		 *
+		 * 第三句曾经是「范围按左下角菜单的档位」且**不可点**——那时这一页确实改不了档位，
+		 * 给它做入口就是假按钮。转型后这一页能改「档位存在与否」（写 enhanced 档），
+		 * 所以它现在可以点，指向 04 节；但「当前会话在哪个档」仍归宿主选择器，
+		 * 分句文案必须把这两件事分开说，否则又变回假按钮。
 		 */
 		function verdictClauses(state) {
 			if (state === null) return [];
@@ -205,10 +234,18 @@ window.__ModuleLoader__.load({
 				: empty
 					? "尾段为空、实际不注入"
 					: "提示词末尾带内容边界";
+			var preset = presetStatusOf(state);
+			var presetClause = preset.kind === "written"
+				? "菜单里有 Enhanced 档"
+				: preset.kind === "unreadable"
+					? "菜单里的 Enhanced 档写不进去"
+					: preset.kind === "noprofile"
+						? "菜单里的 Enhanced 档这一页管不了"
+						: "菜单里没有 Enhanced 档";
 			return [
 				{ kind: "jump", text: "越界时" + ap.word, target: "enh-block-approval" },
 				{ kind: "jump", text: boundary, target: "enh-block-scope" },
-				{ kind: "static", text: "范围按左下角菜单的档位" },
+				{ kind: "jump", text: presetClause, target: "enh-block-preset" },
 			];
 		}
 
@@ -234,18 +271,6 @@ window.__ModuleLoader__.load({
 					detail: item.detail || "",
 				};
 			});
-		}
-
-		/** 把预览的五个状态组摆出来；一组都不丢（参考稿只画了 planned）。 */
-		function planGroups(plan) {
-			if (plan === null || plan === undefined) return null;
-			return {
-				planned: plan.planned || [],
-				skipped: plan.skipped || [],
-				warnings: plan.warnings || [],
-				failed: plan.failed || [],
-				backups: plan.backups || [],
-			};
 		}
 
 		// ---------------------------------------------------------------- 样式
@@ -340,15 +365,13 @@ window.__ModuleLoader__.load({
 			".enh-tag[data-k=keep]{color:var(--dsw-alias-state-success-primary)}",
 			".enh-tag[data-k=back]{color:var(--dsw-alias-state-warn-primary)}",
 			".enh-code{font:11px/18px var(--ds-font-family-code);color:var(--dsw-alias-label-secondary)}",
-			".enh-choice{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);margin:2px 0 0}",
-			".enh-choice input{margin-top:2px;accent-color:var(--dsw-alias-label-primary)}",
 			".enh-out{margin:0;font:11px/18px var(--ds-font-family-code);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2);border-radius:var(--dsw-radius-sm);padding:8px}",
 			".enh-error{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-state-error-primary)}",
 		].join("\n");
 
 		// ---------------------------------------------------------------- 控件
 
-		// 这一页只用六类控件。每类只在这里定义一次外形，调用点不许再写 className。
+		// 这一页只用这几类控件。每类只在这里定义一次外形，调用点不许再写 className。
 		// 这样「同类控件长得一样」是结构保证，不是靠自觉（Nielsen #4 一致性）。
 		// 没有抽成独立文件：本仓无构建链、单文件 bundle，抽文件要动 loader 与 code-map，
 		// 收益只是少几行重复，不划算。
@@ -412,15 +435,6 @@ window.__ModuleLoader__.load({
 			}, props.children);
 		}
 
-		function Checkbox(props) {
-			return h("input", {
-				type: "checkbox",
-				checked: props.checked === true,
-				disabled: props.disabled === true,
-				onChange: props.onChange,
-			});
-		}
-
 		/** 结论句里可点的那一段。与 Button 分开：它长得像链接，不共用外观。 */
 		function Clause(props) {
 			return h("button", {
@@ -457,17 +471,13 @@ window.__ModuleLoader__.load({
 			var checks = checksBox[0];
 			var setChecks = checksBox[1];
 
-			var planBox = React.useState(null);
-			var plan = planBox[0];
-			var setPlan = planBox[1];
+			var confirmRemoveBox = React.useState(false);
+			var confirmRemove = confirmRemoveBox[0];
+			var setConfirmRemove = confirmRemoveBox[1];
 
-			var thoroughBox = React.useState(false);
-			var thorough = thoroughBox[0];
-			var setThorough = thoroughBox[1];
-
-			var confirmBox = React.useState(false);
-			var confirmThorough = confirmBox[0];
-			var setConfirmThorough = confirmBox[1];
+			var presetNoteBox = React.useState(null);
+			var presetNote = presetNoteBox[0];
+			var setPresetNote = presetNoteBox[1];
 
 			/**
 			 * 用服务端快照替换本地状态。
@@ -539,7 +549,10 @@ window.__ModuleLoader__.load({
 			// 03 右上角说的是「服务端现在会怎么做事」，所以只能看已保存的文本；
 			// 草稿的空白与否只影响按钮禁用态，不能拿去改写状态显示（否则清空未保存时自相矛盾）。
 			var savedEmpty = state !== null && normalizeText(state.text) === "";
-			var groups = planGroups(plan);
+			var preset = state === null ? null : (state.preset === undefined ? null : state.preset);
+			var presetStatus = presetStatusOf(state);
+			var rows = checkRows(checks);
+			var allPass = rows.length > 0 && rows.every(function (r) { return r.pass; });
 
 			function section(index, id, title, sub, now, nowTone, body, consequence) {
 				return h("section", { className: "enh-block", id: id, key: id },
@@ -579,8 +592,8 @@ window.__ModuleLoader__.load({
 						}),
 					),
 					h("div", { className: "enh-banner" },
-						h("b", null, "当前会话档位以左下角菜单为准。"),
-						"本页不读、也不显示具体档位；这一页只能改审批三档，改不了权限范围。",
+						h("b", null, "当前会话在哪个档由左下角菜单决定。"),
+						"本页不改那个选择，只决定菜单里有没有 Enhanced 这个档（见 04）。",
 					),
 					errorLine("page"),
 				), null);
@@ -661,6 +674,7 @@ window.__ModuleLoader__.load({
 						h(Button, { disabled: locked || draft === "", onClick: function () { setDraft(""); } }, "清空（= 不加）"),
 						over ? h("span", { className: "enh-hint" }, "超上限，删一点再存") : null,
 					),
+					h("p", { className: "enh-hint" }, "本包不会清空你配置里的 personaSuffix / suffix——它只在你那段之后追加；两者都在时按注册顺序排列。"),
 					errorLine("scope"),
 				),
 				state === null
@@ -671,10 +685,80 @@ window.__ModuleLoader__.load({
 							? "四个条件都成立：插件在本进程活着、总开关开、这个开关开、文本非空——现在真的会注入。"
 							: "现在没有注入，卡在：" + (state.reason || "未知原因") + "。");
 
-			// 04 检查 ------------------------------------------------------
-			var rows = checkRows(checks);
-			var allPass = rows.length > 0 && rows.every(function (r) { return r.pass; });
-			var blockCheck = section("04", "enh-block-check", "检查它真的进去了",
+			// 04 Enhanced 权限档 -------------------------------------------
+			var presetDetail = [];
+			if (presetStatus.kind === "written") {
+				presetDetail.push(h("p", { className: "enh-hint", key: "w" },
+					"已写进 " + (preset && preset.profile ? "profile「" + preset.profile + "」" : "当前 profile") + " 的 cordis.patch.yml；重启后出现在档位菜单、/permission 与设置页默认档下拉里。",
+				));
+			} else if (presetStatus.kind === "noprofile") {
+				presetDetail.push(h("p", { className: "enh-hint", key: "n" },
+					"这一页没拿到 profile 上下文（不是从 profile 启动的），所以不知道往哪写。在桌面版或 dsh --profile <名字> 里打开设置页。",
+				));
+			} else if (presetStatus.kind === "unreadable") {
+				presetDetail.push(h("p", { className: "enh-hint", key: "u" },
+					"profile 的档位表写法认不出（" + ((preset && preset.unreadableReason) || "未知形态") + "），为了不写坏宿主配置，这一页不动它。把 presets 改成块风格后重试，或按下面的说明手工加。",
+				));
+			}
+			if (presetNote !== null) presetDetail.push(h("p", { className: "enh-hint", key: "note" }, presetNote));
+
+			var presetActions = [];
+			if (presetStatus.kind === "absent") {
+				presetActions.push(h(Button, {
+					key: "add",
+					kind: "primary",
+					disabled: busy || state === null,
+					onClick: function () {
+						setPresetNote(null);
+						run("preset", call({ op: "preset", action: "add" }), function (result) {
+							setConfirmRemove(false);
+							setPresetNote("已写入" + (result && result.backup ? "（备份：" + result.backup + "）" : "") + "。重启后生效。");
+							run("preset", call({ op: "state" }));
+						});
+					},
+				}, "写入 Enhanced 档"));
+			}
+			if (presetStatus.kind === "written") {
+				presetActions.push(h(Button, {
+					key: "remove",
+					kind: "danger",
+					disabled: busy || state === null,
+					onClick: function () {
+						if (!confirmRemove) {
+							setConfirmRemove(true);
+							return;
+						}
+						setPresetNote(null);
+						run("preset", call({ op: "preset", action: "remove" }), function (result) {
+							setConfirmRemove(false);
+							setPresetNote((result && result.changed ? "已移除" : "本来就不在") + (result && result.backup ? "（备份：" + result.backup + "）" : "") + "。重启后生效。");
+							run("preset", call({ op: "state" }));
+						});
+					},
+				}, confirmRemove ? "再点一次确认移除" : "移除 Enhanced 档"));
+			}
+
+			var blockPreset = section("04", "enh-block-preset", "Enhanced 权限档",
+				"沙箱全开（danger-full-access）+ 越界仍问人（ask）。宿主内置没有这个组合，要写进 profile 才会出现。",
+				state === null ? "—" : presetStatus.word,
+				state === null ? "mute" : presetStatus.tone,
+				h("div", null,
+					h("p", { className: "enh-hint" }, "没有图标——宿主只为内置四个档位名准备了图标，表外的名字只渲染文字行。这是宿主的显示契约，不是这里缺了什么。"),
+					presetDetail.length === 0 ? null : h("div", null, presetDetail),
+					presetActions.length === 0 ? null : h("div", { className: "enh-actions" }, presetActions),
+					h("details", { className: "enh-term" },
+						h("summary", { className: "enh-hint" }, "它改哪个文件、怎么撤、什么时候生效"),
+						h("p", { className: "enh-hint" }, "改的是当前 profile 的 cordis.patch.yml" + (preset && preset.patchPath ? "（" + preset.patchPath + "）" : "") + "。写前先备份成 .bak-enhance-<时间>，再原子替换。"),
+						h("p", { className: "enh-hint" }, "写入是整块替换 patch 里 permission 行的档位表，所以本工具会连宿主基础三档（read-only / workspace-write / danger-full-access）一起写全——只写一条 enhanced 会把其它三档抹掉。"),
+						h("p", { className: "enh-hint" }, "不改你的默认档位：原来没有 defaultPreset 就仍然没有，宿主按组合的沙箱与审批推导。"),
+						h("p", { className: "enh-hint" }, "移除只摘我们写的 enhanced 那三行；自己手写的同名档位不会被删。要手工撤：把那一节备份文件覆盖回去，或删掉 enhanced 那三行，然后重启。"),
+						h("p", { className: "enh-hint" }, "改动要重启 DeepSeek Harness 才生效。"),
+					),
+					errorLine("preset"),
+				), null);
+
+			// 05 检查 ------------------------------------------------------
+			var blockCheck = section("05", "enh-block-check", "检查",
 				"翻最新一份会话日志读回系统提示，证明那段文字确实在末尾。只读，不改任何东西。",
 				checks === null ? "还没查过" : (allPass ? "全部通过" : "有失败项"),
 				checks === null ? "mute" : (allPass ? "ok" : "bad"),
@@ -700,133 +784,31 @@ window.__ModuleLoader__.load({
 				checks === null
 					? null
 					: allPass
-						? "四项都过了：插件在、文本合规、会话日志里确实有那段文字、派生件带戳。"
+						? "四项都过了：插件在、文本合规、会话日志里确实有那段文字、Enhanced 档的状态是明确的。"
 						: "有项没过，说明现在还不能确认它真的生效；上面的证据列写的是卡在哪。");
 
-			// 05 卸载 ------------------------------------------------------
-			function tagged(title, items) {
-				return h("div", { className: "enh-group", key: title },
-					h("h4", { className: "enh-h4" }, title),
-					items.length === 0
-						? h("p", { className: "enh-hint" }, "（无）")
-						: h("ul", { className: "enh-rows" }, items.map(function (row, i) {
-							return h("li", { key: title + i, className: "enh-row" },
-								h(Tag, { kind: row.kind }, row.tag),
-								h("span", row.code ? { className: "enh-code" } : null, row.text),
-							);
-						})),
+			// 06 升级与卸载 ------------------------------------------------
+			function infoRow(tagKind, tagText, text, code) {
+				return h("li", { className: "enh-row" },
+					h(Tag, { kind: tagKind }, tagText),
+					h("span", code ? { className: "enh-code" } : null, text),
 				);
 			}
 
-			function taggedFromList(title, kind, tag, list) {
-				return tagged(title, list.map(function (text) {
-					return { kind: kind, tag: tag, text: text };
-				}));
-			}
+			var profileName = preset && preset.profile ? preset.profile : "<profile>";
 
-			var confirmLabel = plan === null
-				? "确认卸载"
-				: thorough
-					? (confirmThorough ? "再次确认：彻底删除" : "确认彻底清理")
-					: "确认卸载";
-
-			var previewText = groups === null ? "" : [
-				groups.planned.length === 0 ? null : "planned:\n" + groups.planned.join("\n"),
-				groups.skipped.length === 0 ? null : "skipped:\n" + groups.skipped.join("\n"),
-				groups.warnings.length === 0 ? null : "warnings:\n" + groups.warnings.join("\n"),
-				groups.failed.length === 0 ? null : "failed:\n" + groups.failed.join("\n"),
-			].filter(Boolean).join("\n\n") || "（没有可删的行）";
-
-			var blockUninstall = section("05", "enh-block-uninstall", "卸载这一层",
-				"先看影响再决定。生效层必做；用户数据默认归档，「彻底清理」是另一档。",
-				plan === null ? "已安装" : "待确认",
-				plan === null ? "mute" : "warn",
+			var blockLifecycle = section("06", "enh-block-lifecycle", "升级与卸载",
+				"两条命令，不用点按钮——这一节只说明。",
+				"说明", "mute",
 				h("div", null,
-					tagged("生效层（必做）", [
-						{ kind: "del", tag: "删除", text: "三行挂载：enhance-scope / auto-approve / enhance-ui" },
-						{ kind: "del", tag: "删除", text: "权限替换行 enhance-permissions，并把 ui-permission 的 disabled 还回去" },
-						{ kind: "del", tag: "删除", text: homePath(state), code: true },
-					]),
-					h("div", { className: "enh-group" },
-						h("h4", { className: "enh-h4" }, "用户数据"),
-						h("ul", { className: "enh-rows" },
-							h("li", { className: "enh-row" },
-								h(Tag, { kind: "arc" }, "归档"),
-								h("span", null, "默认：state.json / content-scope.txt / install-manifest.json 先归档到 enhance-archive-<时间戳>/，再删目录"),
-							),
-							h("li", { className: "enh-row" },
-								h(Tag, { kind: "del" }, "不归档"),
-								h("span", null, "彻底清理：不归档，随目录一起删掉"),
-							),
-						),
-						h("label", { className: "enh-choice" },
-							h(Checkbox, {
-								checked: thorough,
-								disabled: busy || plan === null,
-								onChange: function (event) {
-									var next = event.target.checked;
-									setThorough(next);
-									setConfirmThorough(false);
-									run("uninstall", call({ op: "uninstall", dryRun: true, thorough: next }), function (result) { setPlan(result); });
-								},
-							}),
-							h("span", null, "彻底清理：不归档，并删掉本工具自己造的 .bak-* 备份。别人写的备份不动。"),
-						),
+					h("ul", { className: "enh-rows" },
+						infoRow("arc", "升级", "升级 DeepSeek Harness 不用动这个包：它不碰宿主配置文件、不派生任何东西，所以零操作。"),
+						infoRow("keep", "核验", "DSH 发新 rc 之后，照 docs/compatibility.md 的例行核验跑一遍（约 15 分钟）：重数触点 → 逐包 tree-diff → 冒烟 → 改两处声明。"),
+						infoRow("arc", "卸载", "dsh plugin --profile " + profileName + " remove dsh-enhance，然后重启。", true),
+						infoRow("keep", "保留", "你写的文本、开关、" + homePath(state) + " 里的 .bak 备份都会留着；想彻底清就自己删这个目录。"),
 					),
-					// 这一组的标题与标签必须跟着 thorough 走：勾了彻底清理，这些备份是要被删的，
-					// 再写「默认保留 / 保留」就是自相矛盾（用户实测指出过这一点）。
-					groups === null
-						? tagged("回滚备份", [])
-						: tagged(
-							thorough ? "回滚备份（彻底清理会删掉）" : "回滚备份（默认保留）",
-							groups.backups.map(function (item) {
-								return {
-									kind: thorough ? "del" : "keep",
-									tag: thorough ? "会删" : "保留",
-									text: item.profile + " / " + item.name,
-								};
-							}),
-						),
-					plan === null ? null : h("div", { className: "enh-group" },
-						h("h4", { className: "enh-h4" }, "预览明细"),
-						h("pre", { className: "enh-out" }, previewText),
-					),
-					plan === null ? null : taggedFromList("预览里的跳过与告警", "back", "留意",
-						groups.skipped.concat(groups.warnings).concat(groups.failed)),
-					h("div", { className: "enh-actions" },
-						h(Button, { disabled: busy || state === null, onClick: function () { run("uninstall", call({ op: "uninstall", dryRun: true, thorough: thorough }), function (result) { setPlan(result); }); } }, "先看影响"),
-						h(Button, { kind: "danger", disabled: busy || plan === null, onClick: function () {
-								if (thorough && !confirmThorough) {
-									setConfirmThorough(true);
-									return;
-								}
-								run("uninstall", call({ op: "uninstall", thorough: thorough }), function () {
-									setPlan(null);
-									setConfirmThorough(false);
-								});
-							} }, confirmLabel),
-						h(Button, { disabled: busy || plan === null, onClick: function () { setPlan(null); setConfirmThorough(false); } }, "取消"),
-					),
-					errorLine("uninstall"),
-					h("div", { className: "enh-group" },
-						h("h4", { className: "enh-h4" }, "归档之后怎么恢复（命令行）"),
-						h("ul", { className: "enh-rows" },
-							h("li", { className: "enh-row" },
-								h(Tag, { kind: "arc" }, "CLI"),
-								h("span", { className: "enh-code" }, "node install.mjs --home <DSH_HOME> --restore <归档目录> --replace"),
-							),
-							h("li", { className: "enh-row" },
-								h(Tag, { kind: "arc" }, "说明"),
-								h("span", null, "先加 --dry-run 看一遍；归档不参与加载，重装不会自动读；只写回 state.json 与 content-scope.txt"),
-							),
-							h("li", { className: "enh-row" },
-								h(Tag, { kind: "back" }, "不是这个"),
-								h("span", null, "--to <备份文件> 是回滚一个档位的 patch，保留 enhance/ 与 staging，不叫卸载"),
-							),
-						),
-					),
-				),
-				"这一步在真机上会先回包、再动手（needRestart: true），重启后生效。");
+					h("p", { className: "enh-hint" }, "升级后如果 node scripts/check.mjs 报「本机 DSH 版本不在声明范围」，那是提醒你去跑一遍例行核验、再把版本加进声明的意思。"),
+				), null);
 
 			// 页面 ---------------------------------------------------------
 			return h("div", { className: "enh" },
@@ -848,12 +830,13 @@ window.__ModuleLoader__.load({
 						}, "重试")
 						: null,
 				),
-				h("p", { className: "enh-lede" }, "这一页只说清两件事：越界时谁说了算，提示词末尾带不带内容边界。改完不用重启——下一条消息就按新的来。"),
+				h("p", { className: "enh-lede" }, "这一页管三件事：越界时谁说了算、提示词末尾带不带那段字、菜单里有没有 Enhanced 档。改完不用重启——写档例外，要重启一次。"),
 				blockVerdict,
 				blockApproval,
 				blockScope,
+				blockPreset,
 				blockCheck,
-				blockUninstall,
+				blockLifecycle,
 			);
 		}
 
@@ -893,9 +876,9 @@ window.__ModuleLoader__.load({
 			draftBytes: draftBytes,
 			verdictClauses: verdictClauses,
 			checkRows: checkRows,
-			planGroups: planGroups,
 			approvalOf: approvalOf,
 			metaItems: metaItems,
+			presetStatusOf: presetStatusOf,
 		};
 		return module.exports;
 	},

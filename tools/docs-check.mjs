@@ -2,9 +2,9 @@
 /**
  * 文档门禁：把「机械残渣」变成红灯。
  *
- * 为什么要有它：代码侧有五条门禁（`node --check` / `--test` / `graph --check` /
- * `build-client --check` / `doctor`），文档侧一条都没有——`graph` 只比 SVG，
- * `doctor` 只看 home。于是 `design.md` 里能躺一整行字面反斜杠 n、能用死链接、
+ * 为什么要有它：代码侧的门禁（`node --check` / `--test` / `graph --check` / `bundle`）
+ * 都只管代码与结构，文档侧一条都没有——`graph` 只比 SVG，`bundle` 只看 patch 声明。
+ * 于是 `design.md` 里能躺一整行字面反斜杠 n、能用死链接、
  * 能把用例数写成三个版本，而所有闸都绿。
  *
  * 三条检查，都只读：

@@ -1,10 +1,10 @@
 {
   "name": "dsh-enhance",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "license": "MIT",
   "type": "module",
-  "description": "在 DeepSeek Harness 系统提示的末尾追加一段你自己写的文本：写破甲词、人设或内容规矩，存盘即生效，可开关、可检查、可卸载。",
+  "description": "在 DeepSeek Harness 系统提示的末尾追加一段你自己写的文本：写破甲词、人设或内容规矩，存盘即生效，可开关、可检查；还可以一键把 Enhanced 权限档写进你的 profile。",
   "engines": {
     "node": ">=22"
   },
@@ -15,20 +15,30 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "versions": [
+        "0.2.1-rc.1",
+        "0.2.1-rc.2",
+        "0.2.1-rc.3",
+        "0.2.1-rc.4",
+        "0.2.1-rc.5"
+      ],
+      "tested": "0.2.1-rc.3",
+      "basis": "source-level",
+      "verifiedAt": "2026-10-30",
+      "doc": "docs/compatibility.md"
     }
   },
   "files": [
     "auto-approve",
-    "enhance-permissions",
     "enhance-scope",
     "ui",
     "shared",
     "content-scope.txt",
     "cordis.patch.yml",
     "screenshots.json",
-    "install.mjs",
-    "uninstall.mjs",
-    "doctor.mjs",
+    "docs/compatibility.md",
     "README.md",
     "LICENSE",
     "VERSION"

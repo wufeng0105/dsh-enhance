@@ -81,6 +81,19 @@ const SNAPSHOT = {
   degradedReason: null,
   home: 'C:/x',
   limit: 8192,
+  preset: {
+    patchPath: 'C:/x/profiles/desktop/cordis.patch.yml',
+    profile: 'desktop',
+    source: 'profileContext',
+    present: false,
+    unreadable: false,
+    unreadableReason: null,
+    presets: [],
+    defaultPreset: null,
+    recorded: false,
+    writtenAt: null,
+    reason: null,
+  },
 }
 
 // ───────────────────────────────────────────── 行为断言（不动）
@@ -167,12 +180,19 @@ test('call：HTTP 层失败与结构化错误都要抛', async () => {
 
 // ───────────────────────────────────────────── 意图断言
 
-test('结构：五节按 01→05 排列，标题各自说事', () => {
-  const titles = ['现在会怎么做事', '越界时怎么办', '提示词末尾的内容边界', '检查它真的进去了', '卸载这一层']
-  const at = titles.map((title) => source.indexOf(title))
-  at.forEach((index, i) => assert.ok(index >= 0, `缺节标题：${titles[i]}`))
+test('结构：六节按 01→06 排列，标题各自说事', () => {
+  // 用 section() 的调用位置定序（标题字符串可能在别处先出现，比如注释里的「检查项」）
+  const ids = ['enh-block-verdict', 'enh-block-approval', 'enh-block-scope', 'enh-block-preset', 'enh-block-check', 'enh-block-lifecycle']
+  const at = ids.map((id) => source.indexOf(`section("0${ids.indexOf(id) + 1}", "${id}"`))
+  at.forEach((index, i) => assert.ok(index >= 0, `缺节：${ids[i]}`))
   const sorted = [...at].sort((a, b) => a - b)
-  assert.deepEqual(at, sorted, '五节的顺序变了')
+  assert.deepEqual(at, sorted, '六节的顺序变了')
+
+  const titles = ['现在会怎么做事', '越界时怎么办', '提示词末尾的内容边界', 'Enhanced 权限档', '检查', '升级与卸载']
+  titles.forEach((title, i) => {
+    const slice = source.slice(at[i], i + 1 < at.length ? at[i + 1] : source.length)
+    assert.ok(slice.includes(title), `第 ${i + 1} 节的标题不对：缺「${title}」`)
+  })
 
   // 每节都有四层的容器类：标题 / 副行 / 右上现状 / 下方后果
   for (const cls of ['enh-h3', 'enh-sub', 'enh-now', 'enh-reason']) {
@@ -184,14 +204,14 @@ test('结构：结论句在第一节内部，不在页面底部', () => {
   // 用带引号的 className 定位实际使用处，避免匹配到 CSS 里的类定义
   const verdict = source.indexOf('className: "enh-verdict"')
   const firstBlock = source.indexOf('"enh-block-verdict"')
-  const uninstall = source.indexOf('"enh-block-uninstall"')
+  const lastBlock = source.indexOf('"enh-block-lifecycle"')
   assert.ok(verdict > 0, '结论句没有渲染')
   assert.ok(firstBlock > 0, '01 节缺少 id')
   assert.ok(verdict > firstBlock, '结论句不在 01 节内')
-  assert.ok(verdict < uninstall, '结论句掉到了页面后半段')
+  assert.ok(verdict < lastBlock, '结论句掉到了页面后半段')
 })
 
-test('结论句：关闭态一句、开启态三句，前两句可跳转、第三句不可点', () => {
+test('结论句：关闭态一句、开启态三句，三句都可跳转（第三句指向 Enhanced 档）', () => {
   const { verdictClauses } = loadBundle().__testing
 
   const off = verdictClauses({ ...SNAPSHOT, enabled: false })
@@ -202,16 +222,23 @@ test('结论句：关闭态一句、开启态三句，前两句可跳转、第�
 
   const on = verdictClauses({ ...SNAPSHOT, approval: 'ask', contentScope: true, text: 'hello' })
   assert.equal(on.length, 3)
-  assert.deepEqual(on.map((c) => c.kind), ['jump', 'jump', 'static'])
+  // 转型后第三句也能点：这一页确实能改「菜单里有没有这个档」
+  assert.deepEqual(on.map((c) => c.kind), ['jump', 'jump', 'jump'])
   assert.match(on[0].text, /越界时先问我/)
   assert.equal(on[0].target, 'enh-block-approval')
   assert.equal(on[1].text, '提示词末尾带内容边界')
   assert.equal(on[1].target, 'enh-block-scope')
-  assert.match(on[2].text, /范围按左下角菜单的档位/)
+  assert.match(on[2].text, /菜单里没有 Enhanced 档/)
+  assert.equal(on[2].target, 'enh-block-preset')
 
   // 边界那一句随状态三态变化
   assert.equal(verdictClauses({ ...SNAPSHOT, contentScope: false })[1].text, '提示词末尾不带内容边界')
   assert.equal(verdictClauses({ ...SNAPSHOT, text: '  ' })[1].text, '尾段为空、实际不注入')
+
+  // 第三句随 preset 状态变化：已写入 / 写不进去 / 管不了
+  assert.match(verdictClauses({ ...SNAPSHOT, preset: { ...SNAPSHOT.preset, present: true } })[2].text, /菜单里有 Enhanced 档/)
+  assert.match(verdictClauses({ ...SNAPSHOT, preset: { ...SNAPSHOT.preset, unreadable: true } })[2].text, /写不进去/)
+  assert.match(verdictClauses({ ...SNAPSHOT, preset: { ...SNAPSHOT.preset, patchPath: null } })[2].text, /管不了/)
 })
 
 test('结论句：审批词随三档变化，且用的是与宿主菜单错开的词', () => {
@@ -242,11 +269,11 @@ test('检查节：四项以 API 的 name 为键、标题是本地映射、pass �
       { name: 'plugins', pass: true, detail: 'enhance-scope=在 · auto-approve=在' },
       { name: 'text', pass: false, detail: '9000 B / 上限 8192 B' },
       { name: 'inject', pass: false, detail: '会话里没有这段文本' },
-      { name: 'client', pass: true, na: true, detail: 'bundle 安装不含权限菜单图标' },
+      { name: 'preset', pass: true, na: true, detail: '未写入（在「Enhanced 权限档」一节点一下写入）' },
     ],
   })
-  assert.deepEqual(rows.map((r) => r.key), ['plugins', 'text', 'inject', 'client'])
-  assert.deepEqual(rows.map((r) => r.title), ['插件在进程里', '文本合不合规', '真的进了系统提示', '权限菜单图标'])
+  assert.deepEqual(rows.map((r) => r.key), ['plugins', 'text', 'inject', 'preset'])
+  assert.deepEqual(rows.map((r) => r.title), ['插件在进程里', '文本合不合规', '真的进了系统提示', 'Enhanced 档'])
   // 关键：pass / na 来自服务端，页面不伪造通过
   assert.deepEqual(rows.map((r) => r.pass), [true, false, false, true])
   assert.deepEqual(rows.map((r) => r.na), [false, false, false, true])
@@ -257,41 +284,35 @@ test('检查节：四项以 API 的 name 为键、标题是本地映射、pass �
   assert.deepEqual(checkRows(null), [])
 })
 
-test('卸载节：预览的五个状态组一组都不丢', () => {
-  const { planGroups } = loadBundle().__testing
-  const plan = {
-    planned: ['desktop: 删三行'],
-    skipped: ['t1: no patch'],
-    warnings: ['ui-permission 归属不确定'],
-    failed: ['web: 写盘失败'],
-    backups: [{ profile: 'desktop', name: 'cordis.patch.yml.bak-enhance-1' }],
-    thorough: false,
-  }
-  const groups = planGroups(plan)
-  assert.equal(groups.planned.length, 1)
-  assert.equal(groups.skipped.length, 1)
-  assert.equal(groups.warnings.length, 1)
-  assert.equal(groups.failed.length, 1)
-  assert.equal(groups.backups.length, 1)
-  assert.equal(groups.backups[0].profile, 'desktop')
+test('Enhanced 档：四种状态各自说对话，且只在能做事的两种状态给按钮', () => {
+  const { presetStatusOf } = loadBundle().__testing
 
-  // 字段缺失时退化成空数组，不抛
-  assert.deepEqual(planGroups({}).planned, [])
-  assert.equal(planGroups(null), null)
+  assert.deepEqual(presetStatusOf(null), { kind: 'unknown', word: '—', tone: 'mute' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: null } }), { kind: 'noprofile', word: '不可用', tone: 'mute' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', unreadable: true } }), { kind: 'unreadable', word: '改不动', tone: 'bad' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', present: true } }), { kind: 'written', word: '已写入', tone: 'ok' })
+  assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', present: false } }), { kind: 'absent', word: '未写入', tone: 'mute' })
+
+  // 「写不进去」和「管不了」这两种情况不许给操作按钮——按了也只会报错
+  assert.match(source, /presetStatus\.kind === "absent"/, '缺「未写入」才给写入按钮的分支')
+  assert.match(source, /presetStatus\.kind === "written"/, '缺「已写入」才给移除按钮的分支')
+  assert.ok(source.includes('写入 Enhanced 档'), '缺写入按钮文案')
+  assert.ok(source.includes('移除 Enhanced 档'), '缺移除按钮文案')
+  // 移除要二次确认：第一次点变文案，第二次才发请求
+  assert.ok(source.includes('再点一次确认移除'), '移除缺少二次确认')
+  assert.ok(source.includes('action: "add"') && source.includes('action: "remove"'), '缺 preset op 的两种动作')
 })
 
-test('卸载节：三层分区与彻底清理的两段确认都在', () => {
-  for (const label of ['生效层（必做）', '用户数据']) {
-    assert.ok(source.includes(label), `缺分区：${label}`)
-  }
-  // 「回滚备份」这一组的标题必须跟着 thorough 走：勾了彻底清理，这些备份是要删的。
-  assert.ok(source.includes('回滚备份（默认保留）'), '缺默认态标题')
-  assert.ok(source.includes('回滚备份（彻底清理会删掉）'), '勾选彻底清理后标题应改口，不能还写「默认保留」')
-  assert.ok(source.includes('彻底清理'), '缺彻底清理选项')
-  assert.ok(source.includes('再次确认：彻底删除'), '缺彻底清理的二次确认')
-  // 归档/恢复/--to 只能以命令文本出现
-  assert.ok(source.includes('--restore'))
-  assert.ok(source.includes('--to'))
+test('升级与卸载节：只说明、不画按钮，命令照实写', () => {
+  const at = source.indexOf('// 06 升级与卸载')
+  assert.ok(at > 0, '找不到 06 节的注释锚点')
+  const block = source.slice(at, source.indexOf('// 页面', at) > 0 ? source.indexOf('// 页面', at) : at + 4000)
+  assert.ok(!block.includes('h(Button'), '06 节不该有按钮——页内卸载能力已经不存在')
+  assert.ok(block.includes('dsh plugin --profile'), '缺卸载命令')
+  assert.ok(block.includes('remove dsh-enhance'), '缺卸载动词与包名')
+  assert.ok(block.includes('docs/compatibility.md'), '缺例行核验的指引')
+  assert.ok(block.includes('零操作'), '缺「升级零操作」这一句')
+  assert.ok(block.includes('.bak 备份都会留着'), '缺「数据会保留」这一句')
 })
 
 test('按钮：禁用态的样式必须排在 data-kind 之后（否则禁用仍显示危险色）', () => {
@@ -358,20 +379,20 @@ test('WCAG 3.3.1 + 3.3.3：错误行指明哪一节，并给一句怎么改', ()
 })
 
 test('一致性：每类控件只在一个组件里定义，调用点不许写 className', () => {
-  // 六个组件各自是唯一的裸标签出处
-  for (const [tag, component] of [['button', 'Button'], ['input', 'Checkbox'], ['textarea', 'TextArea']]) {
+  // 各组件各自是唯一的裸标签出处
+  for (const [tag, component] of [['button', 'Button'], ['textarea', 'TextArea']]) {
     const count = (source.match(new RegExp(`h\\("${tag}"`, 'g')) ?? []).length
     assert.ok(count >= 1, `缺 ${tag} 的定义`)
   }
-  // 每个裸 button 都必须紧跟在某个 function Xxx(props) 里
-  const sites = [...source.matchAll(/h\("(button|input|textarea)"/g)].map((m) => m.index)
+  // 每个裸 button/textarea 都必须紧跟在某个 function Xxx(props) 里
+  const sites = [...source.matchAll(/h\("(button|textarea)"/g)].map((m) => m.index)
   for (const at of sites) {
     const head = source.slice(Math.max(0, at - 400), at)
-    assert.match(head, /function (Button|Switch|Option|Checkbox|Clause|TextArea)\(props\)/, `裸标签出现在组件定义之外（offset ${at}）`)
+    assert.match(head, /function (Button|Switch|Option|Clause|TextArea)\(props\)/, `裸标签出现在组件定义之外（offset ${at}）`)
   }
   // 调用点改用组件后，不应再有 className: "enh-btn" 之类的直接赋值
   // 类名清单必须覆盖**所有**有独立组件的样式类；漏一个，那个组件就会退化成死代码。`enh-tag` 就是这样漏掉的。
-  for (const cls of ['enh-btn', 'enh-switch', 'enh-seg-btn', 'enh-textarea', 'enh-tag', 'enh-clause', 'enh-choice']) {
+  for (const cls of ['enh-btn', 'enh-switch', 'enh-seg-btn', 'enh-textarea', 'enh-tag', 'enh-clause']) {
     const occurrences = (source.match(new RegExp(`className: "${cls}"`, 'g')) ?? []).length
     assert.equal(occurrences, 1, `${cls} 应只在一个组件定义里出现，实际 ${occurrences} 处`)
   }
@@ -381,8 +402,12 @@ test('错误行：就地、role=alert、每个来源各一处', () => {
   const alerts = source.match(/role: "alert"/g) ?? []
   assert.equal(alerts.length, 1, '错误行应当只有一处实现（复用同一个 helper）')
   const sections = [...source.matchAll(/errorLine\("([a-z]+)"\)/g)].map((m) => m[1])
-  assert.deepEqual(sections.sort(), ['approval', 'check', 'page', 'scope', 'uninstall'])
+  assert.deepEqual(sections.sort(), ['approval', 'check', 'page', 'preset', 'scope'])
   assert.ok(source.includes('没成：'), '错误行缺统一前缀')
+  // 写档这条路上三个错误码各有「怎么改」的一句话
+  for (const code of ['EPROFILE', 'EBADSHAPE', 'ERECORD']) {
+    assert.ok(source.includes(`code === "${code}"`), `缺 ${code} 的建议文案`)
+  }
 })
 
 test('字节口径：与服务端 normalizeText 同一套，再数 UTF-8', () => {
@@ -528,20 +553,24 @@ test('静态：不含已退役的说法，也不再把「范围」做成控件',
 })
 
 test('静态：三个问题都在，但不以问句行形式排列', () => {
-  // 旧实现用三行问句；新实现把它们变成三节的标题与结论句
+  // 旧实现用三行问句；新实现把它们变成各节的标题与结论句
   assert.ok(!/row\("/.test(source), '还在用问句行')
   assert.ok(source.includes('越界时'), '缺越界那一问')
   assert.ok(source.includes('提示词末尾'), '缺边界那一问')
-  // 「能碰多大范围」这一问已经并进结论句的静态分句（页面改不了档位）
-  assert.ok(source.includes('范围按左下角菜单的档位'), '缺范围那一句')
+  assert.ok(source.includes('Enhanced 权限档'), '缺档位那一问')
+  // 「当前会话在哪个档」这一句必须留给宿主选择器，本页只解释边界
+  assert.ok(source.includes('当前会话在哪个档由左下角菜单决定'), '缺「当前档位归谁管」的边界说明')
 })
 
-test('静态：真实能力之外不画假按钮（归档/恢复只给命令）', () => {
+test('静态：真实能力之外不画假按钮（卸载只给命令）', () => {
   assert.ok(!/op: "restore"/.test(source), '页面不该有 restore 的 op')
   assert.ok(!/op: "archive"/.test(source), '页面不该有 archive 的 op')
-  for (const command of ['node install.mjs --home <DSH_HOME> --restore <归档目录> --replace']) {
-    assert.ok(source.includes(command), `缺命令文本：${command}`)
+  assert.ok(!/op: "uninstall"/.test(source), '页面不该有 uninstall 的 op')
+  // 已删掉的完整安装/派生件语境一个字都不许回来
+  for (const gone of ['install.mjs', 'uninstall.mjs', 'enhance-permissions', 'build-client', 'planGroups']) {
+    assert.ok(!source.includes(gone), `残留了已退役的东西：${gone}`)
   }
+  assert.ok(source.includes('dsh plugin --profile'), '卸载指引必须给命令文本')
 })
 
 // ──────────────── 复核发现的回归闸 ────────────────

@@ -3,46 +3,50 @@
  * 门禁总入口。
  *
  * 分层：
- *   fast  syntax、tests、doctor（仓库侧）、graph（结构）、docs、install → doctor → uninstall
- *   full  fast + 有 docs/generated 时的 graph --strict + 给了 --asar 时的 build-client
+ *   fast  version、syntax、tests、graph（结构）、docs、bundle
+ *   full  fast + 有 docs/generated 时的 graph --strict
  *
  * 每道门禁都必须能红。`--self-test` 用一次性副本证明这一点：坏语法文件、坏测试、
- * 未登记的源文件、死链、半装、漏拷共享层、空 patch 还原、卸载残留的档位、
- * 零目标安装、超限文本。
+ * 未登记的源文件、死链、坏 bundle 声明、超限文本。
  *
  * 用法：
- *   node scripts/check.mjs [--layer fast|full] [--asar <path>] [--self-test]
+ *   node scripts/check.mjs [--layer fast|full] [--self-test]
  *
  * 退出码：0 请求的门禁全过 / 自检全部能红；1 有门禁失败或负例没能变红；2 用法错。
  */
 
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { codeFiles as codeFilesIn } from './code-files.mjs'
+import { copyRepoTree } from './repo-copy.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
 const node = process.execPath
 
-/** The repo has 193 tests; a floor catches mass deletion that still exits 0. */
+/** 仓库的 tests 数有一个地板：防「大批删除仍 exit 0」。 */
 const TEST_FLOOR = 50
 
 const args = process.argv.slice(2)
 const layerIndex = args.indexOf('--layer')
 const layer = layerIndex >= 0 ? args[layerIndex + 1] : 'fast'
-const asarIndex = args.indexOf('--asar')
-const asar = asarIndex >= 0 ? resolve(args[asarIndex + 1]) : undefined
 const selfTest = args.includes('--self-test')
+const dshVersionIndex = args.indexOf('--dsh-version')
+const dshVersion = dshVersionIndex >= 0 ? args[dshVersionIndex + 1] : undefined
 
-if (!['fast', 'full'].includes(layer)) {
-  console.error(`check: unknown --layer ${layer === undefined ? '(missing)' : layer}`)
-  process.exit(2)
-}
 if (layerIndex >= 0 && args[layerIndex + 1] === undefined) {
   console.error('check: --layer needs a value')
+  process.exit(2)
+}
+if (dshVersionIndex >= 0 && (dshVersion === undefined || dshVersion.startsWith('--'))) {
+  console.error('check: --dsh-version needs a value')
+  process.exit(2)
+}
+if (layerIndex >= 0 && !['fast', 'full'].includes(layer)) {
+  console.error(`check: unknown --layer ${layer}`)
   process.exit(2)
 }
 
@@ -80,14 +84,15 @@ function testFiles(base = root) {
 // ---------------------------------------------------------------- gates
 
 /**
- * 版本身份：`package.json` 与根 `VERSION` 一致，且 `install.mjs` 写进清单的 `toolVersion`
- * 等于当前版本。
+ * 版本身份与兼容声明。
  *
- * 三处必须同一个值：README 说的版本、清单里记的版本、`doctor` 比对的版本。
- * 少守一处就会漂：只守文件时 install 可能写死一个旧串；只守 install 时 `VERSION`
- * 与 `package.json` 可以各说各的。
+ * **唯一权威是 `package.json` 的 `dsh.compatibility`**：README 里那句适用版本是它的
+ * 派生文本（门禁要求两处逐字一致），本机 DSH 版本超出声明范围时给可操作提示。
+ *
+ * 为什么 README 不是第二权威：README 是给人读的散文，它的那一句必须由声明生成，
+ * 否则「改了声明忘了改 README」和「改了 README 忘了改声明」会各错一次。
  */
-function gateVersion(base = root) {
+function gateVersion(base = root, options = {}) {
   const problems = []
   let pkg
   try {
@@ -107,24 +112,63 @@ function gateVersion(base = root) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) problems.push(`VERSION 不是 x.y.z：${version}`)
   if (pkg.version !== version) problems.push(`package.json version=${String(pkg.version)} != VERSION ${version}`)
 
-  // 落盘侧：真装一次到临时 home，读清单里记的版本。
-  const home = mkdtempSync(join(tmpdir(), 'enhance-version-'))
-  try {
-    mkdirp(join(home, 'profiles', 't1'))
-    writeFileSync(join(home, 'profiles', 't1', 'cordis.patch.yml'), '[]\n', 'utf8')
-    const install = run(['install.mjs', '--home', home, '--profiles', 't1'], base)
-    if (install.code !== 0) {
-      problems.push('install 失败，无法核对写入版本')
+  // ---- 兼容声明 ----
+  const compatibility = pkg?.dsh?.compatibility
+  const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
+  let declared = null
+  if (compatibility === undefined || compatibility === null || typeof compatibility !== 'object' || Array.isArray(compatibility)) {
+    problems.push('缺兼容声明：package.json 的 dsh.compatibility（README 的适用版本句由它派生，本机超范围时的提示也靠它）')
+  } else {
+    const versions = compatibility.versions
+    if (!Array.isArray(versions) || versions.length === 0) {
+      problems.push('兼容声明的 versions 必须是非空数组')
     } else {
-      const manifest = JSON.parse(readFileSync(join(home, 'enhance', 'install-manifest.json'), 'utf8'))
-      if (manifest.toolVersion !== version) {
-        problems.push(`install 写入 toolVersion=${manifest.toolVersion ?? '（无）'} != 当前 ${version}`)
+      const unique = new Set(versions)
+      if (unique.size !== versions.length) problems.push('兼容声明的 versions 有重复项')
+      const bad = versions.filter((item) => typeof item !== 'string' || !VERSION_RE.test(item))
+      if (bad.length > 0) problems.push(`兼容声明的 versions 有不合法版本号：${bad.map(String).join(', ')}`)
+      if (typeof compatibility.tested !== 'string' || !versions.includes(compatibility.tested)) {
+        problems.push(`兼容声明的 tested=${String(compatibility.tested)} 必须属于 versions 之一`)
+      }
+      if (typeof compatibility.basis !== 'string' || compatibility.basis.trim() === '') problems.push('兼容声明的 basis 必须是非空字符串')
+      if (typeof compatibility.verifiedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(compatibility.verifiedAt)) problems.push('兼容声明的 verifiedAt 必须是 YYYY-MM-DD')
+      if (typeof compatibility.doc !== 'string' || compatibility.doc.trim() === '') problems.push('兼容声明的 doc 必须是路径')
+      else if (!existsSync(join(base, compatibility.doc))) problems.push(`兼容声明的 doc 指向不存在的文件：${compatibility.doc}`)
+      if (problems.length === 0) declared = compatibility
+    }
+  }
+
+  // ---- README 派生句（声明是权威，README 是派生文本） ----
+  if (declared !== null) {
+    const sentence = compatibilitySentence(declared)
+    let readme = ''
+    try {
+      readme = readFileSync(join(base, 'README.md'), 'utf8')
+    } catch {
+      problems.push('README.md 读不到，无法核对适用版本句')
+    }
+    if (readme !== '' && !readme.includes(sentence)) {
+      problems.push(`README 缺由声明生成的适用版本句（应逐字包含）：${sentence}`)
+    }
+  }
+
+  // ---- 本机 DSH 版本超出声明范围 ----
+  if (declared !== null) {
+    const local = options.dshVersion ?? detectDshVersion()
+    if (local === undefined) {
+      return {
+        pass: problems.length === 0,
+        detail: problems.length === 0 ? `${pkg.name}@${version}（未探测到本机 DSH 版本）` : problems.join(' | '),
       }
     }
-  } catch (error) {
-    problems.push(`install 版本核对失败：${String(error?.message ?? error)}`)
-  } finally {
-    rmSync(home, { recursive: true, force: true })
+    if (!declared.versions.includes(local)) {
+      problems.push(
+        `本机 DSH ${local} 不在声明范围 [${declared.versions[0]}…${declared.versions[declared.versions.length - 1]}]：`
+        + '先按 docs/compatibility.md 的例行核验跑一遍（约 15 分钟），核验过了再把该版本加进 package.json 的 dsh.compatibility.versions',
+      )
+    }
+    if (problems.length === 0) return { pass: true, detail: `${pkg.name}@${version} · DSH ${local}` }
+    return { pass: false, detail: problems.join(' | ') }
   }
 
   return {
@@ -132,6 +176,47 @@ function gateVersion(base = root) {
     detail: problems.length === 0 ? `${pkg.name}@${version}` : problems.join(' | '),
   }
 }
+
+/** 由声明拼出 README 必须逐字包含的那一句（`basis` → 中文口径）。 */
+function compatibilitySentence(compatibility) {
+  const versions = compatibility.versions
+  const first = versions[0]
+  const last = versions[versions.length - 1]
+  const basis = { 'source-level': '源码级核验', runtime: '运行期验证' }[compatibility.basis] ?? compatibility.basis
+  return `DeepSeek Harness ${first}–${last}（${compatibility.tested} 实测，全系${basis}）`
+}
+
+/**
+ * 探测本机 DSH 版本。顺序：`--dsh-version` → `DSH_VERSION` → `dsh --version`。
+ * 探不到就返回 undefined——**探测失败不许判红**（CI 上必然探不到）。
+ */
+function detectDshVersion() {
+  const env = typeof process.env.DSH_VERSION === 'string' ? process.env.DSH_VERSION.trim() : ''
+  if (VERSION_SHAPE.test(env)) return env
+
+  // 1) PATH 上的 dsh（需要 shell 才能解析 .cmd/.ps1 shim）
+  const onPath = spawnSync('dsh', ['--version'], { encoding: 'utf8', timeout: 8000, shell: true })
+  if (onPath.status === 0) {
+    const match = /(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(`${onPath.stdout ?? ''}`)
+    if (match !== null) return match[1]
+  }
+
+  // 2) 桌面版的启动器（路径含空格，直接 spawn .cmd 会 EINVAL；用 shell 让它自己解析）
+  const local = process.env.LOCALAPPDATA ?? process.env.USERPROFILE
+  if (typeof local === 'string' && local !== '') {
+    const launcher = join(local, 'Programs', 'DeepSeek Harness', 'resources', 'runtime', 'cli', 'bin', 'dsh.cmd')
+    if (existsSync(launcher)) {
+      const result = spawnSync(`"${launcher}" --version`, { encoding: 'utf8', timeout: 8000, shell: true })
+      if (result.status === 0) {
+        const match = /(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(`${result.stdout ?? ''}`)
+        if (match !== null) return match[1]
+      }
+    }
+  }
+  return undefined
+}
+
+const VERSION_SHAPE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
 
 function gateSyntax(base = root) {
   const files = codeFiles(base)
@@ -157,20 +242,6 @@ function gateTests(base = root) {
   return { pass: false, detail: failed.join(' | ') || 'test runner exited non-zero' }
 }
 
-function gateDoctor(base = root) {
-  const result = run(['doctor.mjs'], base)
-  if (result.code === 0) return { pass: true, detail: 'repo checks' }
-  const failed = result.output.split(/\r?\n/).filter((line) => line.startsWith('FAIL')).slice(0, 3)
-  return { pass: false, detail: failed.join(' | ') || 'doctor exited non-zero' }
-}
-
-function gateDoctorHome(base, home) {
-  const result = run(['doctor.mjs', '--home', home], base)
-  if (result.code === 0) return { pass: true, detail: 'home checks' }
-  const failed = result.output.split(/\r?\n/).filter((line) => line.startsWith('FAIL')).slice(0, 3)
-  return { pass: false, detail: failed.join(' | ') || 'doctor --home exited non-zero' }
-}
-
 function gateGraph(base = root, strict = false) {
   const graphArgs = ['tools/graph.mjs', '--check', ...(strict ? ['--strict'] : [])]
   const result = run(graphArgs, base)
@@ -186,7 +257,6 @@ function gateDocs(base = root) {
   return { pass: false, detail: failed.join(' | ') || 'docs-check exited non-zero' }
 }
 
-/** One temp home: install, doctor, uninstall; assert the patch returns to []. */
 /**
  * bundle 门禁：能 `dsh plugin add` 的仓库必须同时满足
  *   - `package.json` 声明 `dsh.bundle.patch`（字符串或字符串数组）；
@@ -244,65 +314,17 @@ function gateBundle(base = root) {
   return { pass: true, detail: `${patches.length} 个 bundle patch` }
 }
 
-function gateLifecycle(base = root) {
-  const home = mkdtempSync(join(tmpdir(), 'enhance-check-'))
-  try {
-    const profile = join(home, 'profiles', 't1')
-    const patch = join(profile, 'cordis.patch.yml')
-    mkdirp(profile)
-    writeFileSync(patch, '[]\n', 'utf8')
-
-    const install = run(['install.mjs', '--home', home, '--profiles', 't1'], base)
-    if (install.code !== 0) return { pass: false, detail: 'install exited non-zero' }
-    const shared = join(home, 'enhance', 'shared', 'text-lines.mjs')
-    if (!existsSync(shared)) return { pass: false, detail: 'install did not ship shared/text-lines.mjs' }
-
-    const doctor = run(['doctor.mjs', '--home', home], base)
-    if (doctor.code !== 0) {
-      const failed = doctor.output.split(/\r?\n/).filter((line) => line.startsWith('FAIL')).slice(0, 3)
-      return { pass: false, detail: `doctor --home: ${failed.join(' | ') || 'non-zero'}` }
-    }
-
-    const uninstall = run(['uninstall.mjs', '--home', home, '--profiles', 't1'], base)
-    if (uninstall.code !== 0) return { pass: false, detail: 'uninstall exited non-zero' }
-    const restored = readFileSync(patch, 'utf8')
-    if (restored.trim() !== '[]') return { pass: false, detail: `patch after uninstall is ${JSON.stringify(restored)}` }
-    return { pass: true, detail: 'install → doctor → uninstall → []' }
-  } finally {
-    rmSync(home, { recursive: true, force: true })
-  }
-}
-
-function gateBuildClient(base = root) {
-  if (asar === undefined) return { pass: true, skipped: true, detail: 'no --asar' }
-  if (!existsSync(asar)) return { pass: false, detail: `asar not found: ${asar}` }
-  const result = run(['enhance-permissions/build-client.mjs', '--check', '--asar', asar], base)
-  return { pass: result.code === 0, detail: result.output.trim().split(/\r?\n/)[0] ?? 'build-client' }
-}
-
 function gateStrict(base = root) {
   const generated = join(base, 'docs', 'generated')
   if (!existsSync(generated)) return { pass: true, skipped: true, detail: 'no docs/generated' }
   return gateGraph(base, true)
 }
 
-function mkdirp(dir) {
-  mkdirSync(dir, { recursive: true })
-}
-
 // ---------------------------------------------------------------- self-test
 
 function freshCopy() {
   const dir = mkdtempSync(join(tmpdir(), 'enhance-selftest-'))
-  cpSync(root, dir, {
-    recursive: true,
-    filter: (src) => {
-      const rel = relative(root, src)
-      if (rel === '') return true
-      const parts = rel.split(sep)
-      return !parts.includes('.git') && !parts.includes('node_modules')
-    },
-  })
+  copyRepoTree(root, dir)
   return dir
 }
 
@@ -365,12 +387,6 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'doctor repo red',
-    (copy) => rmSync(join(copy, 'auto-approve', 'index.js'), { force: true }),
-    (copy) => expectRed('plugins-present')(gateDoctor(copy)),
-  ))
-
-  cases.push(withCopy(
     'zero tests red',
     (copy) => {
       for (const file of testFiles(copy)) writeFileSync(file, '// emptied by self-test\n', 'utf8')
@@ -378,169 +394,15 @@ function runSelfTest() {
     (copy) => expectRed('floor')(gateTests(copy)),
   ))
 
-  cases.push(withCopy(
-    'doctor half-install red',
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 't1'))
-      writeFileSync(join(home, 'profiles', 't1', 'cordis.patch.yml'), '[]\n', 'utf8')
-      if (run(['install.mjs', '--home', home, '--profiles', 't1'], copy).code !== 0) throw new Error('install failed')
-      const patch = join(home, 'profiles', 't1', 'cordis.patch.yml')
-      const text = readFileSync(patch, 'utf8')
-      writeFileSync(patch, text.replace(/^[ \t]*-[ \t]*id: enhance-ui[ \t]*\r?\n(?:[ \t]+.*\r?\n)*/m, ''), 'utf8')
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      return expectRed('半装')(gateDoctorHome(copy, home))
-    },
-  ))
-
-  cases.push(withCopy(
-    'install missing shared red',
-    (copy) => {
-      const file = join(copy, 'install.mjs')
-      const text = readFileSync(file, 'utf8')
-      writeFileSync(file, text.replace("'shared/text-lines.mjs', ", ''), 'utf8')
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 't1'))
-      writeFileSync(join(home, 'profiles', 't1', 'cordis.patch.yml'), '[]\n', 'utf8')
-      if (run(['install.mjs', '--home', home, '--profiles', 't1'], copy).code !== 0) throw new Error('install failed')
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      return expectRed('uninstall:')(gateDoctorHome(copy, home))
-    },
-  ))
-
-
-  cases.push(withCopy(
-    'manifest hash red',
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 't1'))
-      writeFileSync(join(home, 'profiles', 't1', 'cordis.patch.yml'), '[]\n', 'utf8')
-      if (run(['install.mjs', '--home', home, '--profiles', 't1'], copy).code !== 0) throw new Error('install failed')
-      appendFileSync(join(home, 'enhance', 'enhance-scope', 'index.js'), '\n// tampered\n')
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      return expectRed('hash 不符')(gateDoctorHome(copy, home))
-    },
-  ))
-
-  cases.push(withCopy(
-    'enhanced preset red',
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 'desktop'))
-      writeFileSync(join(home, 'profiles', 'desktop', 'cordis.patch.yml'), '[]\n', 'utf8')
-      if (run(['install.mjs', '--home', home], copy).code !== 0) throw new Error('install failed')
-      const patch = join(home, 'profiles', 'desktop', 'cordis.patch.yml')
-      const text = readFileSync(patch, 'utf8')
-      writeFileSync(patch, text.replace(/^[ \t]*enhanced:[ \t]*\r?\n(?:[ \t]+.*\r?\n)*/m, ''), 'utf8')
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      return expectRed('缺 enhanced')(gateDoctorHome(copy, home))
-    },
-  ))
-
-  cases.push(withCopy(
-    'preset never red',
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 't1'))
-      writeFileSync(join(home, 'profiles', 't1', 'cordis.patch.yml'), [
-        '- id: permission',
-        '  name: "@deepseek-ai/dsh-permission-presets"',
-        '  config:',
-        '    presets:',
-        '      danger-full-access:',
-        '        sandbox: danger-full-access',
-        '        approval: never',
-        '    defaultPreset: danger-full-access',
-        '',
-      ].join('\n'), 'utf8')
-      if (run(['install.mjs', '--home', home, '--profiles', 't1'], copy).code !== 0) throw new Error('install failed')
-      // 安装器现在会因 never 档位种 ask；这一条要验的是 doctor 的分支：
-      // 把 state 改成 allow（用户手动选了“直接放行”），doctor 必须指出它被 never 短路。
-      writeFileSync(join(home, 'enhance', 'state.json'), JSON.stringify({
-        version: 3, enabled: true, contentScope: true, approval: 'allow',
-      }, null, 2), 'utf8')
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      return expectRed('approval=never')(gateDoctorHome(copy, home))
-    },
-  ))
-
-  cases.push(withCopy(
-    'uninstalled enhanced residue red',
-    // 卸载残留的门禁侧：`enhance/` 整个不在了（未安装），但 patch 里还留着一份 `enhanced`
-    // 档 —— 卸载与门禁不许同时声称干净。这条造的就是「未安装 + 残留」，要求 doctor 判红、
-    // 并点名是哪一行（旧实现只查 disabled 两类残留，这里会绿）。
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 'web'))
-      writeFileSync(join(home, 'profiles', 'web', 'cordis.patch.yml'), [
-        '- id: permission',
-        '  name: "@deepseek-ai/dsh-permission-presets"',
-        '  config:',
-        '    presets:',
-        '      enhanced:',
-        '        sandbox: danger-full-access',
-        '        approval: ask',
-        '    defaultPreset: enhanced',
-        '',
-      ].join('\n'), 'utf8')
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      return expectRed('残留 enhanced')(gateDoctorHome(copy, home))
-    },
-  ))
-
-  cases.push(withCopy(
-    'uninstall empty-patch red',
-    (copy) => {
-      const file = join(copy, 'uninstall.mjs')
-      const text = readFileSync(file, 'utf8')
-      writeFileSync(file, text.replace("  if (out.trim() === '') out = '[]'\n", ''), 'utf8')
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 't1'))
-      const patch = join(home, 'profiles', 't1', 'cordis.patch.yml')
-      writeFileSync(patch, '[]\n', 'utf8')
-      run(['install.mjs', '--home', home, '--profiles', 't1'], copy)
-      run(['uninstall.mjs', '--home', home, '--profiles', 't1'], copy)
-      return readFileSync(patch, 'utf8').trim() === '[]'
-    },
-  ))
-
   /**
-   * 回退源码型守卫六条 + 归属丢失型两条（归属丢失后的 `enhanced` 残留、用户自己的
-   * `defaultPreset: enhanced` 不许被摘）。
-   * 回退方式都是「把源码改回旧写法，看守卫它的那条负例会不会红」。
+   * 回退源码型守卫：把源码改回旧写法，看守卫它的那条测试会不会红。
    *
-   * 为什么不用「造一个坏产物让门禁自己红」那一套：这六条抓的是**我们自己写坏**的形状
-   * （重复键、拒绝路径、档位语义、清单漏记、计数口径），产物侧造出来正是被测代码该
-   * 拦住的输入 —— 用测试当门禁才问得对问题：旧代码在同一个输入上会「安静地做错事」，
-   * 而门禁全绿。`assertMutated` 保证替换真的落到了源码上（替换没命中就抛，不留假负例）。
-   *
-   * **不涉及 git 的负例**用 `withCopy`：`freshCopy` 不带 `.git`，所以
-   * `tests/gate-counts.test.mjs` 里的 tracked 比对在副本里跑不了；那条单独用
-   * `withGitCopy`（带 `.git`）走 `runSelfTest` 末尾那段。
+   * **极性**：`withCopy` 把 `observe(copy) === false` 记成「gate went red」。
+   * 所以 observe 直接返回 `testPasses(...)`：源码回退后测试**红了** → 返回 false → 记为红。
    */
 
   /** 副本里跑单个测试文件；整文件通过返回 true。 */
   const testPasses = (copy, file) => run(['--test', file], copy).code === 0
-
-  /**
-   * 注意极性：`withCopy`/`withGitCopy` 把 `observe(copy) === false` 记成「gate went red」。
-   * 所以这八条 observe 直接返回 `testPasses(...)`：源码回退后测试**红了** → 返回 false
-   * → 记为红，正是我们要的。反过来写成 `!testPasses` 会让每条都永远绿。
-   */
 
   /** 把 `reverted` 写回文件；替换没命中就抛，免得留一条永远绿的假负例。 */
   const assertMutated = (copy, relativePath, before, after) => {
@@ -552,14 +414,7 @@ function runSelfTest() {
   const withGitCopy = (caseName, mutate, observe) => {
     const copy = mkdtempSync(join(tmpdir(), 'enhance-selftest-git-'))
     try {
-      cpSync(root, copy, {
-        recursive: true,
-        filter: (src) => {
-          const rel = relative(root, src)
-          if (rel === '') return true
-          return !rel.split(sep).includes('node_modules')
-        },
-      })
+      copyRepoTree(root, copy, { includeGit: true })
       mutate(copy)
       const red = observe(copy) === false
       return { name: caseName, pass: red, detail: red ? 'gate went red' : 'gate stayed green' }
@@ -577,162 +432,11 @@ function runSelfTest() {
       const file = join(copy, 'scripts', 'code-files.mjs')
       const text = readFileSync(file, 'utf8')
       const reverted = text
-        .replace("export const SKIP_DIRS = new Set(['.git', 'node_modules', 'design'])", "export const SKIP_DIRS = new Set(['.git', 'node_modules'])")
+        .replace(`new Set(['.git', 'node_modules', 'design', '.codegraph', '.zhll', '.tmp', 'ZCode'])`, `new Set(['.git', 'node_modules'])`)
         .replace('if (tracked.status === 0 && typeof tracked.stdout', 'if (false && typeof tracked.stdout')
       assertMutated(copy, 'scripts/code-files.mjs', text, reverted)
     },
     (copy) => testPasses(copy, 'tests/gate-counts.test.mjs'),
-  ))
-
-  cases.push(withCopy(
-    'flow presets stay single-key',
-    // flow presets：退回「只认块风格」，flow 形状就会再插一个同层 presets
-    (copy) => {
-      const file = join(copy, 'shared', 'patch-rows.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace(
-        "  const presetsInBlock = block.findIndex((line) => PRESETS_LINE.test(line) && presetsLineShape(line).form !== 'error')",
-        "  const presetsInBlock = block.findIndex((line) => /^[ \\t]*presets:[ \\t]*$/.test(line))",
-      )
-      assertMutated(copy, 'shared/patch-rows.mjs', text, reverted)
-    },
-    (copy) => testPasses(copy, 'tests/patch-rows.test.mjs'),
-  ))
-
-  cases.push(withCopy(
-    'install refuses unsafe presets',
-    // P-2：拆掉两道拒绝（preflight + patchProfile），认不出形态的 patch 就会被写坏
-    (copy) => {
-      const file = join(copy, 'install.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text
-        .replace('const blocked = await preflightProfiles(options.profiles)', 'const blocked = []')
-        .replace('  if (presets.error !== undefined) {', '  if (false) {')
-      assertMutated(copy, 'install.mjs', text, reverted)
-    },
-    (copy) => testPasses(copy, 'tests/install-default.test.mjs'),
-  ))
-
-  cases.push(withCopy(
-    'doctor enhanced semantics',
-    // 档位语义：拆掉校验，被改窄的 enhanced 不再判红
-    (copy) => {
-      const file = join(copy, 'doctor.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('      const enhanced = enhancedSemantics(text)', '      const enhanced = undefined')
-      assertMutated(copy, 'doctor.mjs', text, reverted)
-    },
-    (copy) => testPasses(copy, 'tests/doctor-home.test.mjs'),
-  ))
-
-  cases.push(withCopy(
-    'doctor duplicate keys',
-    // 重复键：关掉检测，两份 presets 就不再判红
-    (copy) => {
-      const file = join(copy, 'doctor.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('  const duplicates = duplicateKeys(text)', '  const duplicates = []')
-      assertMutated(copy, 'doctor.mjs', text, reverted)
-    },
-    (copy) => testPasses(copy, 'tests/doctor-home.test.mjs'),
-  ))
-
-
-  cases.push(withCopy(
-    'unowned enhanced residue red',
-    // 卸载残留的另一侧：一份已经增强过的 patch 落到清单里没有归属的 profile 上。
-    // install 收养它时把归属记成 `permissionPresetAction: 'unchanged'`——「这档是我们加的」
-    // 的事实丢了——默认卸载于是只摘 insert 行、exit 0、报告 changed。回退新守卫
-    // （`removeUnownedEnhancedPreset` 那一支）后，卸载完 patch 里仍留着 `defaultPreset: enhanced`；
-    // 这条负例就是钉那一支是吃的劲。
-    (copy) => {
-      const file = join(copy, 'uninstall.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('  } else if (removed.length > 0) {', '  } else if (false && removed.length > 0) {')
-      assertMutated(copy, 'uninstall.mjs', text, reverted)
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      const source = join(copy, '.selftest-src')
-      mkdirp(join(home, 'profiles', 'web'))
-      mkdirp(join(source, 'profiles', 't1'))
-      writeFileSync(join(home, 'profiles', 'web', 'cordis.patch.yml'), '[]\n', 'utf8')
-      writeFileSync(join(source, 'profiles', 't1', 'cordis.patch.yml'), '[]\n', 'utf8')
-      if (run(['install.mjs', '--home', source, '--profiles', 't1'], copy).code !== 0) throw new Error('install (source) failed')
-      cpSync(join(source, 'profiles', 't1', 'cordis.patch.yml'), join(home, 'profiles', 'web', 'cordis.patch.yml'))
-      if (run(['install.mjs', '--home', home, '--profiles', 'web'], copy).code !== 0) throw new Error('install (adopt) failed')
-      if (run(['uninstall.mjs', '--home', home, '--profiles', 'web'], copy).code !== 0) throw new Error('uninstall failed')
-      const after = readFileSync(join(home, 'profiles', 'web', 'cordis.patch.yml'), 'utf8')
-      // 摘干净了 → true；回退后残留 → false → 记为红
-      return !/^[ \t]*enhanced[ \t]*:/m.test(after) && !/^[ \t]*defaultPreset:[ \t]*enhanced/m.test(after)
-    },
-  ))
-
-  cases.push(withCopy(
-    'user defaultPreset survives uninstall',
-    // 用户自写 `defaultPreset: enhanced`（**没有** `enhanced:` 键）的块被 install 收养后，
-    // 归属丢失时卸载只许摘我们插进去的 `enhanced` 档 —— 用户那行默认档位是在我们动手之前就在的，
-    // 必须留下（并出 warn）。回退归属判据（`permissionRowIsPresetTable` 恒真 = 旧写法把
-    // `defaultAdded` 硬编码成 true）后，这一行会被删。
-    (copy) => {
-      const file = join(copy, 'shared', 'patch-rows.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace(
-        '  const rowIsOurs = permissionRowIsPresetTable(lines, found)',
-        '  const rowIsOurs = true',
-      )
-      assertMutated(copy, 'shared/patch-rows.mjs', text, reverted)
-    },
-    (copy) => {
-      const home = join(copy, '.selftest-home')
-      mkdirp(join(home, 'profiles', 't1'))
-      const patch = join(home, 'profiles', 't1', 'cordis.patch.yml')
-      writeFileSync(patch, [
-        '- id: permission',
-        '  name: "@deepseek-ai/dsh-permission-presets"',
-        '  config:',
-        '    presets:',
-        '      read-only:',
-        '        sandbox: read-only',
-        '        approval: ask',
-        '    defaultPreset: enhanced',
-        '',
-      ].join('\n'), 'utf8')
-      if (run(['install.mjs', '--home', home, '--profiles', 't1'], copy).code !== 0) throw new Error('install failed')
-      rmSync(join(home, 'enhance', 'install-manifest.json'), { force: true })
-      if (run(['install.mjs', '--home', home, '--all'], copy).code !== 0) throw new Error('install --all failed')
-      if (run(['uninstall.mjs', '--home', home, '--profiles', 't1'], copy).code !== 0) throw new Error('uninstall failed')
-      // 用户那行还在 → true；回退后被删 → false → 记为红
-      return readFileSync(patch, 'utf8').includes('defaultPreset: enhanced')
-    },
-  ))
-
-  /**
-   * 零目标安装与超限文本的守卫。极性同上：回退源码后，守卫它的测试**红了** →
-   * `testPasses` 返回 false → 记为红。
-   */
-  cases.push(withCopy(
-    'install empty profile set red',
-    // 退掉「一个可装的 profile 都没有就拒绝」：install 又回到 exit 0 的绿色空操作
-    (copy) => {
-      const file = join(copy, 'install.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('if (targetProblem !== undefined) {', 'if (false && targetProblem !== undefined) {')
-      assertMutated(copy, 'install.mjs', text, reverted)
-    },
-    (copy) => testPasses(copy, 'tests/install-default.test.mjs'),
-  ))
-
-  cases.push(withCopy(
-    'doctor oversize home text red',
-    // 退掉 home-text 的上限判据：超限文本又变成 doctor 全绿
-    (copy) => {
-      const file = join(copy, 'doctor.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('    installed.ok && installedBytes <= TEXT_LIMIT,', '    installed.ok,')
-      assertMutated(copy, 'doctor.mjs', text, reverted)
-    },
-    (copy) => testPasses(copy, 'tests/doctor-home.test.mjs'),
   ))
 
   cases.push(withCopy(
@@ -748,34 +452,65 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'doctor unwired install red',
-    // 退掉「装了插件却没有任何 profile 引用」的判红：绿色空操作又隐身
+    'orphan bundle entry red',
+    // bundle 门禁的另一侧：patch 里的 insert 名指向包内不存在的文件必须判红
     (copy) => {
-      const file = join(copy, 'doctor.mjs')
+      const file = join(copy, 'cordis.patch.yml')
       const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('  if (exists(p.dir) && wireOnly !== true) {', '  if (false) {')
-      assertMutated(copy, 'doctor.mjs', text, reverted)
+      const reverted = text.replace("name: 'dsh-enhance/enhance-scope/index.js'", "name: 'dsh-enhance/enhance-scope/missing.js'")
+      assertMutated(copy, 'cordis.patch.yml', text, reverted)
     },
-    (copy) => testPasses(copy, 'tests/doctor-home.test.mjs'),
+    (copy) => expectRed('指向不存在的文件')(gateBundle(copy)),
   ))
 
   cases.push(withCopy(
     'version mismatch red',
     // 版本身份：把 VERSION 改成另一个 x.y.z，package.json 与它就不再一致
     (copy) => writeFileSync(join(copy, 'VERSION'), '9.9.9\n', 'utf8'),
-    (copy) => expectRed('!= VERSION')(gateVersion(copy)),
+    (copy) => expectRed('!= VERSION')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
   ))
 
   cases.push(withCopy(
-    'install records toolVersion red',
-    // 落盘侧：install 写死一个旧串，清单记的版本与当前工具就对不上
+    'compat declaration red',
+    // 兼容声明的 tested 必须是 versions 之一：改成一个不在表里的版本
     (copy) => {
-      const file = join(copy, 'install.mjs')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('    toolVersion: toolVersion(),', "    toolVersion: '0.0.0',")
-      assertMutated(copy, 'install.mjs', text, reverted)
+      const file = join(copy, 'package.json')
+      const pkg = JSON.parse(readFileSync(file, 'utf8'))
+      pkg.dsh.compatibility.tested = '9.9.9'
+      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
     },
-    (copy) => expectRed('install 写入 toolVersion')(gateVersion(copy)),
+    (copy) => expectRed('tested=')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
+  ))
+
+  cases.push(withCopy(
+    'compat missing red',
+    // 第三证（空转检查）：整个声明删掉必须判红——挡「常量定义了、没进判定」
+    (copy) => {
+      const file = join(copy, 'package.json')
+      const pkg = JSON.parse(readFileSync(file, 'utf8'))
+      delete pkg.dsh.compatibility
+      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
+    },
+    (copy) => expectRed('缺兼容声明')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
+  ))
+
+  cases.push(withCopy(
+    'compat readme sentence red',
+    // README 是派生文本：删掉那句必须判红
+    (copy) => {
+      const file = join(copy, 'README.md')
+      const text = readFileSync(file, 'utf8')
+      const reverted = text.replace(/DeepSeek Harness \S+–\S+（\S+ 实测[^）]*）/g, 'DeepSeek Harness 某版本')
+      assertMutated(copy, 'README.md', text, reverted)
+    },
+    (copy) => expectRed('README 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
+  ))
+
+  cases.push(withCopy(
+    'compat out-of-range red',
+    // 本机 DSH 不在声明范围：必须判红并给「先跑例行核验」的可操作提示
+    () => {},
+    (copy) => expectRed('例行核验')(gateVersion(copy, { dshVersion: '0.9.9' })),
   ))
 
   return cases
@@ -798,15 +533,12 @@ const gates = [
   ['version', gateVersion],
   ['syntax', gateSyntax],
   ['tests', gateTests],
-  ['doctor', gateDoctor],
   ['graph', gateGraph],
   ['docs', gateDocs],
   ['bundle', gateBundle],
-  ['lifecycle', gateLifecycle],
 ]
 if (layer === 'full') {
   gates.push(['graph-strict', gateStrict])
-  gates.push(['build-client', gateBuildClient])
 }
 
 let failed = 0
@@ -814,7 +546,7 @@ let skipped = 0
 const started = Date.now()
 for (const [name, gate] of gates) {
   const at = Date.now()
-  const result = gate()
+  const result = name === 'version' ? gate(root, { dshVersion }) : gate()
   const ms = Date.now() - at
   if (result.skipped) skipped += 1
   if (!result.pass) failed += 1

@@ -5,7 +5,8 @@
  *   1. 把 `content-scope.txt` 注入成提示词的一段（`enhance:content-scope`，order 同官方 persona suffix）
  *   2. 在宿主已有的本地 HTTP 服务上挂一条路由 `POST /enhance/api`，供设置页读写
  *
- * 四个 op：`state` 快照、`set` 改开关或文本、`check` 运行时检查、`uninstall` 行级卸载。
+ * 四个 op：`state` 快照、`set` 改开关或文本、`check` 运行时检查、
+ * `preset` 写/摘 `enhanced` 权限档（本页唯一会碰宿主配置的动作，用户显式点才发生）。
  *
  * 两条关键事实：
  *   - **不能 `inject: ['webServer']`**：headless 里没有这个服务，`inject` 要求全部齐备，
@@ -20,15 +21,19 @@
  *      scheme 放行；其余必须与 Host 严格同源（scheme + host + port）。`Origin: null` 拒绝。
  */
 
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   APPROVALS, TEXT_LIMIT, derive, isPluginActive, markPluginActive, paths,
-  readState, readText, resolveHome, textBytes, textSha256, textStat, writeState, writeText,
+  readState, readText, resolveHome, textBytes, textSha256, textStat, writeFileAtomic, writeState, writeText,
 } from '../shared/state.mjs'
 import { ensureEnhanceData } from '../shared/seed.mjs'
 import { sessionContains } from '../shared/session-probe.mjs'
+import {
+  clearPresetRecord, ensureEnhancedPreset, readPresetRecord, readPresetState,
+  removeEnhancedPreset, writePresetRecord,
+} from '../shared/preset.mjs'
 
 /** Diagnostics label. */
 export const name = 'enhance-scope'
@@ -52,6 +57,9 @@ const BODY_LIMIT = TEXT_LIMIT * 4 + 1024
 
 /** `set` 认的键；多一个就 `EBADOP`，不静默忽略。 */
 const SET_KEYS = new Set(['op', 'enabled', 'contentScope', 'approval', 'text'])
+
+/** `preset` 认的键。**路径不许从请求体来**——只认服务端解析出的 patchPath。 */
+const PRESET_KEYS = new Set(['op', 'action', 'dryRun'])
 
 /**
  * @param {import('node:http').ServerResponse} res
@@ -123,36 +131,82 @@ export async function readJson(req) {
 }
 
 /**
+ * 当前 profile 的 patch 位置。三级回退，任一级拿不到就返回 undefined。
+ *
+ *   1. `ctx.get('profileContext')`（宿主启动 profile 时注入，最权威：`patchPath` 是
+ *      宿主自己 configEditor 用来定位同一份文件的字段）；
+ *   2. `DSH_PROFILE_DIR` + `cordis.patch.yml`（宿主给每次 shell 调用注入的环境量，
+ *      插件进程通常也能看到）；
+ *   3. 都没有 → undefined。
+ *
+ * **不猜路径**：拿不到就是拿不到，不去 `~/.dsh/profiles/*` 里找「最近改过的那个」——
+ * 猜错就是把档位写进别人的 profile。
+ *
  * @param {import('@deepseek-ai/cordis').Context} ctx
- * @param {{ enabled?: boolean, file?: string, interpolate?: boolean, onMissing?: 'fail' | 'warn' }} [config]
+ * @returns {{ patchPath: string, profile: string | null, source: 'profileContext' | 'env' } | undefined}
  */
-/**
- * 检查 `enhance-permissions/client.js` 这一项。
- *
- * 它只做一件事：文件里是否有 `// source-sha256: <64 hex>` 那一行戳。
- * **不校验哈希值、不读 asar**——所以它只能证明「文件在且带来源记录」，
- * 证明不了派生件与当前 DSH 同代。文案必须把这个边界说清楚，
- * 否则用户会把「通过」读成「已对齐」（早期实现）。
- *
- * @param {string} pluginDir 插件根目录（`client.js` 的相对位置基于它）
- * @returns {{name: string, pass: boolean, detail: string}}
- */
-export function clientCheck(pluginDir) {
-  let stamped = false
-  try {
-    stamped = /^\/\/ source-sha256: [0-9a-f]{64}$/m.test(readFileSync(join(pluginDir, 'enhance-permissions', 'client.js'), 'utf8'))
-  } catch {
-    stamped = false
+export function resolveProfilePatch(ctx) {
+  const context = typeof ctx?.get === 'function' ? ctx.get('profileContext') : undefined
+  if (context !== undefined && context !== null && typeof context.patchPath === 'string' && context.patchPath.trim() !== '') {
+    return {
+      patchPath: context.patchPath,
+      profile: typeof context.name === 'string' && context.name !== '' ? context.name : null,
+      source: 'profileContext',
+    }
   }
+  const dir = typeof process.env.DSH_PROFILE_DIR === 'string' ? process.env.DSH_PROFILE_DIR.trim() : ''
+  if (dir !== '') {
+    return {
+      patchPath: join(dir, 'cordis.patch.yml'),
+      profile: basename(dir),
+      source: 'env',
+    }
+  }
+  return undefined
+}
+
+/**
+ * 读 profile patch 与其中的档位现状。读不到文件按「空 patch」处理（写档会新建）。
+ * @param {{ patchPath: string, profile: string | null, source: string } | undefined} target
+ * @param {{ dir: string }} p
+ */
+function presetSnapshot(target, p) {
+  if (target === undefined) {
+    return {
+      patchPath: null, profile: null, source: null,
+      present: false, unreadable: false, unreadableReason: null,
+      presets: [], defaultPreset: null, recorded: false, writtenAt: null,
+      reason: '没有 profile 上下文：不是从 profile 启动的，本进程不知道往哪写',
+    }
+  }
+  let text = ''
+  try {
+    text = readFileSync(target.patchPath, 'utf8')
+  } catch {
+    // 文件不存在：写档会新建；读状态按空 patch 处理
+  }
+  const state = readPresetState(text)
+  const record = readPresetRecord(p)
+  const ours = record !== undefined && record.patchPath === target.patchPath
   return {
-    name: 'client',
-    pass: stamped,
-    detail: stamped
-      ? '存在，文件完整，执行 build-client.mjs --check --asar <app.asar> 可验证是否跟当前 DSH 同代'
-      : '不存在，执行 build-client.mjs --asar <app.asar> 生成。',
+    patchPath: target.patchPath,
+    profile: target.profile,
+    source: target.source,
+    present: state.present,
+    unreadable: state.unreadable,
+    unreadableReason: state.unreadableReason,
+    presets: state.presets,
+    defaultPreset: state.defaultPreset,
+    recorded: ours,
+    writtenAt: ours ? record.writtenAt : null,
+    reason: state.unreadable ? state.unreadableReason : null,
   }
 }
 
+/**
+ * @param {import('@deepseek-ai/cordis').Context} ctx
+ * @param {{ enabled?: boolean, file?: string, interpolate?: boolean, onMissing?: 'fail' | 'warn' }} [config]
+ */
 export function apply(ctx, config = {}) {
   if (config.enabled === false) return
   const home = resolveHome()
@@ -160,7 +214,7 @@ export function apply(ctx, config = {}) {
   const file = typeof config.file === 'string' && config.file.trim() !== '' ? config.file : p.text
   const onMissing = config.onMissing === 'warn' ? 'warn' : 'fail'
 
-  // bundle 安装（dsh plugin add）没有 install.mjs 参与：首次加载时补齐 <home>/enhance/
+  // bundle 安装没有 installer 参与：首次加载时补齐 <home>/enhance/
   ensureEnhanceData(home, fileURLToPath(new URL('../shared/content-scope.default.txt', import.meta.url)))
 
   let lastGood = readText({ ...p, text: file })
@@ -224,6 +278,7 @@ export function apply(ctx, config = {}) {
         degradedReason: state.degradedReason ?? null,
         home,
         limit: TEXT_LIMIT,
+        preset: presetSnapshot(resolveProfilePatch(ctx), p),
       }
     }
 
@@ -246,6 +301,7 @@ export function apply(ctx, config = {}) {
         detail: text.ok ? `${textBytes(text.text)} B / 上限 ${TEXT_LIMIT} B` : `读不到 ${file}`,
       })
 
+      // 三项都在进程内完成，不起子进程。
       const proof = await sessionContains(join(home, 'sessions'), text.ok ? text.text : '')
       checks.push({
         name: 'inject',
@@ -255,14 +311,113 @@ export function apply(ctx, config = {}) {
           : `没有注入：${effective.reason ?? '未知'}`,
       })
 
-      // 第四项只在完整安装下成立：只有 `enhance/` 下带派生的 client.js 才有权限菜单图标。
-      // bundle 安装（dsh plugin add）按设计不含它，标成「不适用」而不是红叉。
-      const installedClient = join(p.dir, 'enhance-permissions', 'client.js')
-      checks.push(existsSync(installedClient)
-        ? clientCheck(p.dir)
-        : { name: 'client', pass: true, na: true, detail: 'bundle 安装不含权限菜单图标（Enhanced 档要用完整安装）' })
+      // 第四项：Enhanced 档。
+      // 「没写」不是失败——那是用户没选择的功能（na），红叉会把人骗去修一个没坏的东西。
+      const preset = presetSnapshot(resolveProfilePatch(ctx), p)
+      checks.push(presetCheck(preset))
 
       return { ok: checks.every((check) => check.pass), checks }
+    }
+
+    /**
+     * 「Enhanced 档」这一项怎么判：
+     *   - 写过了 → pass；
+     *   - patch 里没有 → pass + na（用户没 opt-in，不是坏了）；
+     *   - 结构认不出 → 红（真会写坏宿主配置）；
+     *   - 不知道在哪个 profile → pass + na（不是从 profile 启动的）。
+     */
+    const presetCheck = (preset) => {
+      if (preset.patchPath === null) {
+        return { name: 'preset', pass: true, na: true, detail: '不是从 profile 启动的，本进程无法写 profile 配置' }
+      }
+      if (preset.unreadable) {
+        return {
+          name: 'preset',
+          pass: false,
+          detail: `${preset.patchPath} 的 presets 形态认不出，无法安全改写：${preset.unreadableReason ?? ''}`,
+        }
+      }
+      if (preset.present) {
+        return { name: 'preset', pass: true, detail: `已写入 enhanced 档（profile: ${preset.profile ?? '?'}，重启后出现在档位菜单）` }
+      }
+      return {
+        name: 'preset',
+        pass: true,
+        na: true,
+        detail: `未写入（在「Enhanced 权限档」一节点一下写入，重启后生效）· ${preset.patchPath}`,
+      }
+    }
+
+    /**
+     * 写/摘 enhanced 档。
+     *
+     * 写盘前先备份（`.bak-enhance-<时间>`，与原安装器同一命名风格），再用
+     * `writeFileAtomic` 落盘——写坏的 patch 会让宿主整份 profile 解析失败，
+     * 所以宁可多一份备份文件。`dryRun` 只算不改，供测试与预览。
+     *
+     * 路径只认服务端自己解析出来的 `patchPath`，**绝不**从请求体取（否则就是
+     * 一个能写任意文件的本地接口）。
+     */
+    const runPreset = async ({ action, dryRun }) => {
+      const target = resolveProfilePatch(ctx)
+      if (target === undefined) {
+        return { status: 409, body: { ok: false, code: 'EPROFILE', message: '没有 profile 上下文：不是从 profile 启动的，请在桌面版或 `dsh --profile <name>` 里操作' } }
+      }
+      let original = ''
+      let existsBefore = true
+      try {
+        original = readFileSync(target.patchPath, 'utf8')
+      } catch {
+        existsBefore = false
+      }
+      const record = readPresetRecord(p)
+
+      if (action === 'add') {
+        const result = ensureEnhancedPreset(original)
+        if (result.error !== undefined) {
+          return { status: 422, body: { ok: false, code: 'EBADSHAPE', message: result.error } }
+        }
+        if (result.action === 'unchanged' && record !== undefined && record.patchPath === target.patchPath) {
+          return { status: 200, body: { ok: true, changed: null, needRestart: false } }
+        }
+        if (dryRun === true) {
+          return { status: 200, body: { ok: true, dryRun: true, changed: result.changed ?? null, action: result.action, preview: result.text } }
+        }
+        const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 18)
+        const backup = existsBefore ? `${target.patchPath}.bak-enhance-${stamp}` : null
+        if (backup !== null) writeFileSync(backup, original, 'utf8')
+        writeFileAtomic(target.patchPath, result.text)
+        writePresetRecord(p, {
+          patchPath: target.patchPath,
+          profile: target.profile,
+          action: result.action,
+          emptyArray: result.emptyArray === true,
+          original,
+          writtenAt: new Date().toISOString(),
+        })
+        return { status: 200, body: { ok: true, changed: result.changed, backup, needRestart: true } }
+      }
+
+      // action === 'remove'
+      if (record === undefined || record.patchPath !== target.patchPath) {
+        return {
+          status: 409,
+          body: { ok: false, code: 'ERECORD', message: `没有「这一档是我们写的」的记录，无法安全摘除：请手工删掉 ${target.patchPath} 里 enhanced 那三行` },
+        }
+      }
+      const result = removeEnhancedPreset(original, record)
+      if (result.error !== undefined) {
+        return { status: 422, body: { ok: false, code: 'EBADSHAPE', message: result.error } }
+      }
+      if (dryRun === true) {
+        return { status: 200, body: { ok: true, dryRun: true, changed: result.changed ?? null, preview: result.text } }
+      }
+      const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 18)
+      const backup = existsBefore ? `${target.patchPath}.bak-enhance-${stamp}` : null
+      if (backup !== null) writeFileSync(backup, original, 'utf8')
+      writeFileAtomic(target.patchPath, result.text)
+      clearPresetRecord(p)
+      return { status: 200, body: { ok: true, changed: result.changed ?? null, backup, needRestart: true } }
     }
 
     ctx.effect(() => web.register({
@@ -282,7 +437,22 @@ export function apply(ctx, config = {}) {
         try {
           if (op === 'state') return json(res, 200, snapshot())
           if (op === 'check') return json(res, 200, await runChecks())
-          if (op === 'uninstall') return handleUninstall(res, body, home, p)
+          if (op === 'preset') {
+            for (const key of Object.keys(body)) {
+              if (!PRESET_KEYS.has(key)) return fail(res, 400, 'EBADOP', `unknown field: ${key}`)
+            }
+            if (body.action !== 'add' && body.action !== 'remove') {
+              return fail(res, 400, 'EBADOP', `action must be add|remove (got ${String(body.action)})`)
+            }
+            if (body.dryRun !== undefined && typeof body.dryRun !== 'boolean') {
+              return fail(res, 400, 'EBADOP', 'dryRun must be a boolean')
+            }
+            const result = await runPreset({ action: body.action, dryRun: body.dryRun === true })
+            if (result.body.ok === true) {
+              return json(res, result.status, { ...result.body, preset: presetSnapshot(resolveProfilePatch(ctx), p) })
+            }
+            return fail(res, result.status, result.body.code, result.body.message)
+          }
 
           if (op !== 'set') return fail(res, 400, 'EBADOP', `unknown op: ${op === '' ? '(missing)' : op}`)
           for (const key of Object.keys(body)) {
@@ -318,46 +488,6 @@ export function apply(ctx, config = {}) {
   })
 }
 
-/**
- * 卸载：**先回包，再动手**。卸载会删掉 `enhance/`，也就是路由代码自己所在的地方，
- * 反过来做请求会断在半路（`11-settings-page-plan.md` 的铁律之一）。
- */
-async function handleUninstall(res, body, home, p) {
-  const tool = join(p.dir, 'uninstall.mjs')
-  if (!existsSync(tool)) {
-    return fail(res, 409, 'EBUNDLE', '当前是 bundle 安装：用 `dsh plugin --profile <profile> remove dsh-enhance` 卸载；设置页这个按钮只服务完整安装')
-  }
-
-  const load = () => import(pathToFileURL(tool).href)
-  const thorough = body.thorough === true
-  if (body.dryRun === true) {
-    // 预览：调同一个函数、同一份代码，只是不写盘
-    try {
-      const module = await load()
-      const result = await module.uninstall({ home, dryRun: true, thorough })
-      return json(res, 200, {
-        ok: true,
-        dryRun: true,
-        thorough,
-        planned: result.planned,
-        skipped: result.skipped,
-        warnings: result.warnings,
-        failed: result.failed,
-        backups: result.backups,
-      })
-    } catch (error) {
-      return fail(res, 500, 'EIO', 'preview failed')
-    }
-  }
-
-  json(res, 200, { ok: true, needRestart: true })
-  setTimeout(() => {
-    load()
-      .then((module) => module.uninstall({ home, thorough }))
-      .catch((error) => console.error('[enhance-scope] uninstall failed:', error))
-  }, 50)
-  return undefined
-}
 /** 文本写入口的预校验：超限先抛，避免状态已被改动而文本落不下。 */
 function normalizeForWrite(text) {
   const bytes = textBytes(text)
@@ -366,4 +496,4 @@ function normalizeForWrite(text) {
 }
 
 /** 测试口：路由的纯函数部分（来源判定与读体），不依赖 cordis。 */
-export const __testing = { sameOrigin, readJson, LOOPBACK_HOST, BODY_LIMIT, clientCheck }
+export const __testing = { sameOrigin, readJson, LOOPBACK_HOST, BODY_LIMIT }

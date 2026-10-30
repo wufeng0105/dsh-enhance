@@ -59,7 +59,12 @@ const outDir = join(projectRoot, 'docs', 'generated')
 
 /** 不参与模型检查的文件（自指、测试、一次性脚本）。 */
 const IGNORED = new Set(['tools/graph.mjs', 'tests'])
-const SKIP_DIRS = new Set(['node_modules', 'tests', 'scripts', 'design'])
+/**
+ * 走盘时跳过的一级/任意层级目录：`tests` 与 `scripts` 各自有别的门禁守着，
+ * 其余是被 `.gitignore` 排除的本地件——本地克隆的 `ZCode/` 有 3 万多文件，
+ * 让它进模型比对会把一道结构门禁变成一次全盘扫描。
+ */
+const SKIP_DIRS = new Set(['node_modules', 'tests', 'scripts', 'design', '.codegraph', '.zhll', '.tmp', '.dsh', 'ZCode', '.git'])
 
 function toPosix(value) {
   return value.split(sep).join('/')
