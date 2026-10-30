@@ -206,7 +206,7 @@ test('结构：头部是 h2 + 状态标签 + 页级总开关，没有旧的结�
   }
 })
 
-test('结构：越界审批组的最后一行是适用范围说明（read-only / workspace-write）', () => {
+test('结构：越界审批组的最后一行是适用范围说明（宿主中文档名）', () => {
   const groupAt = source.indexOf('"enh-block-approval"')
   const nextGroupAt = source.indexOf('"enh-block-preset"')
   assert.ok(groupAt > 0 && nextGroupAt > groupAt, '找不到越界审批组')
@@ -216,8 +216,9 @@ test('结构：越界审批组的最后一行是适用范围说明（read-only /
   const hintAt = source.indexOf('var APPROVAL_SCOPE_HINT')
   assert.ok(hintAt > 0, '缺适用范围常量')
   const hint = source.slice(hintAt, source.indexOf('\n', hintAt))
-  for (const word of ['read-only', 'workspace-write', 'danger-full-access']) {
-    assert.ok(hint.includes(word), `适用范围必须点名 ${word}`)
+  // 档名必须用宿主中文菜单的叫法（client_locales：仅可查看 / 工作区内修改 / 完全权限）
+  for (const word of ['仅可查看', '工作区内修改', '完全权限', 'Enhanced']) {
+    assert.ok(hint.includes(word), `适用范围必须点名「${word}」`)
   }
   assert.match(hint, /不会产生需要审批的请求/, '要说明全开档下为什么用不上')
 })

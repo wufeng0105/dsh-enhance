@@ -79,8 +79,8 @@ window.__ModuleLoader__.load({
 			preset: "Enhanced 档",
 		};
 
-		/** 三态真正起作用的档位：宿主只在「沙箱挡住 → 申请放宽」时发审批请求。 */
-		var APPROVAL_SCOPE_HINT = "只对 read-only 与 workspace-write 生效：档位是全开（danger-full-access，或上面的 Enhanced）时，宿主不会产生需要审批的请求，这三项就不会起作用。";
+		/** 三态真正起作用的档位：宿主只在「沙箱挡住 → 申请放宽」时发审批请求。名称用宿主中文菜单的叫法。 */
+		var APPROVAL_SCOPE_HINT = "该设置只对「仅可查看」和「工作区内修改」两个档位生效。当档位为「完全权限」或「Enhanced」时，宿主不会产生需要审批的请求，因此这三项不会起作用。";
 
 		function approvalOf(value) {
 			return APPROVAL[value] || APPROVAL.ask;
@@ -645,14 +645,6 @@ window.__ModuleLoader__.load({
 				h("div", { className: "enh-stack" },
 					presetDetail.length === 0 ? null : h("div", null, presetDetail),
 					presetActions.length === 0 ? null : h("div", { className: "enh-actions" }, presetActions),
-					h("details", { className: "enh-term" },
-						h("summary", { className: "enh-hint" }, "它改哪个文件、怎么撤、什么时候生效"),
-						h("p", null, "改的是当前 profile 的 cordis.patch.yml" + (preset && preset.patchPath ? "（" + preset.patchPath + "）" : "") + "。写前先备份成 .bak-enhance-<时间>，再原子替换。"),
-						h("p", null, "写入是整块替换 patch 里 permission 行的档位表，所以本工具会连宿主基础三档（read-only / workspace-write / danger-full-access）一起写全——只写一条 enhanced 会把其它三档抹掉。"),
-						h("p", null, "不改你的默认档位：原来没有 defaultPreset 就仍然没有，宿主按组合的沙箱与审批推导。"),
-						h("p", null, "移除只摘我们写的 enhanced 那三行；自己手写的同名档位不会被删。要手工撤：把那一节备份文件覆盖回去，或删掉 enhanced 那三行，然后重启。"),
-						h("p", null, "改动要重启 DeepSeek Harness 才生效。"),
-					),
 					errorLine("preset"),
 				), null);
 
