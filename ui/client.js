@@ -488,7 +488,7 @@ window.__ModuleLoader__.load({
 				var range = typeof compat.range === "string" && compat.range !== "" ? compat.range : null;
 				var head = "增强 " + compat.tool;
 				if (typeof compat.host !== "string" || compat.host === "") {
-					return h("p", { className: "enh-hint" }, head + (range === null ? "" : " · 已验 DSH " + range + "（读不到本机版本）"));
+					return h("p", { className: "enh-hint" }, head + (range === null ? "" : " · 已验 DSH " + range));
 				}
 				if (compat.inRange === false) {
 					return h("p", { className: "enh-hint", "data-tone": "warn" }, head + " · DSH " + compat.host + (range === null ? "" : " · 超出已验范围 " + range));

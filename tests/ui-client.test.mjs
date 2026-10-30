@@ -469,7 +469,7 @@ test('内容边界只有「保存」「还原」两个动作（清空按钮已�
 
 test('版本行：本包版本 + 本机 DSH 版本 + 已验范围，超范围只变黄不拦人', () => {
   assert.ok(source.includes('function compatLine'), '缺版本行渲染')
-  for (const text of ['已验 DSH ', '已验 ', '超出已验范围 ', '（读不到本机版本）']) {
+  for (const text of ['已验 DSH ', '已验 ', '超出已验范围 ']) {
     assert.ok(source.includes(text), `版本行缺文案：${text}`)
   }
   assert.ok(source.includes('state.compat'), '版本行数据应来自快照的 compat 段')
