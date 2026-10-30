@@ -16,6 +16,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { apply, resolveProfilePatch } from '../enhance-scope/index.js'
 
 /** 一个够 `apply()` 用的假 cordis 上下文；`profile` 为 undefined 时模拟「没有 profile 上下文」。 */
@@ -156,6 +157,28 @@ test('state 快照带 preset 段；没有 profile 上下文时 patchPath 为 nul
   }
 })
 
+test('state 快照带 compat：本包版本取自 package.json，本机版本用于核对已验范围', async () => {
+  const pkg = JSON.parse(readFileSync(join(fileURLToPath(new URL('../package.json', import.meta.url)) ), 'utf8'))
+  const previous = process.env.DSH_VERSION
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    process.env.DSH_VERSION = pkg.dsh.compatibility.tested
+    const inside = (await probe.call({ op: 'state' })).json.compat
+    assert.equal(inside.tool, pkg.version)
+    assert.equal(inside.host, pkg.dsh.compatibility.tested)
+    assert.equal(inside.inRange, true)
+    assert.deepEqual(inside.versions, pkg.dsh.compatibility.versions)
+
+    process.env.DSH_VERSION = '9.9.9'
+    const outside = (await probe.call({ op: 'state' })).json.compat
+    assert.equal(outside.host, '9.9.9')
+    assert.equal(outside.inRange, false)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_VERSION
+    else process.env.DSH_VERSION = previous
+    await probe.close()
+  }
+})
 test('preset add：写完整档位表、留备份、回 needRestart', async () => {
   const original = '# comment\n[]\n'
   const probe = await harness({ patch: original })

@@ -460,6 +460,16 @@ test('内容边界只有「保存」「还原」两个动作（清空按钮已�
   assert.ok(!source.includes('清空（= 不加）'), '「清空」按钮不该回来')
 })
 
+test('版本行：本包版本 + 本机 DSH 版本 + 已验范围，超范围只变黄不拦人', () => {
+  assert.ok(source.includes('function compatLine'), '缺版本行渲染')
+  for (const text of ['已验 DSH ', '已验 ', '超出已验范围 ', '（读不到本机版本）']) {
+    assert.ok(source.includes(text), `版本行缺文案：${text}`)
+  }
+  assert.ok(source.includes('state.compat'), '版本行数据应来自快照的 compat 段')
+  // 超范围是提示，不是拒绝：只给 data-tone=warn，不隐藏任何控件
+  assert.match(source, /"data-tone": "warn" \}, head \+ " · DSH "/, '超范围应只变黄')
+})
+
 test('状态：服务端 active / degraded 必须被用上，降级原因要有一行说明', () => {
   assert.ok(source.includes('state.active === false'), '插件未激活必须能显示出来')
   assert.ok(source.includes('state.degraded'), '降级必须能显示出来')

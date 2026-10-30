@@ -21,7 +21,7 @@
  *      scheme 放行；其余必须与 Host 严格同源（scheme + host + port）。`Origin: null` 拒绝。
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -166,11 +166,86 @@ export function resolveProfilePatch(ctx) {
 }
 
 /**
+ * 本包版本与已验证的 DSH 范围。**唯一来源是 package.json**：
+ * README 的适用版本句、`scripts/check.mjs` 的 version 门禁、这一页的版本行，
+ * 三处都从它派生，改声明只需改一处。
+ */
+const PACKAGE = (() => {
+  try {
+    return JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
+  } catch {
+    return {}
+  }
+})()
+
+const COMPATIBILITY = {
+  tool: typeof PACKAGE.version === 'string' ? PACKAGE.version : null,
+  versions: Array.isArray(PACKAGE?.dsh?.compatibility?.versions) ? PACKAGE.dsh.compatibility.versions : [],
+  tested: typeof PACKAGE?.dsh?.compatibility?.tested === 'string' ? PACKAGE.dsh.compatibility.tested : null,
+}
+
+/**
+ * 本机 DSH 版本。三种来源按可靠性排序，都拿不到就返回 null（页面上只说「读不到」）：
+ *   1. 宿主的 `@deepseek-ai/dsh-package-manifest` → `getDshRuntimeVersion()`
+ *      —— 宿主自己就用它做插件兼容闸，读的是 app-boot 的 package.json；
+ *   2. `DSH_VERSION` 环境变量（脚本与测试用）；
+ *   3. `<home>/dsh-runtimes/<runtime>/runtime.json` 的 `desktopVersion`。
+ * 不猜版本号：读不到就老实说读不到。
+ *
+ * @param {string} home
+ * @returns {Promise<{ host: string | null, source: 'package-manifest' | 'env' | 'runtime-json' | null }>}
+ */
+export async function readHostVersion(home) {
+  try {
+    const manifest = await import('@deepseek-ai/dsh-package-manifest')
+    const value = typeof manifest.getDshRuntimeVersion === 'function' ? manifest.getDshRuntimeVersion() : undefined
+    if (typeof value === 'string' && value.trim() !== '') return { host: value.trim(), source: 'package-manifest' }
+  } catch {
+    // 不在宿主进程里（Node 测试），或这个宿主没暴露该包：落到下一种来源
+  }
+  const env = typeof process.env.DSH_VERSION === 'string' ? process.env.DSH_VERSION.trim() : ''
+  if (env !== '') return { host: env, source: 'env' }
+  try {
+    for (const entry of readdirSync(join(home, 'dsh-runtimes'), { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      try {
+        const parsed = JSON.parse(readFileSync(join(home, 'dsh-runtimes', entry.name, 'runtime.json'), 'utf8'))
+        if (typeof parsed.desktopVersion === 'string' && parsed.desktopVersion.trim() !== '') {
+          return { host: parsed.desktopVersion.trim(), source: 'runtime-json' }
+        }
+      } catch {
+        // 换下一个 runtime 目录
+      }
+    }
+  } catch {
+    // 没有 dsh-runtimes 目录
+  }
+  return { host: null, source: null }
+}
+
+/**
+ * 版本行用的快照：本包版本 + 本机 DSH 版本 + 已验证范围。
+ * `inRange` 为 null 表示**读不到本机版本**——这时页面不判绿也不判红。
+ *
+ * @param {string} home
+ */
+export async function compatSnapshot(home) {
+  const { host, source } = await readHostVersion(home)
+  return {
+    tool: COMPATIBILITY.tool,
+    host,
+    source,
+    versions: COMPATIBILITY.versions,
+    tested: COMPATIBILITY.tested,
+    inRange: host === null || COMPATIBILITY.versions.length === 0 ? null : COMPATIBILITY.versions.includes(host),
+  }
+}
+
+/**
  * 读 profile patch 与其中的档位现状。读不到文件按「空 patch」处理（写档会新建）。
  * @param {{ patchPath: string, profile: string | null, source: string } | undefined} target
  * @param {{ dir: string }} p
- */
-function presetSnapshot(target, p) {
+ */function presetSnapshot(target, p) {
   if (target === undefined) {
     return {
       patchPath: null, profile: null, source: null,
@@ -258,7 +333,7 @@ export function apply(ctx, config = {}) {
     const web = inner.webServer
     if (web === undefined || typeof web.register !== 'function') return
 
-    const snapshot = () => {
+    const snapshot = async () => {
       const { state, text, active, effective } = current()
       const meta = textStat({ ...p, text: file })
       return {
@@ -279,6 +354,7 @@ export function apply(ctx, config = {}) {
         home,
         limit: TEXT_LIMIT,
         preset: presetSnapshot(resolveProfilePatch(ctx), p),
+        compat: await compatSnapshot(home),
       }
     }
 
@@ -435,7 +511,7 @@ export function apply(ctx, config = {}) {
         }
         const op = typeof body.op === 'string' ? body.op : ''
         try {
-          if (op === 'state') return json(res, 200, snapshot())
+          if (op === 'state') return json(res, 200, await snapshot())
           if (op === 'check') return json(res, 200, await runChecks())
           if (op === 'preset') {
             for (const key of Object.keys(body)) {
@@ -475,7 +551,7 @@ export function apply(ctx, config = {}) {
             || next.approval !== before.approval
           if (changed) writeState(p, next)
           if (text !== undefined) writeText({ ...p, text: file }, text)
-          return json(res, 200, snapshot())
+          return json(res, 200, await snapshot())
         } catch (error) {
           const tooLarge = error?.code === 'ETOOLARGE'
           // 超限的细节给调用方（它要改的就是那个数字）；落盘失败的细节只进宿主 stderr，

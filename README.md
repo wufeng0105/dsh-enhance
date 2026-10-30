@@ -58,7 +58,7 @@ dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 dsh plugin --profile desktop remove dsh-enhance
 ```
 
-然后重启。`<DSH_HOME>/enhance/` 里你写的文本、开关、以及 `.bak` 备份都会保留；想彻底清掉就自己删这个目录。**已经写进去的 Enhanced 档不会自动消失**——它是你 profile 里的配置，按上面「怎么撤」那一条摘掉。
+然后重启。市场卸载只摘插件本身：`<DSH_HOME>/enhance/` 里你写的文本、开关、`.bak` 备份都会保留；**你点按钮写进 profile 的档位行也不会被删**，Enhanced 仍留在档位菜单里。想彻底干净，先在设置页点「移除 Enhanced 档」，再卸载；数据目录想清就自己删。
 
 ## 它到底改了什么
 

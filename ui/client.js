@@ -225,6 +225,7 @@ window.__ModuleLoader__.load({
 			".enh-now[data-tone=bad]{color:var(--dsw-alias-state-error-primary)}",
 			".enh-now[data-tone=mute]{color:var(--dsw-alias-label-tertiary)}",
 			".enh-hint{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}",
+			".enh-hint[data-tone=warn]{color:var(--dsw-alias-state-warn-primary)}",
 			".enh-stack{display:flex;flex-direction:column;gap:12px;min-width:0}",
 			".enh-note{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);border-left:2px solid var(--dsw-alias-border-l4);padding:2px 0 2px 12px;overflow-wrap:anywhere}",
 			".enh-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}",
@@ -481,6 +482,24 @@ window.__ModuleLoader__.load({
 			var intro = h("p", { className: "enh-intro" },
 				"这一页管四件事：写一段文字接到系统提示末尾、越界时怎么答、要不要多一个档位、以及它有没有真的生效。");
 
+			// 版本行：本包版本 + 本机 DSH 版本 + 已验证范围。
+			// 「超出已验范围」只变黄、不拦人——拦人是宿主兼容闸的职责，这一页只负责把事实说清。
+			function compatLine(compat) {
+				if (compat === null || compat === undefined || typeof compat.tool !== "string") return null;
+				var versions = Array.isArray(compat.versions) ? compat.versions : [];
+				var range = versions.length > 0 ? versions[0] + "–" + versions[versions.length - 1] : null;
+				var head = "增强 " + compat.tool;
+				if (typeof compat.host !== "string" || compat.host === "") {
+					return h("p", { className: "enh-hint" }, head + (range === null ? "" : " · 已验 DSH " + range + "（读不到本机版本）"));
+				}
+				if (compat.inRange === false) {
+					return h("p", { className: "enh-hint", "data-tone": "warn" }, head + " · DSH " + compat.host + (range === null ? "" : " · 超出已验范围 " + range));
+				}
+				return h("p", { className: "enh-hint" }, head + " · DSH " + compat.host + (range === null ? "" : " · 已验 " + range));
+			}
+
+			var versionLine = compatLine(state === null ? null : state.compat);
+
 			// 状态文件坏了不再有「元信息」块，用一行说清降级原因（这是唯一会丢的信息）
 			var degradedLine = state !== null && state.degraded
 				? h("p", { className: "enh-hint" },
@@ -679,6 +698,7 @@ window.__ModuleLoader__.load({
 			return h("div", { className: "enh" },
 				header,
 				intro,
+				versionLine,
 				degradedLine,
 				errorLine("page"),
 				blockScope,
