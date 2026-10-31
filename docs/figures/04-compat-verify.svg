@@ -1,0 +1,307 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1079 660" data-layout-contract="readable-v2" role="img" xml:lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+<style><![CDATA[
+/* ==========================================================
+       THEME VARIABLES — switch by toggling [data-theme] on <html>
+       ========================================================== */
+    :root, [data-theme="dark"] {--grid: #1e293b;--text: #ffffff;--text-muted: #94a3b8;--text-dim: #475569;--lane-fill: rgba(15, 23, 42, 0.22);--lane-stroke: #334155;--arrow: #64748b;--arrow-emphasis: #34d399;--frontend-fill:    rgba(8, 51, 68, 0.4);--frontend-stroke:  #22d3ee;--backend-fill:     rgba(6, 78, 59, 0.4);--backend-stroke:   #34d399;--database-stroke:  #a78bfa;--cloud-fill:       rgba(120, 53, 15, 0.3);--cloud-stroke:     #fbbf24;--security-fill:    rgba(136, 19, 55, 0.4);--security-stroke:  #fb7185;--messagebus-stroke:#fb923c;--external-fill:    rgba(30, 41, 59, 0.5);--external-stroke:  #94a3b8;}
+[data-theme="light"] {--grid: #e9edf2;--text: #111827;--text-muted: #5b6474;--text-dim: #9aa3b2;--lane-fill: rgba(248, 250, 252, 0.65);--lane-stroke: #cbd5e1;--arrow: #94a3b8;--arrow-emphasis: #059669;--mask: #ffffff;--frontend-fill: rgba(34, 211, 238, 0.15);--frontend-stroke: #0891b2;--backend-fill: rgba(52, 211, 153, 0.18);--backend-stroke: #059669;--database-stroke: #7c3aed;--cloud-fill: rgba(251, 191, 36, 0.18);--cloud-stroke: #d97706;--security-fill: rgba(251, 113, 133, 0.15);--security-stroke: #e11d48;--messagebus-stroke: #ea580c;--external-fill: rgba(148, 163, 184, 0.18);--external-stroke: #64748b;}
+/* Force the FULL light palette — including component fills/strokes and
+         lane/arrow colors — so printing from dark theme doesn't put neon
+         strokes and translucent dark fills on white paper. */
+      :root, [data-theme="dark"], [data-theme="light"] {--grid: transparent;--text: #0f172a;--text-muted: #475569;--text-dim: #94a3b8;--mask: #ffffff;--lane-fill: rgba(248, 250, 252, 0.65);--lane-stroke: #cbd5e1;--arrow: #94a3b8;--arrow-emphasis: #059669;--frontend-fill:    rgba(34, 211, 238, 0.15);--frontend-stroke:  #0891b2;--backend-fill:     rgba(52, 211, 153, 0.18);--backend-stroke:   #059669;--database-stroke:  #7c3aed;--cloud-fill:       rgba(251, 191, 36, 0.18);--cloud-stroke:     #d97706;--security-fill:    rgba(251, 113, 133, 0.15);--security-stroke:  #e11d48;--messagebus-stroke:#ea580c;--external-fill:    rgba(148, 163, 184, 0.18);--external-stroke:  #64748b;}
+/* ==========================================================
+       SVG SEMANTIC CLASSES — use these instead of inline fill/stroke
+       ========================================================== */
+    .c-grid { stroke: var(--grid); fill: none; }
+.c-mask { fill: var(--mask); stroke: none; }
+.c-frontend { fill: var(--frontend-fill);   stroke: var(--frontend-stroke); }
+.c-backend { fill: var(--backend-fill);    stroke: var(--backend-stroke); }
+.c-cloud { fill: var(--cloud-fill);      stroke: var(--cloud-stroke); }
+.c-security { fill: var(--security-fill);   stroke: var(--security-stroke); }
+.c-external { fill: var(--external-fill);   stroke: var(--external-stroke); }
+/* Text helpers */
+    .t-primary { fill: var(--text); }
+.t-muted { fill: var(--text-muted); }
+.t-dim { fill: var(--text-dim); }
+.t-frontend { fill: var(--frontend-stroke); }
+.t-backend { fill: var(--backend-stroke); }
+.t-cloud { fill: var(--cloud-stroke); }
+.t-security { fill: var(--security-stroke); }
+.t-messagebus { fill: var(--messagebus-stroke); }
+.t-edge-emphasis { fill: var(--arrow-emphasis); }
+.t-edge-security { fill: var(--security-stroke); }
+.t-edge-dashed { fill: var(--database-stroke); }
+not icons from a brand
+       pack and not viewer controls. Prefix selectors with svg so the canonical
+       export's SVG-only stylesheet collector keeps them automatically. */
+    svg .semantic-sigil {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.35;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.76;
+      pointer-events: none;
+    }
+svg .semantic-sigil > * { vector-effect: non-scaling-stroke; }
+svg .semantic-sigil .sigil-fill { fill: currentColor; stroke: none; }
+svg .s-frontend { color: var(--frontend-stroke); }
+svg .s-backend { color: var(--backend-stroke); }
+svg .s-cloud { color: var(--cloud-stroke); }
+svg .s-security { color: var(--security-stroke); }
+svg .s-external { color: var(--external-stroke); }
+/* Arrows */
+    .a-default { stroke: var(--arrow); fill: none; }
+.a-emphasis { stroke: var(--arrow-emphasis); fill: none; }
+.a-security { stroke: var(--security-stroke); fill: none; stroke-dasharray: 5,5; }
+.a-dashed { stroke: var(--database-stroke); fill: none; stroke-dasharray: 4,4; }
+/* Arrowhead markers reference these */
+    .m-default { fill: var(--arrow); }
+.m-emphasis { fill: var(--arrow-emphasis); }
+.m-security { fill: var(--security-stroke); }
+.m-dashed { fill: var(--database-stroke); }
+svg [data-node-id] > .c-mask { fill-opacity: 1; }
+svg[data-preset="editorial"] .c-grid {
+      stroke-dasharray: 1 4;
+      opacity: 0.48;
+    }
+svg[data-preset="blueprint"] .c-grid {
+      stroke-dasharray: 1 3;
+      opacity: 0.78;
+    }
+svg[data-preset="blueprint"] .c-security-group, svg[data-preset="blueprint"] .c-lane { stroke-dasharray: 7 3; }
+/* Dashed boundary variants */
+    .c-security-group { fill: transparent; stroke: var(--security-stroke); stroke-dasharray: 4,4; }
+.c-lane { fill: var(--lane-fill); stroke: var(--lane-stroke); stroke-dasharray: 6,6; }
+]]></style>
+        <title id="archify-diagram-title">例行核验五步</title>
+        <desc id="archify-diagram-description">由 Archify 生成的工作流图。</desc>
+        <!-- Definitions -->
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-default" />
+          </marker>
+          <marker id="arrowhead-emphasis" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-emphasis" />
+          </marker>
+          <marker id="arrowhead-security" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-security" />
+          </marker>
+          <marker id="arrowhead-dashed" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-dashed" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" class="c-grid" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- Swimlanes -->
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-0" x="40" y="52" width="970" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="74" class="t-dim" font-size="10" font-weight="600">01 / 本仓</text>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-1" x="40" y="178" width="970" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="200" class="t-dim" font-size="10" font-weight="600">02 / 上游 deepseek-harness</text>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-2" x="40" y="304" width="970" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="326" class="t-dim" font-size="10" font-weight="600">03 / 本机 DSH</text>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-3" x="40" y="430" width="970" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="exception-lane" data-composition-frame-id="lane-3-exception" x="46" y="436" width="958" height="94" rx="8" class="c-security-group" stroke-width="1"/>
+        <text x="54" y="452" class="t-security" font-size="10" font-weight="600">EX / 放行与停手</text>
+
+        <!-- Phase headers -->
+        <line x1="76" y1="35" x2="168" y2="35" class="a-default" stroke-width="1.1"/>
+        <rect x="76" y="27" width="92" height="16" rx="4" class="c-mask"/>
+        <text x="122" y="39" class="t-muted" font-size="8" font-weight="600" text-anchor="middle">数触点</text>
+        <line x1="196" y1="35" x2="678" y2="35" class="a-default" stroke-width="1.1"/>
+        <rect x="196" y="27" width="482" height="16" rx="4" class="c-mask"/>
+        <text x="437" y="39" class="t-muted" font-size="8" font-weight="600" text-anchor="middle">比上游</text>
+        <line x1="762" y1="35" x2="854" y2="35" class="a-emphasis" stroke-width="1.1"/>
+        <rect x="762" y="27" width="92" height="16" rx="4" class="c-mask"/>
+        <text x="808" y="39" class="t-backend" font-size="8" font-weight="600" text-anchor="middle">判接缝</text>
+        <line x1="882" y1="35" x2="974" y2="35" class="a-dashed" stroke-width="1.1"/>
+        <rect x="882" y="27" width="92" height="16" rx="4" class="c-mask"/>
+        <text x="928" y="39" class="t-messagebus" font-size="8" font-weight="600" text-anchor="middle">放行与声明</text>
+
+        <!-- Workflow groups -->
+
+
+        <!-- Edge paths -->
+        <path data-edge-from="recount" data-edge-to="treediff" data-edge-label="重推后的表" data-edge-key="0" data-edge-id="count-to-diff" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="196,120;212,120;212,168;242,168;242,212" d="M 196 120 L 212 120 L 212 168 L 242 168 L 242 212" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="treediff" data-edge-to="sha_same" data-edge-key="1" data-edge-id="diff-to-sha" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="316,246;344,246" d="M 316 246 L 344 246" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="read_diff" data-edge-to="seam" data-edge-key="2" data-edge-id="read-to-seam" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="706,246;734,246" d="M 706 246 L 734 246" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="seam" data-edge-to="pass_seam" data-edge-label="没碰接缝" data-edge-key="3" data-edge-id="seam-to-pass" data-composition-routing="workflow-v2-auto" data-edge-role="branch" data-composition-points="801,280;801,498;706,498" d="M 801 280 L 801 498 L 706 498" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="seam" data-edge-to="smoke" data-edge-label="动了接缝" data-edge-key="4" data-edge-id="seam-to-smoke" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="882,246;928,246;928,338" d="M 882 246 L 928 246 L 928 338" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="sha_same" data-edge-to="pass_sha" data-edge-label="SHA 全同" data-edge-key="5" data-edge-id="sha-to-pass" data-composition-routing="workflow-v2-auto" data-edge-role="branch" data-composition-points="418,280;418,472" d="M 418 280 L 418 472" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="sha_same" data-edge-to="read_diff" data-edge-label="SHA 有差异" data-edge-key="6" data-edge-id="sha-to-read" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="492,246;558,246" d="M 492 246 L 558 246" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="smoke" data-edge-to="declare" data-edge-label="冒烟 exit 0" data-edge-key="7" data-edge-id="smoke-to-declare" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="1002,372;1060.8,372;1060.8,120;1002,120" d="M 1002 372 L 1060.8 372 L 1060.8 120 L 1002 120" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+
+        <!-- Nodes -->
+        <g id="node-recount" data-node-id="recount" data-node-label="重数触点" tabindex="0" role="button" aria-label="聚焦重数触点，grep 重推这张表, 本仓 › 数触点" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="grep 重推这张表" data-node-tag="35 条独立触点" data-node-context="本仓 › 数触点">
+          <title>重数触点 · grep 重推这张表 · 本仓 › 数触点 · 35 条独立触点</title>
+          <rect x="48" y="86" width="148" height="68" rx="6" class="c-mask"/>
+          <rect x="48" y="86" width="148" height="68" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(54 92) scale(0.6875)">
+            <rect x="2" y="3" width="12" height="10" rx="2"/>
+            <path d="M2 6.5h12"/>
+            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
+            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="122" y="107" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">重数触点</text>
+          <text data-detail="context" x="122" y="124" class="t-muted" font-size="8" text-anchor="middle">grep 重推这张表</text>
+        <text data-detail="fine" x="122" y="142" class="t-frontend" font-size="7" text-anchor="middle">35 条独立触点</text>
+        </g>
+
+        <g id="node-declare" data-node-id="declare" data-node-label="改声明" tabindex="0" role="button" aria-label="聚焦改声明，两端一起动, 本仓 › 放行与声明" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="两端一起动" data-node-tag="跑 check.mjs" data-node-context="本仓 › 放行与声明">
+          <title>改声明 · 两端一起动 · 本仓 › 放行与声明 · 跑 check.mjs</title>
+          <rect x="854" y="86" width="148" height="68" rx="6" class="c-mask"/>
+          <rect x="854" y="86" width="148" height="68" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(860 92) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="928" y="107" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">改声明</text>
+          <text data-detail="context" x="928" y="124" class="t-muted" font-size="8" text-anchor="middle">两端一起动</text>
+        <text data-detail="fine" x="928" y="142" class="t-cloud" font-size="7" text-anchor="middle">跑 check.mjs</text>
+        </g>
+
+        <g id="node-treediff" data-node-id="treediff" data-node-label="逐包 tree-diff" tabindex="0" role="button" aria-label="聚焦逐包 tree-diff，比 tree SHA, 上游 deepseek-harness › 比上游" aria-pressed="false" data-node-kind="backend" data-node-sublabel="比 tree SHA" data-node-tag="不信文件列表" data-node-context="上游 deepseek-harness › 比上游">
+          <title>逐包 tree-diff · 比 tree SHA · 上游 deepseek-harness › 比上游 · 不信文件列表</title>
+          <rect x="168" y="212" width="148" height="68" rx="6" class="c-mask"/>
+          <rect x="168" y="212" width="148" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(174 218) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="242" y="246.2" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">逐包 tree-diff</text>
+          <text data-detail="context" x="242" y="261.1" class="t-muted" font-size="8" text-anchor="middle">比 tree SHA</text>
+        <text data-detail="fine" x="242" y="273.9" class="t-backend" font-size="7" text-anchor="middle">不信文件列表</text>
+        </g>
+
+        <g id="node-sha_same" data-node-id="sha_same" data-node-label="SHA 全同？" tabindex="0" role="button" aria-label="聚焦SHA 全同？，同 = 没动, 上游 deepseek-harness › 比上游" aria-pressed="false" data-node-kind="security" data-node-sublabel="同 = 没动" data-node-tag="判断题" data-node-context="上游 deepseek-harness › 比上游">
+          <title>SHA 全同？ · 同 = 没动 · 上游 deepseek-harness › 比上游 · 判断题</title>
+          <rect x="344" y="212" width="148" height="68" rx="6" class="c-mask"/>
+          <rect x="344" y="212" width="148" height="68" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(350 218) scale(0.6875)">
+            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
+            <path d="m5.8 8 1.5 1.5 3-3"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="417" y="233" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">SHA 全同？</text>
+          <text data-detail="context" x="418" y="250" class="t-muted" font-size="8" text-anchor="middle">同 = 没动</text>
+        <text data-detail="fine" x="418" y="268" class="t-security" font-size="7" text-anchor="middle">判断题</text>
+        </g>
+
+        <g id="node-read_diff" data-node-id="read_diff" data-node-label="读 diff" tabindex="0" role="button" aria-label="聚焦读 diff，有变更看内容, 上游 deepseek-harness › 比上游" aria-pressed="false" data-node-kind="backend" data-node-sublabel="有变更看内容" data-node-context="上游 deepseek-harness › 比上游">
+          <title>读 diff · 有变更看内容 · 上游 deepseek-harness › 比上游</title>
+          <rect x="558" y="220" width="148" height="52" rx="6" class="c-mask"/>
+          <rect x="558" y="220" width="148" height="52" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(564 226) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="632" y="241" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">读 diff</text>
+          <text data-detail="context" x="632" y="258" class="t-muted" font-size="8" text-anchor="middle">有变更看内容</text>
+        </g>
+
+        <g id="node-seam" data-node-id="seam" data-node-label="动到接缝？" tabindex="0" role="button" aria-label="聚焦动到接缝？，槽位 / 配置形状, 上游 deepseek-harness › 判接缝" aria-pressed="false" data-node-kind="security" data-node-sublabel="槽位 / 配置形状" data-node-tag="判断题" data-node-context="上游 deepseek-harness › 判接缝">
+          <title>动到接缝？ · 槽位 / 配置形状 · 上游 deepseek-harness › 判接缝 · 判断题</title>
+          <rect x="734" y="212" width="148" height="68" rx="6" class="c-mask"/>
+          <rect x="734" y="212" width="148" height="68" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(740 218) scale(0.6875)">
+            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
+            <path d="m5.8 8 1.5 1.5 3-3"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="807" y="233" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">动到接缝？</text>
+          <text data-detail="context" x="808" y="250" class="t-muted" font-size="8" text-anchor="middle">槽位 / 配置形状</text>
+        <text data-detail="fine" x="808" y="268" class="t-security" font-size="7" text-anchor="middle">判断题</text>
+        </g>
+
+        <g id="node-smoke" data-node-id="smoke" data-node-label="隔离冒烟" tabindex="0" role="button" aria-label="聚焦隔离冒烟，装、写档、摘档, 本机 DSH › 放行与声明" aria-pressed="false" data-node-kind="backend" data-node-sublabel="装、写档、摘档" data-node-tag="exit 0 才过" data-node-context="本机 DSH › 放行与声明">
+          <title>隔离冒烟 · 装、写档、摘档 · 本机 DSH › 放行与声明 · exit 0 才过</title>
+          <rect x="854" y="338" width="148" height="68" rx="6" class="c-mask"/>
+          <rect x="854" y="338" width="148" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(860 344) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="928" y="359" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">隔离冒烟</text>
+          <text data-detail="context" x="928" y="376" class="t-muted" font-size="8" text-anchor="middle">装、写档、摘档</text>
+        <text data-detail="fine" x="928" y="394" class="t-backend" font-size="7" text-anchor="middle">exit 0 才过</text>
+        </g>
+
+        <g id="node-pass_sha" data-node-id="pass_sha" data-node-label="放行：没动" tabindex="0" role="button" aria-label="聚焦放行：没动，记一笔不改代码, 放行与停手 › 比上游" aria-pressed="false" data-node-kind="external" data-node-sublabel="记一笔不改代码" data-node-context="放行与停手 › 比上游">
+          <title>放行：没动 · 记一笔不改代码 · 放行与停手 › 比上游</title>
+          <rect x="344" y="472" width="148" height="52" rx="6" class="c-mask"/>
+          <rect x="344" y="472" width="148" height="52" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(350 478) scale(0.6875)">
+            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
+            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="417" y="493" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">放行：没动</text>
+          <text data-detail="context" x="418" y="510" class="t-muted" font-size="8" text-anchor="middle">记一笔不改代码</text>
+        </g>
+
+        <g id="node-pass_seam" data-node-id="pass_seam" data-node-label="放行：没碰接缝" tabindex="0" role="button" aria-label="聚焦放行：没碰接缝，埋点、注释、重构, 放行与停手 › 比上游" aria-pressed="false" data-node-kind="external" data-node-sublabel="埋点、注释、重构" data-node-context="放行与停手 › 比上游">
+          <title>放行：没碰接缝 · 埋点、注释、重构 · 放行与停手 › 比上游</title>
+          <rect x="558" y="472" width="148" height="52" rx="6" class="c-mask"/>
+          <rect x="558" y="472" width="148" height="52" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(564 478) scale(0.6875)">
+            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
+            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="632" y="504" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">放行：没碰接缝</text>
+          <text data-detail="context" x="632" y="516.3" class="t-muted" font-size="8" text-anchor="middle">埋点、注释、重构</text>
+        </g>
+
+        <!-- Edge labels -->
+        <g data-detail="context" data-edge-from="recount" data-edge-to="treediff" data-edge-label="重推后的表" data-edge-key="0" data-edge-id="count-to-diff">
+          <rect x="198" y="148" width="58" height="14" rx="3" class="c-mask"/>
+          <text x="227" y="158" class="t-edge-emphasis" font-size="8" text-anchor="middle">重推后的表</text>
+        </g>
+
+
+        <g data-detail="context" data-edge-from="seam" data-edge-to="pass_seam" data-edge-label="没碰接缝" data-edge-key="3" data-edge-id="seam-to-pass">
+          <rect x="729.3" y="478" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="753.5" y="488" class="t-edge-dashed" font-size="8" text-anchor="middle">没碰接缝</text>
+        </g>
+        <g data-detail="context" data-edge-from="seam" data-edge-to="smoke" data-edge-label="动了接缝" data-edge-key="4" data-edge-id="seam-to-smoke">
+          <rect x="880.8" y="226" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="905" y="236" class="t-edge-security" font-size="8" text-anchor="middle">动了接缝</text>
+        </g>
+        <g data-detail="context" data-edge-from="sha_same" data-edge-to="pass_sha" data-edge-label="SHA 全同" data-edge-key="5" data-edge-id="sha-to-pass">
+          <rect x="393.8" y="366" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="418" y="376" class="t-edge-security" font-size="8" text-anchor="middle">SHA 全同</text>
+        </g>
+        <g data-detail="context" data-edge-from="sha_same" data-edge-to="read_diff" data-edge-label="SHA 有差异" data-edge-key="6" data-edge-id="sha-to-read">
+          <rect x="496" y="226" width="58" height="14" rx="3" class="c-mask"/>
+          <text x="525" y="236" class="t-edge-emphasis" font-size="8" text-anchor="middle">SHA 有差异</text>
+        </g>
+        <g data-detail="context" data-edge-from="smoke" data-edge-to="declare" data-edge-label="冒烟 exit 0" data-edge-key="7" data-edge-id="smoke-to-declare">
+          <rect x="1000.0000000000001" y="352" width="62.8" height="14" rx="3" class="c-mask"/>
+          <text x="1031.4" y="362" class="t-edge-emphasis" font-size="8" text-anchor="middle">冒烟 exit 0</text>
+        </g>
+
+        <!-- Legend -->
+        <g data-legend="" data-legend-bridge="">
+          <text x="20" y="560" class="t-primary" font-size="12" font-weight="650">图例</text>
+          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="用户界面" data-legend-x="20" data-legend-baseline="580" data-legend-width="78">
+            <rect x="20" y="572" width="14" height="9" rx="2" class="c-frontend" stroke-width="1"/>
+            <text x="42" y="580" class="t-muted" font-size="7.5" font-weight="500">用户界面</text>
+          </g>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Agent 逻辑" data-legend-x="105" data-legend-baseline="580" data-legend-width="87">
+            <rect x="105" y="572" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
+            <text x="127" y="580" class="t-muted" font-size="7.5" font-weight="500">Agent 逻辑</text>
+          </g>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="策略" data-legend-x="199" data-legend-baseline="580" data-legend-width="61">
+            <rect x="199" y="572" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
+            <text x="221" y="580" class="t-muted" font-size="7.5" font-weight="500">策略</text>
+          </g>
+          <g data-legend-semantic-kind="cloud" data-legend-kind="cloud" data-legend-label="云服务" data-legend-x="267" data-legend-baseline="580" data-legend-width="70">
+            <rect x="267" y="572" width="14" height="9" rx="2" class="c-cloud" stroke-width="1"/>
+            <text x="289" y="580" class="t-muted" font-size="7.5" font-weight="500">云服务</text>
+          </g>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="外部系统" data-legend-x="344" data-legend-baseline="580" data-legend-width="78">
+            <rect x="344" y="572" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
+            <text x="366" y="580" class="t-muted" font-size="7.5" font-weight="500">外部系统</text>
+          </g>
+        </g>
+      </svg>

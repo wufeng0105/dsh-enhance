@@ -1,0 +1,300 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" data-sequence-column-fit="spread" role="img" xml:lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+<style><![CDATA[
+/* ==========================================================
+       THEME VARIABLES — switch by toggling [data-theme] on <html>
+       ========================================================== */
+    :root, [data-theme="dark"] {--grid: #1e293b;--text: #ffffff;--text-muted: #94a3b8;--text-dim: #475569;--lane-fill: rgba(15, 23, 42, 0.22);--lane-stroke: #334155;--arrow: #64748b;--arrow-emphasis: #34d399;--backend-fill:     rgba(6, 78, 59, 0.4);--backend-stroke:   #34d399;--database-fill:    rgba(76, 29, 149, 0.4);--database-stroke:  #a78bfa;--security-stroke:  #fb7185;}
+[data-theme="light"] {--grid: #e9edf2;--text: #111827;--text-muted: #5b6474;--text-dim: #9aa3b2;--lane-fill: rgba(248, 250, 252, 0.65);--lane-stroke: #cbd5e1;--arrow: #94a3b8;--arrow-emphasis: #059669;--mask: #ffffff;--backend-fill: rgba(52, 211, 153, 0.18);--backend-stroke: #059669;--database-fill: rgba(167, 139, 250, 0.2);--database-stroke: #7c3aed;--security-stroke: #e11d48;}
+/* Force the FULL light palette — including component fills/strokes and
+         lane/arrow colors — so printing from dark theme doesn't put neon
+         strokes and translucent dark fills on white paper. */
+      :root, [data-theme="dark"], [data-theme="light"] {--grid: transparent;--text: #0f172a;--text-muted: #475569;--text-dim: #94a3b8;--mask: #ffffff;--lane-fill: rgba(248, 250, 252, 0.65);--lane-stroke: #cbd5e1;--arrow: #94a3b8;--arrow-emphasis: #059669;--backend-fill:     rgba(52, 211, 153, 0.18);--backend-stroke:   #059669;--database-fill:    rgba(167, 139, 250, 0.2);--database-stroke:  #7c3aed;--security-stroke:  #e11d48;}
+/* ==========================================================
+       SVG SEMANTIC CLASSES — use these instead of inline fill/stroke
+       ========================================================== */
+    .c-grid { stroke: var(--grid); fill: none; }
+.c-mask { fill: var(--mask); stroke: none; }
+.c-backend { fill: var(--backend-fill);    stroke: var(--backend-stroke); }
+.c-database { fill: var(--database-fill);   stroke: var(--database-stroke); }
+/* Text helpers */
+    .t-primary { fill: var(--text); }
+.t-muted { fill: var(--text-muted); }
+.t-dim { fill: var(--text-dim); }
+.t-edge-emphasis { fill: var(--arrow-emphasis); }
+.t-edge-dashed { fill: var(--database-stroke); }
+not icons from a brand
+       pack and not viewer controls. Prefix selectors with svg so the canonical
+       export's SVG-only stylesheet collector keeps them automatically. */
+    svg .semantic-sigil {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.35;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.76;
+      pointer-events: none;
+    }
+svg .semantic-sigil > * { vector-effect: non-scaling-stroke; }
+svg .s-backend { color: var(--backend-stroke); }
+svg .s-database { color: var(--database-stroke); }
+/* Arrows */
+    .a-default { stroke: var(--arrow); fill: none; }
+.a-emphasis { stroke: var(--arrow-emphasis); fill: none; }
+.a-dashed { stroke: var(--database-stroke); fill: none; stroke-dasharray: 4,4; }
+/* Arrowhead markers reference these */
+    .m-default { fill: var(--arrow); }
+.m-emphasis { fill: var(--arrow-emphasis); }
+.m-security { fill: var(--security-stroke); }
+.m-dashed { fill: var(--database-stroke); }
+svg [data-node-id] > .c-mask { fill-opacity: 1; }
+svg[data-preset="editorial"] .c-grid {
+      stroke-dasharray: 1 4;
+      opacity: 0.48;
+    }
+svg[data-preset="blueprint"] .c-grid {
+      stroke-dasharray: 1 3;
+      opacity: 0.78;
+    }
+svg[data-preset="blueprint"] .c-lane { stroke-dasharray: 7 3; }
+.c-lane { fill: var(--lane-fill); stroke: var(--lane-stroke); stroke-dasharray: 6,6; }
+]]></style>
+        <title id="archify-diagram-title">一条消息的注入路径</title>
+        <desc id="archify-diagram-description">由 Archify 生成的时序图。</desc>
+        <!-- Definitions -->
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-default" />
+          </marker>
+          <marker id="arrowhead-emphasis" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-emphasis" />
+          </marker>
+          <marker id="arrowhead-security" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-security" />
+          </marker>
+          <marker id="arrowhead-dashed" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="m-dashed" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" class="c-grid" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- Time Segments -->
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="0" x="48" y="150" width="884" height="175" rx="10" class="c-lane" stroke-width="1"/>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="1" x="48" y="330" width="884" height="145" rx="10" class="c-lane" stroke-width="1"/>
+
+        <!-- Lifelines -->
+        <path d="M 121.5 142 L 121.5 524" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 273.3 142 L 273.3 524" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 425.1 142 L 425.1 524" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 576.9000000000001 142 L 576.9000000000001 524" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 728.7 142 L 728.7 524" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 880.5 142 L 880.5 524" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+
+        <!-- Activations -->
+        <rect x="116.5" y="158" width="10" height="187" rx="3" class="c-mask"/>
+        <rect x="116.5" y="158" width="10" height="187" rx="3" class="c-backend" stroke-width="1"/>
+        <rect x="268.3" y="158" width="10" height="312" rx="3" class="c-mask"/>
+        <rect x="268.3" y="158" width="10" height="312" rx="3" class="c-backend" stroke-width="1"/>
+        <rect x="420.1" y="188" width="10" height="97" rx="3" class="c-mask"/>
+        <rect x="420.1" y="188" width="10" height="97" rx="3" class="c-backend" stroke-width="1"/>
+        <rect x="571.9000000000001" y="218" width="10" height="37" rx="3" class="c-mask"/>
+        <rect x="571.9000000000001" y="218" width="10" height="37" rx="3" class="c-database" stroke-width="1"/>
+        <rect x="723.7" y="368" width="10" height="98" rx="3" class="c-mask"/>
+        <rect x="723.7" y="368" width="10" height="98" rx="3" class="c-backend" stroke-width="1"/>
+        <rect x="875.5" y="336" width="10" height="100" rx="3" class="c-mask"/>
+        <rect x="875.5" y="336" width="10" height="100" rx="3" class="c-database" stroke-width="1"/>
+
+        <!-- Messages -->
+        <g data-edge-from="prompt" data-edge-to="scope" data-edge-label="装配时回调 text()" data-edge-key="0" data-edge-id="assemble-calls-text">
+          <path data-composition-edge-from="prompt" data-composition-edge-to="scope" data-composition-edge-id="assemble-calls-text" data-composition-points="128.5,160;266.3,160" d="M 128.5 160 L 266.3 160" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="135.3" y="140" width="124.19999999999999" height="18" rx="3" class="c-mask"/>
+          <text x="197.4" y="150" class="t-muted" font-size="11" text-anchor="middle">装配时回调 text()</text>
+        </g>
+        </g>
+
+        <g data-edge-from="scope" data-edge-to="state" data-edge-label="readState + readText" data-edge-key="1" data-edge-id="scope-reads-state">
+          <path data-composition-edge-from="scope" data-composition-edge-to="state" data-composition-edge-id="scope-reads-state" data-composition-points="280.3,190;418.1,190" d="M 280.3 190 L 418.1 190" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="277.20000000000005" y="170" width="144" height="18" rx="3" class="c-mask"/>
+          <text x="349.20000000000005" y="180" class="t-muted" font-size="11" text-anchor="middle">readState + readText</text>
+        </g>
+        </g>
+
+        <g data-edge-from="state" data-edge-to="file" data-edge-label="读 content-scope.txt" data-edge-key="2" data-edge-id="state-reads-file">
+          <path data-composition-edge-from="state" data-composition-edge-to="file" data-composition-edge-id="state-reads-file" data-composition-points="432.1,220;569.9000000000001,220" d="M 432.1 220 L 569.9000000000001 220" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="429.00000000000006" y="200" width="144" height="18" rx="3" class="c-mask"/>
+          <text x="501.00000000000006" y="210" class="t-muted" font-size="11" text-anchor="middle">读 content-scope.txt</text>
+        </g>
+        </g>
+
+        <g data-edge-from="file" data-edge-to="state" data-edge-label="文件正文" data-edge-key="3" data-edge-id="file-returns">
+          <path data-composition-edge-from="file" data-composition-edge-to="state" data-composition-edge-id="file-returns" data-composition-points="569.9000000000001,250;432.1,250" d="M 569.9000000000001 250 L 432.1 250" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="468.6000000000001" y="230" width="64.8" height="18" rx="3" class="c-mask"/>
+          <text x="501.00000000000006" y="240" class="t-muted" font-size="11" text-anchor="middle">文件正文</text>
+        </g>
+        </g>
+
+        <g data-edge-from="state" data-edge-to="scope" data-edge-label="归一后的文本 + 三个开关" data-edge-key="4" data-edge-id="state-returns">
+          <path data-composition-edge-from="state" data-composition-edge-to="scope" data-composition-edge-id="state-returns" data-composition-points="418.1,280;280.3,280" d="M 418.1 280 L 280.3 280" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="267.30000000000007" y="260" width="163.79999999999998" height="18" rx="3" class="c-mask"/>
+          <text x="349.20000000000005" y="270" class="t-muted" font-size="11" text-anchor="middle">归一后的文本 + 三个开关</text>
+        </g>
+        </g>
+
+        <g data-edge-from="scope" data-edge-to="prompt" data-edge-label="返回文本，或空串" data-edge-key="5" data-edge-id="scope-returns-text">
+          <path data-composition-edge-from="scope" data-composition-edge-to="prompt" data-composition-edge-id="scope-returns-text" data-composition-points="266.3,310;128.5,310" d="M 266.3 310 L 128.5 310" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <g data-detail="context">
+          <rect x="138.60000000000002" y="290" width="117.6" height="18" rx="3" class="c-mask"/>
+          <text x="197.40000000000003" y="300" class="t-edge-emphasis" font-size="11" text-anchor="middle">返回文本，或空串</text>
+        </g>
+        </g>
+
+        <g data-edge-from="prompt" data-edge-to="log" data-edge-label="落成 system-prompt 记录" data-edge-key="6" data-edge-id="prompt-writes-log">
+          <path data-composition-edge-from="prompt" data-composition-edge-to="log" data-composition-edge-id="prompt-writes-log" data-composition-points="128.5,340;873.5,340" d="M 128.5 340 L 873.5 340" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <g data-detail="context">
+          <rect x="419.1" y="320" width="163.79999999999998" height="18" rx="3" class="c-mask"/>
+          <text x="501" y="330" class="t-edge-dashed" font-size="11" text-anchor="middle">落成 system-prompt 记录</text>
+        </g>
+        </g>
+
+        <g data-edge-from="scope" data-edge-to="probe" data-edge-label="check：sessionContains(文本)" data-edge-key="7" data-edge-id="scope-asks-probe">
+          <path data-composition-edge-from="scope" data-composition-edge-to="probe" data-composition-edge-id="scope-asks-probe" data-composition-points="280.3,370;721.7,370" d="M 280.3 370 L 721.7 370" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <g data-detail="context">
+          <rect x="402.6" y="350" width="196.79999999999998" height="18" rx="3" class="c-mask"/>
+          <text x="501" y="360" class="t-edge-dashed" font-size="11" text-anchor="middle">check：sessionContains(文本)</text>
+        </g>
+        </g>
+
+        <g data-edge-from="probe" data-edge-to="log" data-edge-label="最近 10 份，逐帧解压" data-edge-key="8" data-edge-id="probe-reads-log">
+          <path data-composition-edge-from="probe" data-composition-edge-to="log" data-composition-edge-id="probe-reads-log" data-composition-points="735.7,400;873.5,400" d="M 735.7 400 L 873.5 400" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="732.6" y="380" width="144" height="18" rx="3" class="c-mask"/>
+          <text x="804.6" y="390" class="t-muted" font-size="11" text-anchor="middle">最近 10 份，逐帧解压</text>
+        </g>
+        </g>
+
+        <g data-edge-from="log" data-edge-to="probe" data-edge-label="只认含 system-prompt 的行" data-edge-key="9" data-edge-id="log-returns">
+          <path data-composition-edge-from="log" data-composition-edge-to="probe" data-composition-edge-id="log-returns" data-composition-points="873.5,430;735.7,430" d="M 873.5 430 L 735.7 430" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="716.1" y="410" width="177" height="18" rx="3" class="c-mask"/>
+          <text x="804.6" y="420" class="t-muted" font-size="11" text-anchor="middle">只认含 system-prompt 的行</text>
+        </g>
+        </g>
+
+        <g data-edge-from="probe" data-edge-to="scope" data-edge-label="命中次数 / 未命中" data-edge-key="10" data-edge-id="probe-reports">
+          <path data-composition-edge-from="probe" data-composition-edge-to="scope" data-composition-edge-id="probe-reports" data-composition-points="721.7,460;280.3,460" d="M 721.7 460 L 280.3 460" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="438.9" y="440" width="124.19999999999999" height="18" rx="3" class="c-mask"/>
+          <text x="501" y="450" class="t-muted" font-size="11" text-anchor="middle">命中次数 / 未命中</text>
+        </g>
+        </g>
+
+        <!-- Segment Labels -->
+        <g data-graph-role="segment-label" data-segment-id="0">
+          <rect x="56" y="128" width="42" height="18" rx="3" class="c-mask"/>
+          <text x="62" y="141" class="t-dim" font-size="9" font-weight="600">装配</text>
+        </g>
+        <g data-graph-role="segment-label" data-segment-id="1">
+          <rect x="56" y="308" width="55.6" height="18" rx="3" class="c-mask"/>
+          <text x="62" y="321" class="t-dim" font-size="9" font-weight="600">读回验证</text>
+        </g>
+
+        <!-- Participants -->
+        <g id="node-prompt" data-node-id="prompt" data-node-label="宿主提示词" tabindex="0" role="button" aria-label="聚焦宿主提示词，systemPrompt 注册表, 时序参与者" aria-pressed="false" data-node-kind="backend" data-node-sublabel="systemPrompt 注册表" data-node-context="时序参与者">
+          <title>宿主提示词 · systemPrompt 注册表 · 时序参与者</title>
+          <rect x="62" y="72" width="119" height="60" rx="6" class="c-mask"/>
+          <rect x="62" y="72" width="119" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(68 78) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="121.5" y="108" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">宿主提示词</text>
+          <text data-detail="context" x="121.5" y="122" class="t-muted" font-size="7" text-anchor="middle">systemPrompt 注册表</text>
+        </g>
+
+        <g id="node-scope" data-node-id="scope" data-node-label="enhance-scope" tabindex="0" role="button" aria-label="聚焦enhance-scope，注入段, 时序参与者" aria-pressed="false" data-node-kind="backend" data-node-sublabel="注入段" data-node-context="时序参与者">
+          <title>enhance-scope · 注入段 · 时序参与者</title>
+          <rect x="213.8" y="72" width="119" height="60" rx="6" class="c-mask"/>
+          <rect x="213.8" y="72" width="119" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(219.8 78) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="273.3" y="108" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">enhance-scope</text>
+          <text data-detail="context" x="273.3" y="122" class="t-muted" font-size="7" text-anchor="middle">注入段</text>
+        </g>
+
+        <g id="node-state" data-node-id="state" data-node-label="shared/state" tabindex="0" role="button" aria-label="聚焦shared/state，开关与文本, 时序参与者" aria-pressed="false" data-node-kind="backend" data-node-sublabel="开关与文本" data-node-context="时序参与者">
+          <title>shared/state · 开关与文本 · 时序参与者</title>
+          <rect x="365.6" y="72" width="119" height="60" rx="6" class="c-mask"/>
+          <rect x="365.6" y="72" width="119" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(371.6 78) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="425.1" y="108" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">shared/state</text>
+          <text data-detail="context" x="425.1" y="122" class="t-muted" font-size="7" text-anchor="middle">开关与文本</text>
+        </g>
+
+        <g id="node-file" data-node-id="file" data-node-label="内容边界文本" tabindex="0" role="button" aria-label="聚焦内容边界文本，content-scope.txt, 时序参与者" aria-pressed="false" data-node-kind="database" data-node-sublabel="content-scope.txt" data-node-context="时序参与者">
+          <title>内容边界文本 · content-scope.txt · 时序参与者</title>
+          <rect x="517.4000000000001" y="72" width="119" height="60" rx="6" class="c-mask"/>
+          <rect x="517.4000000000001" y="72" width="119" height="60" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(523.4000000000001 78) scale(0.6875)">
+            <ellipse cx="8" cy="4" rx="5" ry="2"/>
+            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="576.9000000000001" y="108" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">内容边界文本</text>
+          <text data-detail="context" x="576.9000000000001" y="122" class="t-muted" font-size="7" text-anchor="middle">content-scope.txt</text>
+        </g>
+
+        <g id="node-probe" data-node-id="probe" data-node-label="会话探针" tabindex="0" role="button" aria-label="聚焦会话探针，只读, 时序参与者" aria-pressed="false" data-node-kind="backend" data-node-sublabel="只读" data-node-context="时序参与者">
+          <title>会话探针 · 只读 · 时序参与者</title>
+          <rect x="669.2" y="72" width="119" height="60" rx="6" class="c-mask"/>
+          <rect x="669.2" y="72" width="119" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(675.2 78) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="728.7" y="108" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">会话探针</text>
+          <text data-detail="context" x="728.7" y="122" class="t-muted" font-size="7" text-anchor="middle">只读</text>
+        </g>
+
+        <g id="node-log" data-node-id="log" data-node-label="会话日志" tabindex="0" role="button" aria-label="聚焦会话日志，session.v4.jsonl.zstd, 时序参与者" aria-pressed="false" data-node-kind="database" data-node-sublabel="session.v4.jsonl.zstd" data-node-context="时序参与者">
+          <title>会话日志 · session.v4.jsonl.zstd · 时序参与者</title>
+          <rect x="821" y="72" width="119" height="60" rx="6" class="c-mask"/>
+          <rect x="821" y="72" width="119" height="60" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(827 78) scale(0.6875)">
+            <ellipse cx="8" cy="4" rx="5" ry="2"/>
+            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="880.5" y="108" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">会话日志</text>
+          <text data-detail="context" x="880.5" y="122" class="t-muted" font-size="7" text-anchor="middle">session.v4.jsonl.zstd</text>
+        </g>
+
+        <!-- Legend -->
+        <g data-legend="">
+          <text x="40" y="546" class="t-primary" font-size="12" font-weight="650">图例</text>
+          <g data-legend-semantic-kind="emphasis" data-legend-x="40" data-legend-baseline="566" data-legend-width="93">
+            <path d="M 40 563 L 74 563" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+            <text x="83" y="566" class="t-muted" font-size="10" font-weight="500">主路径请求</text>
+          </g>
+          <g data-legend-semantic-kind="return" data-legend-x="155" data-legend-baseline="566" data-legend-width="63">
+            <path d="M 155 563 L 189 563" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+            <text x="198" y="566" class="t-muted" font-size="10" font-weight="500">返回</text>
+          </g>
+          <g data-legend-semantic-kind="dashed" data-legend-x="240" data-legend-baseline="566" data-legend-width="83">
+            <path d="M 240 563 L 274 563" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+            <text x="283" y="566" class="t-muted" font-size="10" font-weight="500">异步追踪</text>
+          </g>
+          <g data-legend-semantic-kind="default" data-legend-x="345" data-legend-baseline="566" data-legend-width="83">
+            <path d="M 345 563 L 379 563" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+            <text x="388" y="566" class="t-muted" font-size="10" font-weight="500">普通消息</text>
+          </g>
+        </g>
+      </svg>
