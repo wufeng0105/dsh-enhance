@@ -3,136 +3,136 @@
 [![CI](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml/badge.svg)](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Append your own text to the end of DeepSeek Harness's system prompt. Saved to disk, effective on the next message.
+在 DeepSeek Harness 的系统提示末尾追加一段你自己写的文本——人设、内容边界、破甲词都行。存盘即生效，下一条消息就带上。不用重启，不改宿主。
 
-[简体中文](./README.zh-CN.md) | English
+简体中文 | [English](./README.en.md)
 
-## What it does
+## 它做什么
 
-DeepSeek Harness assembles a long system prompt before every reply: who it is, which tools it may call, which tone to use. That text is the host's own, and it leaves you no seam to write into.
+DeepSeek Harness 每次回答前，都会先读一段很长的系统提示：它是谁、能调哪些工具、该用什么语气。这段内容由宿主自己拼，没留给你改的位置。
 
-`dsh-enhance` is a cordis plugin bundle that registers one extra prompt section and appends it after the host's persona suffix. You write the words; the host's own prompt stays byte-for-byte untouched.
+`dsh-enhance` 是一个 cordis 插件 bundle：它注册多一段提示词，接在宿主的 persona suffix 后面。文字你写，宿主自己的提示词一个字节不动。
 
-- **Content boundary** — one text file, up to 8 KB, injected at the end of every system prompt.
-- **Out-of-scope approval** — when an action exceeds the current permission preset, answer it automatically, ask the user, or refuse.
-- **Enhanced preset** *(optional)* — add a "sandbox fully open, still asks" permission preset to your profile.
-- **Check** — read the session log back and prove the text really reached the prompt.
-- **Bounded compatibility** — one `engines.dsh` range, verified against `DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）`. The host itself enforces it at install and at startup.
+- **内容边界**——一个文本文件，最多 8 KB，接在每条系统提示的末尾。
+- **越界审批**——动作超出当前档位允许的范围时，自动放行、问你要么直接回绝，你选。
+- **Enhanced 权限档**（可选）——往你的 profile 里多加一个「沙箱全开、越界仍问你」的档位。
+- **检查**——读会话日志读回来，证明这段文字真的进了提示词。
+- **有界的兼容性**——一条 `engines.dsh` 区间，已对 `DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）` 核验过。宿主自己在装的时候和启动的时候都执行这条声明。
 
-## Contents
+## 目录
 
-- [What it does](#what-it-does)
-- [Install](#install)
-  - [Dependencies](#dependencies)
-- [Usage](#usage)
-  - [Settings page](#settings-page)
-  - [Uninstall](#uninstall)
-- [How it fits together](#how-it-fits-together)
-  - [One message, end to end](#one-message-end-to-end)
-  - [One save, end to end](#one-save-end-to-end)
-- [Compatibility](#compatibility)
-- [The Enhanced preset](#the-enhanced-preset)
-- [Maintainer](#maintainer)
-- [Contributing](#contributing)
-- [License](#license)
+- [它做什么](#它做什么)
+- [安装](#安装)
+  - [依赖](#依赖)
+- [用法](#用法)
+  - [设置页](#设置页)
+  - [卸载](#卸载)
+- [它怎么接进去的](#它怎么接进去的)
+  - [一条消息的全程](#一条消息的全程)
+  - [一次保存的全程](#一次保存的全程)
+- [兼容性](#兼容性)
+- [Enhanced 权限档](#enhanced-权限档)
+- [维护者](#维护者)
+- [如何贡献](#如何贡献)
+- [许可证](#许可证)
 
-## Install
+## 安装
 
 ```powershell
 dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
 ```
 
-Restart DeepSeek Harness afterwards. Nothing else is required — no separate Node install, no host configuration edit.
+装完重启 DeepSeek Harness。别的都不用做——不用单独装 Node，不用改宿主配置。
 
-To install from a clone instead:
+想从 clone 装：
 
 ```powershell
 git clone https://github.com/wufeng0105/dsh-enhance.git
 dsh plugin --profile desktop add .\dsh-enhance
 ```
 
-### Dependencies
+### 依赖
 
-Node.js ≥ 22 (the host already ships one) and a DeepSeek Harness within the verified range above.
+Node.js ≥ 22（宿主自带一个），以及落在上面那个已验区间里的 DeepSeek Harness。
 
-## Usage
+## 用法
 
-Write the text you want appended. Either edit the file the plugin created, or use the settings page:
+写下你想追加的那段文字。改插件建好的文件，或者直接用设置页：
 
 ```powershell
-# <DSH_HOME>/enhance/content-scope.txt holds the text itself.
-# <DSH_HOME>/enhance/state.json holds three switches.
+# <DSH_HOME>/enhance/content-scope.txt 放文字本身。
+# <DSH_HOME>/enhance/state.json 放三个开关。
 notepad "$env:USERPROFILE\.dsh\enhance\content-scope.txt"
 ```
 
-The three switches decide whether and how it applies:
+三个开关决定它起不起作用、怎么起作用：
 
-| Field | Default | Meaning |
+| 字段 | 默认 | 管什么 |
 | --- | --- | --- |
-| `enabled` | on | Master switch. Off stops everything. |
-| `contentScope` | on | Off detaches the text from the prompt. |
-| `approval` | depends | `allow` / `ask` / `deny` — how to answer an out-of-scope approval request. |
+| `enabled` | 开 | 总开关。关掉 = 全部停下。 |
+| `contentScope` | 开 | 关掉 = 不接那段文本。 |
+| `approval` | 看情况 | `allow` / `ask` / `deny`——越界时自动同意、先问我、自动回绝。 |
 
-A damaged `state.json` never grants silent permission: it falls back to `ask`.
+`state.json` 坏了不会静默放行：回落到「先问我」。
 
-### Settings page
+### 设置页
 
-Restarting the host adds an **Enhance** section to DSH's settings page with four groups: content boundary, out-of-scope approval, Enhanced preset, and check. It writes to the same two files, so the text area and the file stay in sync.
+重启后，DSH 的设置页里会多出「增强」一节，四组：内容边界、越界审批、Enhanced 权限档、检查。它写的是同样那两个文件，所以页面里的文本框和你手改的文件始终一致。
 
-### Uninstall
+### 卸载
 
 ```powershell
 dsh plugin --profile desktop remove dsh-enhance
 ```
 
-Then restart. Your text and switches under `<DSH_HOME>/enhance/` are kept; delete that directory to remove them too.
+然后重启。`<DSH_HOME>/enhance/` 里你写的文本和开关会保留；想一并清掉就删掉那个目录。
 
-## How it fits together
+## 它怎么接进去的
 
-The bundle inserts three entries into the profile's `cordis.patch.yml`. Nothing else in the host is touched.
+这个 bundle 往 profile 的 `cordis.patch.yml` 里插三条入口。宿主其他地方一律不碰。
 
-![Host composition and the three plugin seams](./docs/figures/01-host-seams.svg)
+![宿主组合与三个插件的接缝](./docs/figures/01-host-seams.svg)
 
-`enhance-scope` registers the prompt section and serves the settings page's only endpoint; `auto-approve` answers approval requests; the browser half of the UI mounts into the host's settings slot.
+`enhance-scope` 注册提示词段、给设置页提供唯一那个接口；`auto-approve` 应答审批请求；界面那半挂在宿主的设置槽位上。
 
-### One message, end to end
+### 一条消息的全程
 
-Your text reaches the prompt through a callback the host invokes on every assembly — the section's order is read from the host's own persona-suffix order, not hard-coded.
+你的文字是靠宿主每次装配时回调一个函数进入提示词的——这一段的 order 是从宿主自己的 persona suffix 顺序读来的，不是写死的数。
 
-![How one message reaches the system prompt](./docs/figures/02-prompt-injection.svg)
+![一条消息怎么进到系统提示末尾](./docs/figures/02-prompt-injection.svg)
 
-### One save, end to end
+### 一次保存的全程
 
-The settings page writes through one route on the host's own local HTTP server. The text is size-checked *before* any state changes, so an oversized save leaves both files exactly as they were.
+设置页走宿主本地 HTTP 服务上唯一那条路由。文字先验大小、**再**改状态，所以超限的保存不会把两个文件改坏。
 
-![The settings page save round trip](./docs/figures/03-save-roundtrip.svg)
+![设置页一次保存的往返](./docs/figures/03-save-roundtrip.svg)
 
-## Compatibility
+## 兼容性
 
-`engines.dsh` in `package.json` is the single source of truth. The host reads it at install, after install, and at profile startup — it refuses an incompatible version rather than loading it.
+`package.json` 里的 `engines.dsh` 是唯一权威。宿主在装前、装后、启动装载时都会读它——不兼容的版本会被直接拒掉，而不是装进去再说。
 
-When a new DeepSeek Harness release appears, the routine check below takes about 15 minutes and ends in one reviewable diff:
+DeepSeek Harness 出了新版本，下面这套流程约 15 分钟跑完，最后只剩一处可审的 diff：
 
-![The routine compatibility check](./docs/figures/04-compat-verify.svg)
+![例行核验五步](./docs/figures/04-compat-verify.svg)
 
-The full contract — which host seams are verified, how the range is enforced, and how to widen it — lives in [docs/compatibility.md](./docs/compatibility.md).
+完整契约——核了哪些宿主接缝、这条区间怎么被执行、怎么扩区间——在 [docs/compatibility.md](./docs/compatibility.md)。
 
-## The Enhanced preset
+## Enhanced 权限档
 
-`danger-full-access` means "sandbox fully open **and** never ask". If you want "sandbox fully open, still ask", you need a custom preset, and the host only knows preset names defined in your profile.
+`danger-full-access` 的意思是「沙箱全开 **而且** 从不问人」。想要「沙箱全开、但仍问你」，得有一个自定义档，而宿主只认 profile 里定义过的档名。
 
-![Writing, activating and removing the Enhanced preset](./docs/figures/05-enhanced-preset.svg)
+![Enhanced 档的写入、生效与撤净](./docs/figures/05-enhanced-preset.svg)
 
-Writing it is the only action in this package that touches host configuration, and it happens only when you click the button. The preset table is written in full, because a profile patch replaces `config` wholesale rather than merging it — writing only the new preset would silently delete the three built-in ones. Your default preset is never changed, and every write leaves a timestamped `.bak` beside the patch.
+写档是这个包里唯一会碰宿主配置的动作，而且只在你点那个按钮时才发生。档位表是写全的——profile patch 的 `config` 是整块替换而不是合并，只写新档会把内置三档一起抹掉。你的默认档位不会被改，每次写档都会在 patch 旁边留一份带时间戳的 `.bak`。
 
-## Maintainer
+## 维护者
 
 [wufeng0105](https://github.com/wufeng0105)
 
-## Contributing
+## 如何贡献
 
-Issues and pull requests are welcome on [GitHub](https://github.com/wufeng0105/dsh-enhance/issues). Before opening a pull request, run `node scripts/check.mjs` — it runs six gates (version, syntax, tests, structure, docs, bundle) and must exit 0. Contributions must keep the terms in [docs/terminology.md](./docs/terminology.md) consistent, and the compatibility sentence in this README is derived from `package.json`, so changing the version range means changing the declaration first.
+issue 与 pull request 都在 [GitHub](https://github.com/wufeng0105/dsh-enhance/issues) 上开。提 PR 之前先跑 `node scripts/check.mjs`——它跑六道门禁（version / syntax / tests / graph / docs / bundle），必须 exit 0。改动要保持 [docs/terminology.md](./docs/terminology.md) 里的术语一致；README 里那句适用版本是从 `package.json` 派生的，改版本区间要先改声明。
 
-## License
+## 许可证
 
-MIT © 2026 wufeng0105 — see [LICENSE](./LICENSE).
+MIT © 2026 wufeng0105——见 [LICENSE](./LICENSE)。
