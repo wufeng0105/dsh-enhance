@@ -131,7 +131,7 @@ DeepSeek Harness 出了新版本，下面这套流程约 15 分钟跑完，最�
 
 ## 如何贡献
 
-issue 与 pull request 都在 [GitHub](https://github.com/wufeng0105/dsh-enhance/issues) 上开。提 PR 之前先跑 `node scripts/check.mjs`——它跑六道门禁（version / syntax / tests / graph / docs / bundle），必须 exit 0。改动要保持 [docs/terminology.md](./docs/terminology.md) 里的术语一致；README 里那句适用版本是从 `package.json` 派生的，改版本区间要先改声明。
+issue 与 pull request 都在 [GitHub](https://github.com/wufeng0105/dsh-enhance/issues) 上开。提 PR 之前先跑 `node scripts/check.mjs`——它跑七道门禁（version / syntax / tests / graph / docs / readme / bundle），必须 exit 0。改动要保持 [docs/terminology.md](./docs/terminology.md) 里的术语一致；README 里那句适用版本是从 `package.json` 派生的，改版本区间要先改声明。
 
 ## 许可证
 

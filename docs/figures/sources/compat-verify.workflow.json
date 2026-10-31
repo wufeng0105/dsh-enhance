@@ -1,0 +1,328 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "例行核验五步",
+    "output": "docs/figures/sources/04-compat-verify.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/wufeng0105/dsh-enhance",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "bfe1ef22a58e8b135b797380968e2daa75bdb026"
+    }
+  },
+  "lanes": [
+    {
+      "id": "repo",
+      "label": "本仓"
+    },
+    {
+      "id": "upstream",
+      "label": "上游 deepseek-harness"
+    },
+    {
+      "id": "machine",
+      "label": "本机 DSH"
+    },
+    {
+      "id": "stop",
+      "label": "放行与停手",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "count",
+      "label": "数触点",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "diff",
+      "label": "比上游",
+      "fromCol": 1,
+      "toCol": 3
+    },
+    {
+      "id": "judge",
+      "label": "判接缝",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "declare",
+      "label": "放行与声明",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "recount",
+    "treediff",
+    "sha_same",
+    "read_diff",
+    "seam",
+    "smoke",
+    "declare"
+  ],
+  "nodes": [
+    {
+      "id": "recount",
+      "lane": "repo",
+      "col": 0,
+      "type": "frontend",
+      "label": "重数触点",
+      "sublabel": "grep 重推这张表",
+      "tag": "35 条独立触点",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 79,
+          "end_line": 81,
+          "label": "口径：独立触点项"
+        },
+        {
+          "path": "docs/compatibility.md",
+          "line": 58,
+          "end_line": 73,
+          "label": "触点表"
+        }
+      ]
+    },
+    {
+      "id": "treediff",
+      "lane": "upstream",
+      "col": 1,
+      "type": "backend",
+      "label": "逐包 tree-diff",
+      "sublabel": "比 tree SHA",
+      "tag": "不信文件列表",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 83,
+          "end_line": 107,
+          "label": "取 SHA 的命令"
+        }
+      ]
+    },
+    {
+      "id": "sha_same",
+      "lane": "upstream",
+      "col": 2,
+      "type": "security",
+      "label": "SHA 全同？",
+      "sublabel": "同 = 没动",
+      "tag": "判断题",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 108,
+          "label": "全同就放行"
+        }
+      ]
+    },
+    {
+      "id": "read_diff",
+      "lane": "upstream",
+      "col": 3,
+      "type": "backend",
+      "label": "读 diff",
+      "sublabel": "有变更看内容",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 110,
+          "end_line": 119,
+          "label": "取 blob 原文"
+        }
+      ]
+    },
+    {
+      "id": "seam",
+      "lane": "upstream",
+      "col": 4,
+      "type": "security",
+      "label": "动到接缝？",
+      "sublabel": "槽位 / 配置形状",
+      "tag": "判断题",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 108,
+          "label": "埋点与重构不算接缝"
+        }
+      ]
+    },
+    {
+      "id": "smoke",
+      "lane": "machine",
+      "col": 5,
+      "type": "backend",
+      "label": "隔离冒烟",
+      "sublabel": "装、写档、摘档",
+      "tag": "exit 0 才过",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 121,
+          "end_line": 149,
+          "label": "六步冒烟"
+        },
+        {
+          "path": "tools/smoke.mjs",
+          "line": 145,
+          "end_line": 169,
+          "label": "写档重启摘档断言"
+        }
+      ]
+    },
+    {
+      "id": "declare",
+      "lane": "repo",
+      "col": 5,
+      "type": "cloud",
+      "label": "改声明",
+      "sublabel": "两端一起动",
+      "tag": "跑 check.mjs",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 151,
+          "end_line": 153,
+          "label": "改声明步骤"
+        },
+        {
+          "path": "package.json",
+          "line": 10,
+          "label": "engines.dsh"
+        },
+        {
+          "path": "scripts/check.mjs",
+          "line": 99,
+          "end_line": 175,
+          "label": "version 门禁"
+        }
+      ]
+    },
+    {
+      "id": "pass_sha",
+      "lane": "stop",
+      "col": 2,
+      "type": "external",
+      "label": "放行：没动",
+      "sublabel": "记一笔不改代码",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 108,
+          "label": "SHA 全同的结论"
+        }
+      ]
+    },
+    {
+      "id": "pass_seam",
+      "lane": "stop",
+      "col": 3,
+      "type": "external",
+      "label": "放行：没碰接缝",
+      "sublabel": "埋点、注释、重构",
+      "width": 148,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 108,
+          "label": "不算接缝的改动"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "count-to-diff",
+      "from": "recount",
+      "to": "treediff",
+      "label": "重推后的表",
+      "variant": "emphasis"
+    },
+    {
+      "id": "diff-to-sha",
+      "from": "treediff",
+      "to": "sha_same"
+    },
+    {
+      "id": "sha-to-read",
+      "from": "sha_same",
+      "to": "read_diff",
+      "label": "SHA 有差异",
+      "variant": "emphasis"
+    },
+    {
+      "id": "sha-to-pass",
+      "from": "sha_same",
+      "to": "pass_sha",
+      "label": "SHA 全同",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "read-to-seam",
+      "from": "read_diff",
+      "to": "seam"
+    },
+    {
+      "id": "seam-to-pass",
+      "from": "seam",
+      "to": "pass_seam",
+      "label": "没碰接缝",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "seam-to-smoke",
+      "from": "seam",
+      "to": "smoke",
+      "label": "动了接缝",
+      "variant": "security"
+    },
+    {
+      "id": "smoke-to-declare",
+      "from": "smoke",
+      "to": "declare",
+      "label": "冒烟 exit 0",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "两个判断题不是形式主义",
+      "items": [
+        "SHA 全同 → 这个触点没动，不处理",
+        "SHA 变了 → 必须读内容：埋点、注释、内部重构不影响接缝",
+        "改到 ctx.slots、config 形状或装载协议才要处理"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "真会话这一步仍未验",
+      "items": [
+        "没有余额的机器上，inject 项必红——记录，不下结论",
+        "别把「没跑」读成「回退了」",
+        "扩区间前两端一起动：engines.dsh 与 dsh.compatibility 同一次改"
+      ]
+    }
+  ]
+}

@@ -3,11 +3,11 @@
  * 门禁总入口。
  *
  * 分层：
- *   fast  version、syntax、tests、graph（结构）、docs、bundle
+ *   fast  version、syntax、tests、graph（结构）、docs、readme、bundle
  *   full  fast + 有 docs/generated 时的 graph --strict
  *
  * 每道门禁都必须能红。`--self-test` 用一次性副本证明这一点：坏语法文件、坏测试、
- * 未登记的源文件、死链、坏 bundle 声明、超限文本。
+ * 未登记的源文件、死链、坏 README 里的图路径、坏 bundle 声明、超限文本。
  *
  * 用法：
  *   node scripts/check.mjs [--layer fast|full] [--self-test]
@@ -22,6 +22,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { codeFiles as codeFilesIn } from './code-files.mjs'
 import { copyRepoTree } from './repo-copy.mjs'
+import { gateReadme } from './check-readme.mjs'
 import { basisLabel, declarationOf, displayRange, inRange, parseEnginesDsh } from '../shared/compat.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -248,6 +249,18 @@ function gateDocs(base = root) {
   if (result.code === 0) return { pass: true, detail: result.output.split(/\r?\n/)[0] ?? 'docs' }
   const failed = result.output.split(/\r?\n/).filter((line) => line.trim().startsWith('- ')).slice(0, 3)
   return { pass: false, detail: failed.join(' | ') || 'docs-check exited non-zero' }
+}
+
+/**
+ * README 门禁：结构性的写作约束——章节顺序、站内链接是否失效、图是否真的存在、
+ * ToC 是否覆盖全部二级标题、代码块有没有标语言、许可证是不是最后一节。
+ *
+ * 与 version 门不重叠：version 门只管「README 必须逐字含 package.json 派生的那句
+ * 适用版本」，这里管其余部分。
+ */
+function gateReadmeGate(base = root) {
+  const result = gateReadme(base)
+  return { pass: result.pass, detail: result.detail }
 }
 
 /**
@@ -528,6 +541,18 @@ function runSelfTest() {
     (copy) => expectRed('例行核验')(gateVersion(copy, { dshVersion: '0.9.9' })),
   ))
 
+  cases.push(withCopy(
+    'readme red',
+    // README 门禁：图路径改成不存在的文件必须判红——链接红掉没人知道是常事
+    (copy) => {
+      const file = join(copy, 'README.md')
+      const text = readFileSync(file, 'utf8')
+      const reverted = text.replace('./docs/figures/01-host-seams.svg', './docs/figures/nope.svg')
+      assertMutated(copy, 'README.md', text, reverted)
+    },
+    (copy) => expectRed('图片存在')(gateReadmeGate(copy)),
+  ))
+
   return cases
 }
 
@@ -550,6 +575,7 @@ const gates = [
   ['tests', gateTests],
   ['graph', gateGraph],
   ['docs', gateDocs],
+  ['readme', gateReadmeGate],
   ['bundle', gateBundle],
 ]
 if (layer === 'full') {

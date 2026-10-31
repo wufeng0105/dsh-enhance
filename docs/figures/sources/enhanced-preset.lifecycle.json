@@ -1,0 +1,294 @@
+{
+  "schema_version": 2,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Enhanced 档：写入 → 重启生效 → 撤净",
+    "output": "docs/figures/sources/05-enhanced-preset.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/wufeng0105/dsh-enhance",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "bfe1ef22a58e8b135b797380968e2daa75bdb026"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "用户点击那条路"
+    },
+    {
+      "id": "fail",
+      "label": "拒绝与手工收尾"
+    }
+  ],
+  "states": [
+    {
+      "id": "absent",
+      "type": "start",
+      "label": "未写入",
+      "sublabel": "patch 里没有 enhanced",
+      "lane": "main",
+      "col": 0,
+      "sources": [
+        {
+          "path": "shared/preset.mjs",
+          "line": 283,
+          "end_line": 354,
+          "label": "写档入口"
+        },
+        {
+          "path": "shared/preset.mjs",
+          "line": 33,
+          "end_line": 43,
+          "label": "档名与四档表"
+        }
+      ]
+    },
+    {
+      "id": "written",
+      "type": "active",
+      "label": "已写入，待重启",
+      "sublabel": "完整四档 + .bak + 归属记录",
+      "lane": "main",
+      "col": 1,
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 611,
+          "end_line": 628,
+          "label": "备份后原子写"
+        },
+        {
+          "path": "shared/preset.mjs",
+          "line": 443,
+          "end_line": 478,
+          "label": "归属记录落盘"
+        }
+      ]
+    },
+    {
+      "id": "effective",
+      "type": "success",
+      "label": "已生效",
+      "sublabel": "重启后组合树里出现 Enhanced",
+      "lane": "main",
+      "col": 2,
+      "sources": [
+        {
+          "path": "tools/smoke.mjs",
+          "line": 145,
+          "end_line": 169,
+          "label": "重启后组合断言"
+        },
+        {
+          "path": "docs/compatibility.md",
+          "line": 175,
+          "end_line": 179,
+          "label": "表外档名是显示契约"
+        }
+      ]
+    },
+    {
+      "id": "removed",
+      "type": "success",
+      "label": "已撤净",
+      "sublabel": "逐字节还原，或只摘那三行",
+      "lane": "main",
+      "col": 3,
+      "sources": [
+        {
+          "path": "shared/preset.mjs",
+          "line": 380,
+          "end_line": 438,
+          "label": "摘档实现"
+        },
+        {
+          "path": "shared/preset.mjs",
+          "line": 398,
+          "end_line": 404,
+          "label": "有没有被改过的判据"
+        }
+      ]
+    },
+    {
+      "id": "no_profile",
+      "type": "failure",
+      "label": "拿不到 profile 上下文",
+      "sublabel": "不是从 profile 启动的",
+      "lane": "fail",
+      "col": 0,
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 588,
+          "label": "EPROFILE 409"
+        }
+      ]
+    },
+    {
+      "id": "bad_shape",
+      "type": "failure",
+      "label": "档位表形态认不出",
+      "sublabel": "为了不写坏配置，一律不动",
+      "lane": "fail",
+      "col": 1,
+      "sources": [
+        {
+          "path": "shared/preset.mjs",
+          "line": 287,
+          "end_line": 289,
+          "label": "unreadable 判定"
+        }
+      ]
+    },
+    {
+      "id": "no_record",
+      "type": "failure",
+      "label": "没有归属记录",
+      "sublabel": "不替你猜是不是我们写的",
+      "lane": "fail",
+      "col": 2,
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 629,
+          "label": "ERECORD 409"
+        },
+        {
+          "path": "shared/preset.mjs",
+          "line": 443,
+          "end_line": 478,
+          "label": "记录读写"
+        }
+      ]
+    },
+    {
+      "id": "manual",
+      "type": "neutral",
+      "label": "手工删那三行",
+      "sublabel": "记录对不上时的出路",
+      "lane": "fail",
+      "col": 3,
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 629,
+          "label": "错误消息里的指引"
+        }
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "id": "write",
+      "from": "absent",
+      "to": "written",
+      "label": "点写入",
+      "variant": "emphasis"
+    },
+    {
+      "id": "restart",
+      "from": "written",
+      "to": "effective",
+      "label": "重启（宿主重新组合）",
+      "variant": "emphasis"
+    },
+    {
+      "id": "remove",
+      "from": "effective",
+      "to": "removed",
+      "label": "点移除",
+      "variant": "security"
+    },
+    {
+      "id": "remove-before-restart",
+      "from": "written",
+      "to": "removed",
+      "label": "还没重启就撤",
+      "variant": "dashed",
+      "route": "top-channel"
+    },
+    {
+      "id": "shape-fail",
+      "from": "absent",
+      "to": "bad_shape",
+      "label": "认不出就不动",
+      "variant": "security",
+      "route": "drop",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "shape-retry",
+      "from": "bad_shape",
+      "to": "absent",
+      "label": "改成块风格后重试",
+      "variant": "dashed"
+    },
+    {
+      "id": "no-ctx",
+      "from": "absent",
+      "to": "no_profile",
+      "label": "非 profile 启动",
+      "variant": "security",
+      "route": "drop",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "record-missing",
+      "from": "effective",
+      "to": "no_record",
+      "label": "记录被删或换了 profile",
+      "variant": "security",
+      "route": "drop",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "manual-fix",
+      "from": "no_record",
+      "to": "manual",
+      "label": "按提示手工删",
+      "variant": "dashed"
+    },
+    {
+      "id": "manual-done",
+      "from": "manual",
+      "to": "removed",
+      "label": "删完即撤净",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "config 是整块替换",
+      "items": [
+        "profile patch 的 config 不是深合并：只写一条 enhanced，基础三档会连根拔掉",
+        "所以写的是完整表：宿主三档 + enhanced",
+        "defaultPreset 一概不写——不改用户默认档"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "备份与还原",
+      "items": [
+        "写和摘都先落一份 cordis.patch.yml.bak-enhance-<时间>",
+        "还原判据：拿记录里的原文再跑一次写档，结果与此刻字节相同 = 中间没人改过",
+        "被改过就不整行摘，退到只摘 enhanced 那三行，免得连带删掉用户的改动"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "一个档三层名字",
+      "items": [
+        "patch 里的键名是 enhanced，档位菜单里是纯文字 Enhanced",
+        "设置页那一组叫「Enhanced 权限档」，检查项里那项叫「Enhanced 档」",
+        "四层名字并存是有意的，别统一成一个"
+      ]
+    }
+  ]
+}

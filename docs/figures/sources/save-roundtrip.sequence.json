@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "设置页一次保存的往返",
+    "output": "docs/figures/sources/03-save-roundtrip.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "repository": {
+      "url": "https://github.com/wufeng0105/dsh-enhance",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "bfe1ef22a58e8b135b797380968e2daa75bdb026"
+    },
+    "viewBox": [
+      1040,
+      660
+    ]
+  },
+  "participants": [
+    {
+      "id": "page",
+      "type": "frontend",
+      "label": "设置页",
+      "sublabel": "ui/client.js",
+      "sources": [
+        {
+          "path": "ui/client.js",
+          "line": 29,
+          "end_line": 45,
+          "label": "call() 发请求"
+        },
+        {
+          "path": "ui/client.js",
+          "line": 533,
+          "label": "保存按钮"
+        },
+        {
+          "path": "ui/client.js",
+          "line": 378,
+          "end_line": 382,
+          "label": "adopt 换状态"
+        }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "backend",
+      "label": "宿主 webServer",
+      "sublabel": "exact 路由表",
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 647,
+          "end_line": 651,
+          "label": "路由注册"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 480,
+          "end_line": 482,
+          "label": "运行期注入"
+        }
+      ]
+    },
+    {
+      "id": "route",
+      "type": "backend",
+      "label": "路由处理",
+      "sublabel": "enhance-scope",
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 681,
+          "end_line": 701,
+          "label": "set op 分支"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 87,
+          "end_line": 106,
+          "label": "来源校验"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 112,
+          "end_line": 132,
+          "label": "读体限长"
+        }
+      ]
+    },
+    {
+      "id": "store",
+      "type": "backend",
+      "label": "shared/state",
+      "sublabel": "唯一读写口",
+      "sources": [
+        {
+          "path": "shared/state.mjs",
+          "line": 178,
+          "end_line": 190,
+          "label": "writeText"
+        },
+        {
+          "path": "shared/state.mjs",
+          "line": 68,
+          "end_line": 86,
+          "label": "原子写"
+        },
+        {
+          "path": "shared/state.mjs",
+          "line": 25,
+          "end_line": 26,
+          "label": "8 KB 上限"
+        }
+      ]
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "<home>/enhance/",
+      "sublabel": "state.json + 文本",
+      "sources": [
+        {
+          "path": "shared/state.mjs",
+          "line": 40,
+          "end_line": 51,
+          "label": "两个文件路径"
+        },
+        {
+          "path": "shared/state.mjs",
+          "line": 50,
+          "end_line": 56,
+          "label": "归一口径"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 322,
+      "label": "进门与先验（超限即停）"
+    },
+    {
+      "from": 327,
+      "to": 448,
+      "label": "通过后落盘"
+    },
+    {
+      "from": 452,
+      "to": 530,
+      "label": "回快照"
+    }
+  ],
+  "messages": [
+    {
+      "id": "post",
+      "from": "page",
+      "to": "web",
+      "y": 160,
+      "label": "POST /enhance/api {op:set,text}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "dispatch",
+      "from": "web",
+      "to": "route",
+      "y": 190,
+      "label": "exact 路由交给 handler",
+      "variant": "default"
+    },
+    {
+      "id": "precheck",
+      "from": "route",
+      "to": "store",
+      "y": 220,
+      "label": "normalizeForWrite：先验 8 KB",
+      "variant": "default"
+    },
+    {
+      "id": "too-large",
+      "from": "store",
+      "to": "route",
+      "y": 250,
+      "label": "超限：抛 ETOOLARGE",
+      "variant": "return"
+    },
+    {
+      "id": "reject",
+      "from": "route",
+      "to": "web",
+      "y": 280,
+      "label": "413 ETOOLARGE",
+      "variant": "security"
+    },
+    {
+      "id": "no-write",
+      "from": "web",
+      "to": "page",
+      "y": 310,
+      "label": "错误行：状态未被改动",
+      "variant": "return"
+    },
+    {
+      "id": "write",
+      "from": "route",
+      "to": "store",
+      "y": 345,
+      "label": "writeState + writeText",
+      "variant": "emphasis"
+    },
+    {
+      "id": "atomic",
+      "from": "store",
+      "to": "disk",
+      "y": 375,
+      "label": "同目录 temp + rename",
+      "variant": "default"
+    },
+    {
+      "id": "snapshot",
+      "from": "route",
+      "to": "store",
+      "y": 405,
+      "label": "snapshot()",
+      "variant": "default"
+    },
+    {
+      "id": "snapshot-back",
+      "from": "store",
+      "to": "route",
+      "y": 435,
+      "label": "文本 / 开关 / 派生 / preset / compat",
+      "variant": "return"
+    },
+    {
+      "id": "ok",
+      "from": "route",
+      "to": "web",
+      "y": 465,
+      "label": "200 + 快照",
+      "variant": "return"
+    },
+    {
+      "id": "adopt",
+      "from": "web",
+      "to": "page",
+      "y": 495,
+      "label": "200 + 快照，页面 adopt()",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "page",
+      "from": 158,
+      "to": 500,
+      "type": "frontend"
+    },
+    {
+      "participant": "web",
+      "from": 158,
+      "to": 500,
+      "type": "backend"
+    },
+    {
+      "participant": "route",
+      "from": 188,
+      "to": 470,
+      "type": "backend"
+    },
+    {
+      "participant": "store",
+      "from": 218,
+      "to": 440,
+      "type": "backend"
+    },
+    {
+      "participant": "disk",
+      "from": 373,
+      "to": 380,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三道门",
+      "items": [
+        "来源：socket 必须是回环 → Host 必须是回环字面量 → Origin 缺失或 app: 或严格同源",
+        "读体：请求体上限是文本上限的 4 倍加 1 KB，超了直接 413",
+        "字段：只认 op / enabled / contentScope / approval / text，多一个键就 EBADOP，不静默忽略"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "先验后写",
+      "items": [
+        "文本超限时，状态也不先被改——归一与上限检查在 writeState 之前",
+        "所以一次超限的保存，两个文件都保持原样",
+        "归一口径：去 BOM → 折 CRLF → 去控制字符 → trim，字节数按归一后算"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "错误码表",
+      "items": [
+        "EORIGIN 403 · EMETHOD 405 · EBADOP 400 · ETOOLARGE 413 · EIO 500",
+        "EPROFILE 409 · ERECORD 409 · EBADSHAPE 422",
+        "另一个 op（preset）写的是 profile patch，不是这两个文件"
+      ]
+    }
+  ]
+}

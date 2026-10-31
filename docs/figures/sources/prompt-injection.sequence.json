@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "一条消息的注入路径",
+    "output": "docs/figures/sources/02-prompt-injection.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "repository": {
+      "url": "https://github.com/wufeng0105/dsh-enhance",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "bfe1ef22a58e8b135b797380968e2daa75bdb026"
+    },
+    "viewBox": [
+      980,
+      620
+    ]
+  },
+  "participants": [
+    {
+      "id": "prompt",
+      "type": "backend",
+      "label": "宿主提示词",
+      "sublabel": "systemPrompt 注册表",
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 58,
+          "end_line": 73,
+          "label": "宿主接缝"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 462,
+          "end_line": 471,
+          "label": "段注册"
+        }
+      ]
+    },
+    {
+      "id": "scope",
+      "type": "backend",
+      "label": "enhance-scope",
+      "sublabel": "注入段",
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 462,
+          "end_line": 471,
+          "label": "section 注册"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 449,
+          "end_line": 460,
+          "label": "每次现算"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 46,
+          "label": "段名"
+        }
+      ]
+    },
+    {
+      "id": "state",
+      "type": "backend",
+      "label": "shared/state",
+      "sublabel": "开关与文本",
+      "sources": [
+        {
+          "path": "shared/state.mjs",
+          "line": 164,
+          "end_line": 170,
+          "label": "读文本"
+        },
+        {
+          "path": "shared/state.mjs",
+          "line": 229,
+          "end_line": 242,
+          "label": "派生 injecting"
+        }
+      ]
+    },
+    {
+      "id": "file",
+      "type": "database",
+      "label": "内容边界文本",
+      "sublabel": "content-scope.txt",
+      "sources": [
+        {
+          "path": "shared/state.mjs",
+          "line": 164,
+          "end_line": 170,
+          "label": "读文件"
+        },
+        {
+          "path": "shared/state.mjs",
+          "line": 50,
+          "end_line": 56,
+          "label": "归一口径"
+        }
+      ]
+    },
+    {
+      "id": "probe",
+      "type": "backend",
+      "label": "会话探针",
+      "sublabel": "只读",
+      "sources": [
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 123,
+          "end_line": 171,
+          "label": "扫最近十份"
+        },
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 152,
+          "end_line": 159,
+          "label": "只认 system-prompt 行"
+        }
+      ]
+    },
+    {
+      "id": "log",
+      "type": "database",
+      "label": "会话日志",
+      "sublabel": "session.v4.jsonl.zstd",
+      "sources": [
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 33,
+          "label": "文件名与两层目录"
+        },
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 81,
+          "end_line": 102,
+          "label": "逐帧解压"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 325,
+      "label": "装配"
+    },
+    {
+      "from": 330,
+      "to": 475,
+      "label": "读回验证"
+    }
+  ],
+  "messages": [
+    {
+      "id": "assemble-calls-text",
+      "from": "prompt",
+      "to": "scope",
+      "y": 160,
+      "label": "装配时回调 text()",
+      "variant": "default"
+    },
+    {
+      "id": "scope-reads-state",
+      "from": "scope",
+      "to": "state",
+      "y": 190,
+      "label": "readState + readText",
+      "variant": "default"
+    },
+    {
+      "id": "state-reads-file",
+      "from": "state",
+      "to": "file",
+      "y": 220,
+      "label": "读 content-scope.txt",
+      "variant": "default"
+    },
+    {
+      "id": "file-returns",
+      "from": "file",
+      "to": "state",
+      "y": 250,
+      "label": "文件正文",
+      "variant": "return"
+    },
+    {
+      "id": "state-returns",
+      "from": "state",
+      "to": "scope",
+      "y": 280,
+      "label": "归一后的文本 + 三个开关",
+      "variant": "return"
+    },
+    {
+      "id": "scope-returns-text",
+      "from": "scope",
+      "to": "prompt",
+      "y": 310,
+      "label": "返回文本，或空串",
+      "variant": "emphasis"
+    },
+    {
+      "id": "prompt-writes-log",
+      "from": "prompt",
+      "to": "log",
+      "y": 340,
+      "label": "落成 system-prompt 记录",
+      "variant": "dashed"
+    },
+    {
+      "id": "scope-asks-probe",
+      "from": "scope",
+      "to": "probe",
+      "y": 370,
+      "label": "check：sessionContains(文本)",
+      "variant": "dashed"
+    },
+    {
+      "id": "probe-reads-log",
+      "from": "probe",
+      "to": "log",
+      "y": 400,
+      "label": "最近 10 份，逐帧解压",
+      "variant": "default"
+    },
+    {
+      "id": "log-returns",
+      "from": "log",
+      "to": "probe",
+      "y": 430,
+      "label": "只认含 system-prompt 的行",
+      "variant": "return"
+    },
+    {
+      "id": "probe-reports",
+      "from": "probe",
+      "to": "scope",
+      "y": 460,
+      "label": "命中次数 / 未命中",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "prompt",
+      "from": 158,
+      "to": 345,
+      "type": "backend"
+    },
+    {
+      "participant": "scope",
+      "from": 158,
+      "to": 470,
+      "type": "backend"
+    },
+    {
+      "participant": "state",
+      "from": 188,
+      "to": 285,
+      "type": "backend"
+    },
+    {
+      "participant": "file",
+      "from": 218,
+      "to": 255,
+      "type": "database"
+    },
+    {
+      "participant": "probe",
+      "from": 368,
+      "to": 466,
+      "type": "backend"
+    },
+    {
+      "participant": "log",
+      "from": 336,
+      "to": 436,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "为什么落在末尾",
+      "items": [
+        "order 取自 getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX')，不是硬编码的常数",
+        "段名与官方 deployment:persona-suffix 不同名——同名二次注册会抛",
+        "同 order 时宿主按段名定序，enhance: 排在 deployment: 之后，所以接在 persona suffix 后面"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "空串就是不注入",
+      "items": [
+        "text() 返回空串，这一段就不在提示词里；理由进 reason，页面照实显示",
+        "判定链：插件激活 → 总开关 → 内容开关 → 读得到 → 非空 → 不超 8 KB",
+        "文本每次 assembly 都重读；读失败保留上一次好值，不抛"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "读的一侧也管上限",
+      "items": [
+        "derive() 按写入口径判 8 KB——手改文件绕过写入口时，这是唯一拦得住的地方",
+        "超限时整段注入没有信号，所以宁可不注，理由给到人",
+        "探针只认 system-prompt 那条记录；工具结果里出现过同一句话不算命中"
+      ]
+    }
+  ]
+}

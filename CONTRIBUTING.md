@@ -13,7 +13,7 @@
 ## 改之前先跑一遍门禁
 
 ```powershell
-node scripts/check.mjs              # 六道闸：version / syntax / tests / graph / docs / bundle
+node scripts/check.mjs              # 七道闸：version / syntax / tests / graph / docs / readme / bundle
 node scripts/check.mjs --self-test  # 15 个负例，证明每道闸都真的能红
 ```
 

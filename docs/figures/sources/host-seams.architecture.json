@@ -1,0 +1,529 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "宿主组合与三个插件的接缝",
+    "output": "docs/figures/sources/01-host-seams.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/wufeng0105/dsh-enhance",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "bfe1ef22a58e8b135b797380968e2daa75bdb026"
+    }
+  },
+  "layout": {
+    "mode": "grid",
+    "cols": 5,
+    "gapX": 112,
+    "gapY": 52
+  },
+  "components": [
+    {
+      "id": "installer",
+      "type": "external",
+      "label": "dsh plugin add",
+      "sublabel": "装前先过 engines 预检",
+      "row": 0,
+      "col": 0,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 35,
+          "end_line": 44,
+          "label": "三个时机读声明"
+        }
+      ]
+    },
+    {
+      "id": "profile",
+      "type": "database",
+      "label": "profile 目录",
+      "sublabel": "依赖与 bundles 清单",
+      "row": 0,
+      "col": 1,
+      "sources": [
+        {
+          "path": "package.json",
+          "line": 18,
+          "label": "bundle patch 声明"
+        },
+        {
+          "path": "shared/seed.mjs",
+          "line": 73,
+          "label": "profiles/<name>/ 布局"
+        }
+      ]
+    },
+    {
+      "id": "bundle-patch",
+      "type": "backend",
+      "label": "cordis.patch.yml",
+      "sublabel": "三条 insert 声明",
+      "row": 0,
+      "col": 2,
+      "sources": [
+        {
+          "path": "cordis.patch.yml",
+          "line": 10,
+          "end_line": 16,
+          "label": "三个入口"
+        }
+      ]
+    },
+    {
+      "id": "auto-approve",
+      "type": "backend",
+      "label": "auto-approve",
+      "sublabel": "审批三态",
+      "row": 1,
+      "col": 1,
+      "sources": [
+        {
+          "path": "auto-approve/index.js",
+          "line": 22,
+          "end_line": 39,
+          "label": "waterfall 接管"
+        }
+      ]
+    },
+    {
+      "id": "enhance-scope",
+      "type": "backend",
+      "label": "enhance-scope",
+      "sublabel": "注入 + /enhance/api",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 40,
+          "end_line": 43,
+          "label": "入口形状"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 462,
+          "end_line": 471,
+          "label": "section 注册"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 647,
+          "end_line": 651,
+          "label": "exact 路由"
+        }
+      ]
+    },
+    {
+      "id": "ui-host",
+      "type": "backend",
+      "label": "ui/index.js",
+      "sublabel": "宿主半 · 空壳",
+      "row": 1,
+      "col": 3,
+      "sources": [
+        {
+          "path": "ui/index.js",
+          "line": 12,
+          "end_line": 14,
+          "label": "宿主侧无事可做"
+        }
+      ]
+    },
+    {
+      "id": "ui-client",
+      "type": "frontend",
+      "label": "ui/client.js",
+      "sublabel": "浏览器半 · 设置页",
+      "row": 1,
+      "col": 4,
+      "sources": [
+        {
+          "path": "ui/client.js",
+          "line": 726,
+          "end_line": 733,
+          "label": "settings.section 槽位"
+        },
+        {
+          "path": "ui/client.js",
+          "line": 26,
+          "label": "唯一接口路径"
+        }
+      ]
+    },
+    {
+      "id": "host-approval",
+      "type": "security",
+      "label": "宿主 approval",
+      "sublabel": "waterfall 事件",
+      "row": 2,
+      "col": 1,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 58,
+          "end_line": 73,
+          "label": "approval/request 触点"
+        }
+      ]
+    },
+    {
+      "id": "host-prompt",
+      "type": "backend",
+      "label": "宿主 systemPrompt",
+      "sublabel": "有序段注册表",
+      "row": 2,
+      "col": 2,
+      "sources": [
+        {
+          "path": "docs/compatibility.md",
+          "line": 58,
+          "end_line": 73,
+          "label": "cordis 插件 API 触点"
+        }
+      ]
+    },
+    {
+      "id": "host-web",
+      "type": "backend",
+      "label": "宿主 webServer",
+      "sublabel": "exact 路由表",
+      "row": 2,
+      "col": 3,
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 480,
+          "end_line": 482,
+          "label": "运行期可选注入"
+        },
+        {
+          "path": "enhance-scope/index.js",
+          "line": 647,
+          "end_line": 651,
+          "label": "register exact"
+        }
+      ]
+    },
+    {
+      "id": "host-settings",
+      "type": "frontend",
+      "label": "宿主设置页",
+      "sublabel": "settings.section 槽位",
+      "row": 2,
+      "col": 4,
+      "sources": [
+        {
+          "path": "ui/client.js",
+          "line": 726,
+          "end_line": 733,
+          "label": "槽位注册"
+        },
+        {
+          "path": "docs/compatibility.md",
+          "line": 58,
+          "end_line": 73,
+          "label": "设置页分节触点"
+        }
+      ]
+    },
+    {
+      "id": "shared-state",
+      "type": "backend",
+      "label": "shared/state.mjs",
+      "sublabel": "唯一读写口 · temp+rename",
+      "row": 3,
+      "col": 1,
+      "sources": [
+        {
+          "path": "shared/state.mjs",
+          "line": 40,
+          "end_line": 51,
+          "label": "两个数据文件"
+        },
+        {
+          "path": "shared/state.mjs",
+          "line": 68,
+          "end_line": 86,
+          "label": "temp + rename"
+        }
+      ]
+    },
+    {
+      "id": "shared-preset",
+      "type": "backend",
+      "label": "shared/preset.mjs",
+      "sublabel": "patch 行级改写",
+      "row": 3,
+      "col": 2,
+      "sources": [
+        {
+          "path": "shared/preset.mjs",
+          "line": 33,
+          "end_line": 43,
+          "label": "档名与四档表"
+        },
+        {
+          "path": "shared/preset.mjs",
+          "line": 443,
+          "end_line": 478,
+          "label": "归属记录"
+        }
+      ]
+    },
+    {
+      "id": "shared-probe",
+      "type": "backend",
+      "label": "session-probe.mjs",
+      "sublabel": "只读探针 · 逐帧解压",
+      "row": 3,
+      "col": 3,
+      "sources": [
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 33,
+          "label": "会话文件名"
+        },
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 123,
+          "end_line": 171,
+          "label": "最近十份逐帧解"
+        }
+      ]
+    },
+    {
+      "id": "home-dir",
+      "type": "database",
+      "label": "<home>/enhance/",
+      "sublabel": "state.json + 文本",
+      "row": 4,
+      "col": 1,
+      "sources": [
+        {
+          "path": "shared/state.mjs",
+          "line": 40,
+          "end_line": 51,
+          "label": "目录即数据位置"
+        },
+        {
+          "path": "shared/seed.mjs",
+          "line": 73,
+          "label": "首装幂等补齐"
+        }
+      ]
+    },
+    {
+      "id": "profile-patch",
+      "type": "database",
+      "label": "profile patch",
+      "sublabel": "写全表 + .bak",
+      "row": 4,
+      "col": 2,
+      "sources": [
+        {
+          "path": "enhance-scope/index.js",
+          "line": 611,
+          "end_line": 628,
+          "label": "备份后原子写"
+        },
+        {
+          "path": "docs/compatibility.md",
+          "line": 175,
+          "end_line": 179,
+          "label": "config 整块替换"
+        }
+      ]
+    },
+    {
+      "id": "session-log",
+      "type": "database",
+      "label": "会话日志",
+      "sublabel": "session.v4.jsonl.zstd",
+      "row": 4,
+      "col": 3,
+      "sources": [
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 33,
+          "label": "文件与两层目录"
+        },
+        {
+          "path": "shared/session-probe.mjs",
+          "line": 152,
+          "end_line": 159,
+          "label": "只认 system-prompt 行"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "DeepSeek Harness 宿主进程",
+      "wraps": [
+        "host-approval",
+        "host-prompt",
+        "host-web",
+        "host-settings"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "add-writes-profile",
+      "from": "installer",
+      "to": "profile",
+      "label": "写一行依赖",
+      "variant": "emphasis"
+    },
+    {
+      "id": "profile-declares-patch",
+      "from": "profile",
+      "to": "bundle-patch",
+      "label": "bundle 声明"
+    },
+    {
+      "id": "insert-approve",
+      "from": "bundle-patch",
+      "to": "auto-approve",
+      "label": "insert"
+    },
+    {
+      "id": "insert-scope",
+      "from": "bundle-patch",
+      "to": "enhance-scope",
+      "label": "insert",
+      "variant": "emphasis"
+    },
+    {
+      "id": "insert-ui",
+      "from": "bundle-patch",
+      "to": "ui-host",
+      "label": "insert ./ui"
+    },
+    {
+      "id": "client-mount",
+      "from": "ui-host",
+      "to": "ui-client",
+      "label": "挂客户端半"
+    },
+    {
+      "id": "approval-takeover",
+      "from": "auto-approve",
+      "to": "host-approval",
+      "label": "approval/request",
+      "variant": "security"
+    },
+    {
+      "id": "section-register",
+      "from": "enhance-scope",
+      "to": "host-prompt",
+      "label": "systemPrompt.section()",
+      "variant": "emphasis",
+      "labelDy": 26
+    },
+    {
+      "id": "route-register",
+      "from": "enhance-scope",
+      "to": "host-web",
+      "label": "注册路由",
+      "variant": "dashed",
+      "labelDy": 46
+    },
+    {
+      "id": "ui-registers-route",
+      "from": "ui-client",
+      "to": "host-web",
+      "label": "POST",
+      "variant": "dashed"
+    },
+    {
+      "id": "settings-slot",
+      "from": "ui-client",
+      "to": "host-settings",
+      "label": "slots.register"
+    },
+    {
+      "id": "approve-reads-state",
+      "from": "auto-approve",
+      "to": "shared-state",
+      "label": "每条请求现读"
+    },
+    {
+      "id": "scope-reads-state",
+      "from": "enhance-scope",
+      "to": "shared-state",
+      "label": "每次装配现读"
+    },
+    {
+      "id": "scope-uses-preset",
+      "from": "enhance-scope",
+      "to": "shared-preset",
+      "label": "算好再落盘"
+    },
+    {
+      "id": "scope-uses-probe",
+      "from": "enhance-scope",
+      "to": "shared-probe",
+      "label": "check 用探针"
+    },
+    {
+      "id": "state-owns-files",
+      "from": "shared-state",
+      "to": "home-dir",
+      "label": "两个文件"
+    },
+    {
+      "id": "preset-owns-record",
+      "from": "shared-preset",
+      "to": "home-dir",
+      "label": "归属记录",
+      "variant": "dashed"
+    },
+    {
+      "id": "scope-writes-patch",
+      "from": "shared-preset",
+      "to": "profile-patch",
+      "label": "唯一写宿主配置的动作",
+      "variant": "security"
+    },
+    {
+      "id": "probe-reads-log",
+      "from": "shared-probe",
+      "to": "session-log",
+      "label": "只读"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "装法只加三行",
+      "items": [
+        "bundle patch 的 entry name 相对本包目录解析，不是 profile 目录",
+        "浏览器半只认精确包名或路径里最近的 package.json，所以第三个入口写 ./ui/index.js",
+        "安装不动宿主程序，也不派生任何产物；唯一的 profile 写入是设置页那个按钮"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "版本行怎么退化",
+      "items": [
+        "五级探测命中即停：DSH_VERSION → package-manifest → 装入作用域核心包 → app.asar 头 → dsh-runtimes",
+        "四态：区间内 / 超出已验范围变黄 / 读不到就照实写 / 范围本身解析失败",
+        "这是唯一新增的宿主耦合，读不到不影响注入、审批与写档"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "不碰的东西",
+      "items": [
+        "不改宿主自带系统提示，只在自己的段名上追加一段",
+        "不写 defaultPreset，不覆盖用户已有的档位选择",
+        "没有 webServer 的部署里，路由整条不挂，注入照常"
+      ]
+    }
+  ]
+}
