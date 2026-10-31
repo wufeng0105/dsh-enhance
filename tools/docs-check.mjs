@@ -10,9 +10,9 @@
  * 三条检查，都只读：
  *   1. 正文（代码块与行内代码之外）里的字面 `反斜杠+n` / `反斜杠+t`——写盘转义没生效的痕迹
  *   2. 相对链接指向的文件必须存在
- *   3. 反引号里点名的仓库路径必须存在（`docs/...` / `.zhll/...`）；
- *      只扫正文（代码块里的命令不按路径查），带 `<...>` 或 `*` 占位的不查，
- *      带 `:行号` 的按路径查
+ *   3. 反引号里点名的 `docs/...` 路径必须存在；只扫 README 与 `docs/` 下的 markdown，
+ *      草稿区 `.zhll/` 根本不在收集范围（见 `collectDocs`）。只扫正文（代码块里的命令
+ *      不按路径查），带 `<...>` 或 `*` 占位的不查，带 `:行号` 的按路径查
  *
  * 退出码：0 全过；1 有问题或用法错（用法错只打一行消息，不吐栈）。
  *
@@ -66,7 +66,7 @@ function collectDocs() {
   }
   if (existsSync(join(projectRoot, 'README.md'))) out.push(join(projectRoot, 'README.md'))
   if (existsSync(join(projectRoot, 'docs'))) add(join(projectRoot, 'docs'))
-  // .zhll 是草稿区：里面的调研件会引用宿主仓库的相对路径，不纳入死路径检查
+  // 只收 README 与 docs/ 这两处：草稿区（.zhll/）与宿主仓库不在收集范围，本来就不会被扫到
   return out
 }
 

@@ -1,10 +1,28 @@
 {
   "name": "dsh-enhance",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "license": "MIT",
   "type": "module",
   "description": "在 DeepSeek Harness 系统提示的末尾追加一段你自己写的文本：写破甲词、人设或内容规矩，存盘即生效，可开关、可检查；还可以一键把 Enhanced 权限档写进你的 profile。",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "bundle",
+    "system-prompt",
+    "persona"
+  ],
+  "author": "wufeng0105",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wufeng0105/dsh-enhance.git"
+  },
+  "homepage": "https://github.com/wufeng0105/dsh-enhance#readme",
+  "bugs": {
+    "url": "https://github.com/wufeng0105/dsh-enhance/issues"
+  },
   "engines": {
     "node": ">=22",
     "dsh": ">=0.2.1-rc.1 <0.2.1-rc.6"
@@ -32,6 +50,7 @@
     "content-scope.txt",
     "cordis.patch.yml",
     "docs/compatibility.md",
+    "docs/terminology.md",
     "README.md",
     "LICENSE",
     "VERSION"

@@ -3,7 +3,7 @@
  *
  * 用途：`POST /enhance/api` 的 `check` op（页面上的「检查」按钮）。
  * 它在**运行时**回答一个文件层回答不了的问题：插件挂上了、文件也在，但这一次装配
- * 内容边界到底有没有拼进提示词？唯一可信的证据是会话日志里 system 事件的原文。
+ * 内容边界到底有没有拼进提示词？唯一可信的证据是会话日志里 `system-prompt` 那条记录的原文。
  *
  * 日志形状：`<home>/sessions/<workspace>/<session>/session.v4.jsonl.zstd`，
  * zstd 压缩的 jsonl，**追加写，一个文件里有多帧**。

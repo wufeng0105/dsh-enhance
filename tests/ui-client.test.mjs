@@ -3,9 +3,12 @@
  *
  * 两层：
  *   1. 行为断言 —— 装载、注册、首帧、`call` 的 ok:false 语义。这些是契约，不随文案变。
- *   2. 意图断言 —— 四组结构、审批三态语义、检查项映射、Enhanced 四种状态、就地错误行、
- *      字节口径、CSS 守卫、以及「按宿主设置页刻度排版」这件事本身（16/24 标题、
- *      14/22 行标题、0.5px 发丝线、12px 节间距、720 上限宽、焦点环走宿主 token）。
+ *   2. 意图断言 —— 四组结构（内容边界 / 越界审批 / Enhanced 权限档 / 检查）、开关档
+ *      `approval` 的三态语义、检查项映射、Enhanced 档四种状态、就地错误行、字节口径、
+ *      CSS 守卫、以及「按宿主设置页刻度排版」这件事本身（16/24 标题、14/22 行标题、
+ *      0.5px 发丝线、12px 节间距、720 上限宽、焦点环走宿主 token）。
+ *
+ * 两个 Enhanced 名分属两个标签位，都锁着：检查项叫 **Enhanced 档**，设置组叫 **Enhanced 权限档**。
  *
  * 浏览器里没有 Node 测试跑得了它，但它在浏览器里做的事只有两件：注册 `settings.section`，
  * 组件首帧不抛且只发一次 `state`。这两件都能用一个假 `window.__ModuleLoader__` + 假 react 验掉。
@@ -195,7 +198,10 @@ test('结构：四组按顺序排列（内容边界 → 越界审批 → Enhance
   at.forEach((index, i) => assert.ok(index >= 0, `缺组：${ids[i]}`))
   assert.deepEqual(at, [...at].sort((a, b) => a - b), '四组的顺序变了')
 
-  const titles = ['内容边界', '越界时怎么办', 'Enhanced 权限档', '检查']
+  // 第 2 组的切片里两个名字各出现一次：组标题「越界审批」与控件标签「越界时怎么办」。
+  // 断言只要求「标题串出现在切片里」，所以只改其中一处时测试仍会绿（弱锁）；
+  // 把两处都改掉才会红。别为了「统一」把控件标签也改成「越界审批」。
+  const titles = ['内容边界', '越界审批', 'Enhanced 权限档', '检查']
   titles.forEach((title, i) => {
     const slice = source.slice(at[i], i + 1 < at.length ? at[i + 1] : source.length)
     assert.ok(slice.includes(title), `第 ${i + 1} 组的标题不对：缺「${title}」`)
@@ -241,6 +247,7 @@ test('结构：四组的说明都走 .enh-note，且每组至多一行后果 + �
 test('结论：Enhanced 档四种状态各自说对话，且只在能做事的两种状态给按钮', () => {
   const { presetStatusOf } = loadBundle().__testing
 
+  // 四态 = 不可用 / 改不动 / 已写入 / 未写入；`null` 快照另有一条前置回落 unknown。
   assert.deepEqual(presetStatusOf(null), { kind: 'unknown', word: '—', tone: 'mute' })
   assert.deepEqual(presetStatusOf({ preset: { patchPath: null } }), { kind: 'noprofile', word: '不可用', tone: 'mute' })
   assert.deepEqual(presetStatusOf({ preset: { patchPath: 'C:/p/x.yml', unreadable: true } }), { kind: 'unreadable', word: '改不动', tone: 'bad' })
@@ -254,11 +261,11 @@ test('结论：Enhanced 档四种状态各自说对话，且只在能做事的�
   assert.ok(source.includes('再点一次确认移除'), '移除缺少二次确认')
   assert.ok(source.includes('action: "add"') && source.includes('action: "remove"'), '缺 preset op 的两种动作')
 
-  // 04 节只留「用户确认过的那一句话」+ 右上状态 + 按钮 + 折叠区；
+  // Enhanced 权限档那一节只留「用户确认过的那一句话」+ 右上状态 + 按钮 + 折叠区；
   // 其余解释性句子（档位归属、图标契约、写入后的路径说明）已按用户要求删除。
-  assert.ok(source.includes('档位菜单里可以通过 profile 增加一个「全开沙箱、保留审批」的可选档'), '缺 04 的副行')
+  assert.ok(source.includes('档位菜单里可以通过 profile 增加一个「全开沙箱、保留审批」的可选档'), '缺 03 的副行')
   for (const gone of ['当前用哪个档仍由菜单决定', '没有图标', '已写进 profile', '显示契约']) {
-    assert.ok(!source.includes(gone), `04 节又长回去了：${gone}`)
+    assert.ok(!source.includes(gone), `03 节又长回去了：${gone}`)
   }
 })
 

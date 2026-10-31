@@ -1,6 +1,11 @@
 /**
  * `auto-approve` 的三态映射。
  *
+ * 三态是开关档 `approval` 的三个值（`allow` / `ask` / `deny`），与档位规格里的审批策略
+ * `approval/policy`（只有 `ask` / `never`）不是一套词表。三态对应宿主四个 outcome 里
+ * 我们主动产出的三个：`allow` → `allowed-once`、`ask` → `next()`（三态键 `ask`）、
+ * `deny` → `rejected`；`ask` 又没有下游时明确回 `unavailable`，不静默失败。
+ *
  * 这组用例存在的理由：三态是状态层的核心卖点，但之前**零覆盖**——
  * 把 `deny` 分支删掉、或整块 `ctx.on('approval/request')` 删掉，测试仍全绿。
  * 这里用一个假 ctx 把注册的 handler 抓出来，直接喂 `(req, next)`。

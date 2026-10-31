@@ -1,10 +1,12 @@
 /**
  * `enhance-scope` 路由的纯函数测试：来源判定与读体限长。
  *
- * 这一组钉住来源判定的三条顺序：
- *   - 跨站 Origin 必须被拒；
- *   - **Host 是域名时必拒**，哪怕 Origin 与 Host 一模一样——DNS rebinding 的构造就是这样；
- *   - `Origin: null` 拒，缺失放行（curl / CLI / Electron 主进程）。
+ * 这一组钉住来源判定的三道顺序，任一道不过即拒：
+ *   - socket 远端必须是回环；
+ *   - `Host` 必须是**回环字面量**（`localhost` / `127.0.0.1` / `[::1]`，带不带端口都行），
+ *     哪怕 Origin 与 Host 一模一样——DNS rebinding 的构造就是这样；
+ *   - 缺失 `Origin` 放行（curl / CLI / Electron 主进程），`app:` 放行，其余必须与 Host 严格同源；
+ *     `Origin: null` 拒。
  */
 
 import test from 'node:test'

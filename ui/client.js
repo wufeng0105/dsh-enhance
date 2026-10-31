@@ -15,6 +15,8 @@
 // 语义边界（这一页最容易做错的地方）：
 //   本页能改「档位**存在与否**」——点一下就往当前 profile 的 patch 里写 Enhanced 档；
 //   但改不了「这一轮用哪个档」——那永远归宿主的档位菜单。
+//
+// 主线在这一页的落法：只追加一段文本、只多声明一个档位，别的一个字不动。
 window.__ModuleLoader__.load({
 	id: "dsh-enhance-ui",
 	factory: (require) => {
@@ -46,8 +48,8 @@ window.__ModuleLoader__.load({
 
 		// ---------------------------------------------------------------- 文案
 
-		// 三档说的是「拿到审批请求之后怎么回」，与档位菜单里那个叫「直接放行」的档位不是一回事，
-		// 同名不同义，所以这里的词与菜单错开。
+		// 三档说的是「拿到审批请求之后怎么回」，与档位菜单里那几档不是一回事——
+		// 菜单管的是权限范围，这里的词与它错开，叫「自动同意」「先问我」「自动回绝」。
 		var APPROVAL = {
 			allow: {
 				word: "自动同意",
@@ -123,7 +125,7 @@ window.__ModuleLoader__.load({
 		var SECTION_LABELS = {
 			page: "页面：",
 			scope: "「内容边界」：",
-			approval: "「越界时怎么办」：",
+			approval: "「越界审批」：",
 			preset: "「Enhanced 权限档」：",
 			check: "「检查」：",
 		};
@@ -137,7 +139,7 @@ window.__ModuleLoader__.load({
 		 * 这里只补动作；没有对应建议就返回空串，不硬编一句废话。
 		 */
 		function errorHint(code) {
-			if (code === "ETOOLARGE") return " 删掉一些字再存，上限 8 KB。";
+			if (code === "ETOOLARGE") return " 超过上限了，删掉一些字再存。";
 			if (code === "EBADOP") return " 页面发出了服务端不认的字段，刷新后重试。";
 			if (code === "EIO") return " 写盘失败：看看 <home>/enhance/ 能不能写，再试一次。";
 			if (code === "EORIGIN") return " 只接受本机页面的请求，换个地址访问不行。";
@@ -158,6 +160,7 @@ window.__ModuleLoader__.load({
 			if (state === null) return { text: "读取中…", tone: "mute" };
 			if (state.enabled === false) return { text: "已停手", tone: "mute" };
 			// 插件没挂上时，任何开关都不会生效——这跟「开关关了」是两回事，必须分开说。
+			// 这个标签与 shared/state.mjs 的 derive() 里那条 reason 同词：改一处要一起看。
 			if (state.active === false) return { text: "插件未激活", tone: "bad" };
 			if (state.degraded) return { text: "降级运行", tone: "warn" };
 			if (state.injecting) return { text: "正在生效", tone: "ok" };
@@ -548,7 +551,7 @@ window.__ModuleLoader__.load({
 				]);
 
 			// ---- 02 越界审批 ----
-			var blockApproval = group("enh-block-approval", "越界时怎么办",
+			var blockApproval = group("enh-block-approval", "越界审批",
 				"DSH 要做的事，超出当前档位允许的范围时。",
 				state === null ? "—" : (on ? ap.word : "不接管"),
 				state === null ? "mute" : (on ? ap.tone : "mute"),
@@ -586,7 +589,7 @@ window.__ModuleLoader__.load({
 					// 不是当前状态的一部分。常驻会在用户选「先问我」时原地讲「自动同意」，读起来像没更新。
 					h("details", { className: "enh-term" },
 						h("summary", { className: "enh-hint" }, "为什么这三个词和主菜单不一样"),
-						h("p", null, "主菜单里那个「直接放行」说的是权限范围；这里三档说的是拿到审批请求之后怎么回。同名不同义，所以这里叫「自动同意」「自动回绝」。"),
+						h("p", null, "主菜单里的档位管的是权限范围；这里三档管的是拿到审批请求之后怎么回——两回事，所以这里的词与菜单错开，叫「自动同意」「先问我」「自动回绝」。"),
 					),
 					errorLine("approval"),
 				),
@@ -688,7 +691,7 @@ window.__ModuleLoader__.load({
 				[checks === null
 					? null
 					: allPass
-						? "四项都过了：插件在、文字合规、会话日志里有这段文字、Enhanced 档状态明确。"
+						? "四项都过了：插件在进程里、文字合规、真的进了系统提示、Enhanced 档状态明确。"
 						: "有项没过，现在还确认不了它真的生效；证据列写的是卡在哪。",
 				]);
 

@@ -102,7 +102,7 @@ export function inRange(parsed, version) {
  *
  * 规则只有一条分支：上界是 `X-rc.N`（N≥2）时，排他上界在 rc 线上恰好等于
  * 「到 X-rc.N-1 为止」——`<0.2.1-rc.6` 展示成 `0.2.1-rc.1–0.2.1-rc.5`。
- * 其余形状（上界是非 rc 版本、或 rc.1）不硬凑首尾，直接写「X 起 · Y 之前」，
+ * 其余形状（上界是非 rc 版本、rc.1，或推算出的末位落在下界之前）不硬凑首尾，直接写「X 起 · Y 之前」，
  * 不含糊也不撒谎。
  * @param {{ min: string, max: string }} parsed
  */

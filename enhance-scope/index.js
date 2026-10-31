@@ -36,13 +36,13 @@ import {
 } from '../shared/preset.mjs'
 import { declarationOf, displayRange, inRange, parseEnginesDsh } from '../shared/compat.mjs'
 
-/** Diagnostics label. */
+/** 诊断标签；只出现在宿主日志与失败链里。 */
 export const name = 'enhance-scope'
 
 /** 提示词注册表；`webServer` 是可选的，所以不写进 inject。 */
 export const inject = ['systemPrompt']
 
-/** 段名与官方 persona suffix 不同名（同名二次注册会抛），order 相同。 */
+/** 段名与官方 persona suffix 不同名（同名二次注册会抛）。order 相同；同 order 时宿主按段名定序（`comparePromptSections`），`enhance:` 在 `deployment:` 之后，所以仍落在 persona suffix 之后。 */
 const SECTION_NAME = 'enhance:content-scope'
 
 /** 路由路径。设置页与探针都用这一条。 */
@@ -525,7 +525,6 @@ export function apply(ctx, config = {}) {
         detail: text.ok ? `${textBytes(text.text)} B / 上限 ${TEXT_LIMIT} B` : `读不到 ${file}`,
       })
 
-      // 三项都在进程内完成，不起子进程。
       const proof = await sessionContains(join(home, 'sessions'), text.ok ? text.text : '')
       checks.push({
         name: 'inject',

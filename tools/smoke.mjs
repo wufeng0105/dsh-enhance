@@ -1,7 +1,7 @@
 /**
  * 端到端冒烟（真机装载 + 进程内跑真实的 op 处理链路）。
  *
- * 前置：由一个隔离的 DSH_HOME 里已经用 `dsh plugin --profile smoke add <本仓库>` 装好；
+ * 前置：在一个隔离的 DSH_HOME 里已经用 `dsh plugin --profile smoke add <本仓库>` 装好；
  * 这个脚本自己不做安装，只做验证——安装步骤在 smoke.ps1 里，两者都落盘成证据。
  *
  * 为什么不用 `dsh headless "..."` 跑真会话：那需要模型凭据，而凭据在用户的

@@ -48,7 +48,7 @@ export function copyRepoTree(from, to, options = {}) {
   return to
 }
 
-/** 走盘兜底时跳过的一级目录：全都是被 `.gitignore` 排除的本地件。 */
+/** 走盘兜底时跳过的一级目录：`.git` 是元数据、`node_modules` 是依赖，其余是被 `.gitignore` 排除的本地件。 */
 export const IGNORED_TOP_LEVEL = new Set([
   '.git',
   'node_modules',

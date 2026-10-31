@@ -19,9 +19,10 @@ import { defaultPresetApproval } from './preset-shape.mjs'
 /**
  * 首装该种哪一档审批。
  *
- * 宿主在 `user-approval` 里先判档位策略：`approval: never` 的档位在分发前就 `rejected`，
- * 我们种的 `allow` 永远轮不到。所以播种必须看这台机器的实际默认档位，不能无条件种 `allow`：
- * 只要有一个目标 profile 的 `defaultPreset` 是 `never`，就种 `ask`（问人，语义诚实）并带出是谁。
+ * 宿主在 `user-approval` 里先判档位策略（审批策略 `approval/policy`，不是本仓的开关档 `approval`）：
+ * `never` 的档位在分发前就 `rejected`，我们种的 `allow` 永远轮不到。
+ * 所以播种要看这台机器的实际默认档位，不能无条件种 `allow`：只要有一个目标 profile
+ * 的 `defaultPreset` 是 `never`，就种 `ask`（问人，语义诚实）并带出是谁。
  *
  * @param {{ profile?: string, text: string }[]} patches
  * @returns {{ approval: 'allow' | 'ask', blockedBy: string | undefined }}

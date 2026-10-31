@@ -35,7 +35,7 @@ export const ENHANCED_NAME = 'enhanced'
 /** 这条档位的两个旋钮。沙箱全开 + 越界仍问人——与内置 `danger-full-access`（never）的区别就在这。 */
 export const ENHANCED_SPEC = Object.freeze({ sandbox: 'danger-full-access', approval: 'ask' })
 
-/** 宿主基础组合包里那张三档表。写全表时以它为准（少一条就是删了用户的一个档位）。 */
+/** 宿主基础组合包里那张三档表。写全表时以它为准（少一条就是删了用户的一个档位）。这里的 `approval:` 是档位规格的审批策略（`approval/policy`），与本仓 state.json 的开关档 `approval` 不是一套词表。 */
 export const BASE_PRESETS = Object.freeze([
   { name: 'read-only', sandbox: 'read-only', approval: 'ask' },
   { name: 'workspace-write', sandbox: 'workspace-write', approval: 'ask' },
@@ -269,8 +269,7 @@ function fullPresetTable(indent) {
  *
  * 三条分支：
  *   - 没有 `- id: permission` 行 → 在末尾追加一整行（含完整三档 + enhanced）。
- *     必须写全：profile patch 的 `config` 会整块替换基础层的配置，只写一条
- *     会把 read-only / workspace-write / danger-full-access 一起抹掉。
+ *     必须写全，理由见文件头第 1 条硬约束（`config` 是整块替换，不是深合并）。
  *   - 有该行、但块里没有 `presets:` → 在 `config:`（或行尾）下补一个完整映射。
  *   - 有 `presets:` → 在映射里补 enhanced（块风格插在表尾；flow 风格改写那一行）。
  *
@@ -370,8 +369,10 @@ export function ensureEnhancedPreset(text) {
  * 「逐字节认领」那套取证被拿掉了：宁可让用户手删三行，也不去猜一份同名档位是不是我们写的。
  *
  * 文案口径：`changed` / 错误消息里出现的 `enhanced` 指的是 patch 里的字面键名
- * （`enhanced:` 三行）；档位在用户面前的名字是 **Enhanced 档**。两处并存是有意的，
- * 别「统一」掉。
+ * （`enhanced:` 三行）。它在用户面前有三层名字，都别「统一」成同一个：
+ * 档位菜单里是纯文字的 **Enhanced**（表外档名，宿主按 Title Case 渲染）；
+ * 设置页那一组的组名是「Enhanced 权限档」；检查项里那一项叫「Enhanced 档」。
+ * 键名与这三个显示名并存是有意的。
  *
  * @param {string} text
  * @param {{ action?: 'added' | 'inserted' | 'unchanged', emptyArray?: boolean, original?: string } | undefined} [record]

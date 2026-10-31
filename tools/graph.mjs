@@ -58,7 +58,7 @@ try {
 const projectRoot = cli.root
 const outDir = join(projectRoot, 'docs', 'generated')
 
-/** 不参与模型检查的文件（自指、测试、一次性脚本）。 */
+/** 不参与模型检查的：自指的这个文件 + `tests/` 整个目录；其余 tools/ 下的脚本必须登记进 `code-map.json`。 */
 const IGNORED = new Set(['tools/graph.mjs', 'tests'])
 /**
  * 走盘时跳过的一级/任意层级目录：`tests` 与 `scripts` 各自有别的门禁守着，

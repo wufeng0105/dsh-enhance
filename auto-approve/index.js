@@ -2,9 +2,9 @@
  * 审批处理（三态，状态可关）。
  *
  * `approval/request` 是 waterfall：返回一个 outcome 即认领该请求，调 `next()` 则交还下游。
- * 三态与宿主 outcome 一一对应：
+ * 三态对应宿主四个 outcome 里我们主动产出的三个：
  *   allow → `allowed-once`（不问人）
- *   ask   → `next()`（GUI 弹窗 / headless 报 no approval channel）
+ *   ask   → `next()`（三态键 `ask`；GUI 弹窗 / headless 报 no approval channel）
  *   deny  → `rejected`（不问、当场拒）
  *
  * 关掉时必须 `next()`——`return undefined` 会把整条链短路成 `unavailable`，
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { markPluginActive, paths, readState, resolveHome } from '../shared/state.mjs'
 import { ensureEnhanceData } from '../shared/seed.mjs'
 
-/** Diagnostics label. */
+/** 诊断标签；只出现在宿主日志与失败链里。 */
 export const name = 'auto-approve'
 
 /** @param {import('@deepseek-ai/cordis').Context} ctx */

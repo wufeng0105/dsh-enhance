@@ -7,8 +7,11 @@
  *
  * 关键的几条纪律在这里也有断言：
  *   - 路径只认服务端自己解析出来的 patchPath（请求体里给路径必须被当未知字段拒掉）；
- *   - 写前必须有 `.bak-enhance-*` 备份，且备份内容等于写前原文；
- *   - 没有归属记录不许摘（不猜）。
+ *   - 写前必须有 `.bak-enhance-*` 备份，且备份内容等于写前原文；dryRun 只算不改，也不落备份；
+ *   - 没有归属记录不许摘（不猜）；没有 profile 上下文就报 EPROFILE，不猜路径。
+ *
+ * 另有几条不经过 op 的：`resolveProfilePatch` 的回落顺序（profileContext → DSH_PROFILE_DIR）、
+ * `readAsarManifestVersion` 的只读读法、以及 `state` 快照里的 preset 与 compat 两段。
  */
 
 import test from 'node:test'

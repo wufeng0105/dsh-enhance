@@ -51,7 +51,7 @@ if (layerIndex >= 0 && !['fast', 'full'].includes(layer)) {
   process.exit(2)
 }
 
-/** Run one Node command and collect both streams. */
+/** 跑一条 Node 命令，两个流都收回来。 */
 function run(toolArgs, cwd = root, timeout = 120_000) {
   const result = spawnSync(node, toolArgs, { cwd, encoding: 'utf8', timeout })
   return {
@@ -62,7 +62,7 @@ function run(toolArgs, cwd = root, timeout = 120_000) {
 }
 
 /**
- * Code files the syntax gate covers.
+ * 语法门禁覆盖的文件集合。
  *
  * 实现挪到 `scripts/code-files.mjs`：那个集合是判据（门禁报的数必须等于仓库里的数），
  * 只留一处实现，测试才能直接钉住它而不用起整条 fast 层。
@@ -142,7 +142,9 @@ function gateVersion(base = root, options = {}) {
     } catch {
       problems.push('README.md 读不到，无法核对适用版本句')
     }
-    if (readme !== '' && !readme.includes(sentence)) {
+    // 空 README 也必须判红：`readme !== '' &&` 那个短路会让「把 README 删空」
+    // 变成静默关掉这道门（2026-10-31 实测：0 字节 README 时 version 门仍 PASS）。
+    if (!readme.includes(sentence)) {
       problems.push(`README 缺由声明生成的适用版本句（应逐字包含）：${sentence}`)
     }
   }
@@ -332,7 +334,7 @@ function withCopy(caseName, mutate, observe) {
   }
 }
 
-/** A gate is red for the expected reason only when it failed and its detail names the failure. */
+/** 只有当门禁失败、且 detail 里点了那条失败原因时，才算「因该原因变红」。 */
 function expectRed(marker) {
   return (result) => !(result.pass === false && result.detail.includes(marker))
 }
@@ -419,11 +421,14 @@ function runSelfTest() {
   cases.push(withGitCopy(
     'syntax counts tracked files',
     // 读数口径：退回「走盘数一切」的旧实现（不认 .gitignore，也不问 git）
+    // 替换锚在「以 '.git' 开头的那个 Set」上而不是整串字面量：SKIP_DIRS 增减条目
+    // 不该让这条负例失效（2026-10-31 给 SKIP_DIRS 补 `.dsh` 时，整串 replace 静默没命中，
+    // 只有下面第二处替换生效，写出半残变体，负例挂在 `gate stayed green`）。
     (copy) => {
       const file = join(copy, 'scripts', 'code-files.mjs')
       const text = readFileSync(file, 'utf8')
       const reverted = text
-        .replace(`new Set(['.git', 'node_modules', 'design', '.codegraph', '.zhll', '.tmp', 'ZCode'])`, `new Set(['.git', 'node_modules'])`)
+        .replace(/new Set\(\['\.git'[^\]]*\]\)/, `new Set(['.git', 'node_modules'])`)
         .replace('if (tracked.status === 0 && typeof tracked.stdout', 'if (false && typeof tracked.stdout')
       assertMutated(copy, 'scripts/code-files.mjs', text, reverted)
     },
@@ -506,6 +511,13 @@ function runSelfTest() {
       const reverted = text.replace(/DeepSeek Harness \S+–\S+（\S+ 实测[^）]*）/g, 'DeepSeek Harness 某版本')
       assertMutated(copy, 'README.md', text, reverted)
     },
+    (copy) => expectRed('README 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
+  ))
+
+  cases.push(withCopy(
+    'compat readme empty red',
+    // 把 README 删空 = 没有那句派生文本；这不许变成「静默过关」（去掉 `readme !== ''` 短路）
+    (copy) => writeFileSync(join(copy, 'README.md'), '', 'utf8'),
     (copy) => expectRed('README 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
   ))
 

@@ -40,7 +40,7 @@
       "id": "plugin.ui-client",
       "layer": "plugin",
       "path": "ui/client.js",
-      "owns": "设置页：浏览器半，四组设置（内容边界 / 越界时怎么办 / Enhanced 权限档 / 检查）+ 就地错误行，注册 settings.section 并调 /enhance/api"
+      "owns": "设置页：浏览器半，四组设置（内容边界 / 越界审批 / Enhanced 权限档 / 检查）+ 就地错误行，注册 settings.section 并调 /enhance/api"
     },
     {
       "id": "tool.docs-check",

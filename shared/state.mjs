@@ -11,7 +11,8 @@
  *   - 文本按「去 BOM → 去控制字符 → trim」归一，落盘与上报字节数用同一个口径。
  *
  * 状态里只有 `enabled` / `contentScope` / `approval` 三个字段，审批是三态
- * （`allow` / `ask` / `deny`），与宿主 `approval/request` 能做的三件事一一对应
+ * （`allow` / `ask` / `deny`）；宿主的 `approval/request` 有四个 outcome
+ * （`allowed-once` / `rejected` / `cancelled` / `unavailable`），我们只产出其中三个
  * （回 `allowed-once`、`next()` 交还下游、回 `rejected`）。1.0 起不做旧格式迁移：
  * 读的时候只认这三个字段，`approval` 不认识就标坏并倒向 `ask`（问人，不静默放行）。
  */
@@ -27,7 +28,10 @@ export const TEXT_LIMIT = 8 * 1024
 /** `state.json` 的格式版本。 */
 export const STATE_VERSION = 3
 
-/** 审批三态；与宿主 outcome 的映射见文件头。 */
+/**
+ * 审批三态，也就是开关档 `approval` 的词表：`allow` / `ask` / `deny`。
+ * 与宿主 outcome 的映射见文件头；与档位规格的审批策略 `approval/policy`（`ask` / `never`）不是一套。
+ */
 export const APPROVALS = ['allow', 'ask', 'deny']
 
 /** `$DSH_HOME`（非空优先），否则 `~/.dsh`。 */
@@ -106,7 +110,7 @@ function readFlag(value, fallback) {
  * 只认 `enabled` / `contentScope` / `approval` 三个字段；`approval` 不是三态之一时
  * 按 `ask` 处理**并标坏**（`degraded=true`）——这一层唯一的降级方向是倒向问人。
  * @param {{ state: string, text: string }} p
- * @returns {{ version: number, contentScope: boolean, approval: 'allow'|'ask'|'deny', updatedAt?: string, degraded: boolean, degradedReason: 'missing' | 'corrupt' | null }}
+ * @returns {{ version: number, enabled: boolean, contentScope: boolean, approval: 'allow'|'ask'|'deny', updatedAt?: string, degraded: boolean, degradedReason: 'missing' | 'corrupt' | null }}
  */
 export function readState(p) {
   let raw
@@ -141,9 +145,9 @@ export function readState(p) {
 }
 
 /**
- * 写状态（总是写 v3）。三个开关由调用方给全；`version`/`updatedAt` 由这里生成。
+ * 写状态（总是写 v3）。三个开关由调用方给全（`enabled` 省略即当开）；`version`/`updatedAt` 由这里生成。
  * @param {{ state: string, text: string }} p
- * @param {{ contentScope: boolean, approval: 'allow'|'ask'|'deny' }} next
+ * @param {{ enabled?: boolean, contentScope: boolean, approval: 'allow'|'ask'|'deny' }} next
  */
 export function writeState(p, next) {
   const body = {

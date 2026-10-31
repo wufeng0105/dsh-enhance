@@ -1,11 +1,14 @@
 /**
  * `shared/state.mjs` 的契约测试。
  *
- * 覆盖四件在文档里被当成承诺的事：
- *   - 坏 `state.json` 降级而不抛（缺失 / 损坏 / 非法 approval 三种）
+ * 覆盖这几件在文档里被当成承诺的事：
+ *   - 坏 `state.json` 降级而不抛（缺失 / 损坏 / 非法开关档 `approval`；字符串布尔按字面认）
  *   - 写盘是原子的（目录自动建、不留 `*.tmp-*`、写后读得回）
+ *   - 文本按「去 BOM → 去控制字符 → trim」归一，CRLF / CR 折成 LF，字节数按折后算
  *   - 文本超限抛 `ETOOLARGE`，且原文件不动；超限的落盘文本不会被注入
  *   - 只认 enabled / contentScope / approval 三个字段，旧版本同形状字段照读、没有迁移支路
+ *   - 总开关 `enabled` 默认开，关掉即停手；写盘只认 true / false，不认识的字段不写进去
+ *   - derive 停手的理由各有字面（未激活 / 总开关关闭 / 读不到 / 文本为空），与读盘降级分开
  */
 
 import test from 'node:test'

@@ -3,7 +3,8 @@
  *
  * 单独成文件是因为这个集合本身是**判据**：门禁报的「N files」必须等于仓库里真实的
  * `.mjs/.js` 数。两边各写一套遍历，读数就会分叉——`design/` 被 `.gitignore` 排除，
- * 走盘会把它算进去，于是两边对不上（曾出现两边读数不一致：门禁报 33 而 tracked 只有 32；现在是 33 / 33）。
+ * 走盘会把它算进去，于是两边对不上（历史上出现过门禁报 33 而 tracked 只有 32）。
+ * 两边必须逐数相等，这一条由 tests/gate-counts.test.mjs 守着。
  *
  * 所以这里是唯一实现，`scripts/check.mjs` 与测试都从它取：
  *   1. 优先 `git ls-files '*.mjs' '*.js'` —— tracked 就是权威，被忽略的目录天然不在里面；
@@ -22,10 +23,11 @@ import { join } from 'node:path'
 
 /**
  * 走盘时跳过的目录：`.git` 是仓库元数据，`node_modules` 是依赖，其余是被 `.gitignore`
- * 排除的本地件（`design/`、代码索引 `.codegraph/`、草稿区 `.zhll/`、本地克隆的 `ZCode/`、
- * 临时件 `.tmp/`）——它们不属于核心仓，数进来会让门禁读数与 tracked 对不上。
+ * 排除的本地件（`design/`、代码索引 `.codegraph/`、草稿区 `.zhll/`、临时件 `.tmp/`、
+ * 本地 DSH 数据 `.dsh/`、本地克隆的 `ZCode/`）——它们不属于核心仓，数进来会让门禁读数与
+ * tracked 对不上。
  */
-export const SKIP_DIRS = new Set(['.git', 'node_modules', 'design', '.codegraph', '.zhll', '.tmp', 'ZCode'])
+export const SKIP_DIRS = new Set(['.git', 'node_modules', 'design', '.codegraph', '.zhll', '.tmp', '.dsh', 'ZCode'])
 
 /**
  * @param {string} base 项目根
