@@ -100,6 +100,8 @@ Your text reaches the prompt through a callback the host invokes on every assemb
 
 ![How one message reaches the system prompt](./docs/figures/02-prompt-injection.svg)
 
+For the full walkthrough — how the host's registry is sorted at request time, where this package slips one extra section in, and how the session log proves it landed — there is a long-form page: [How the system prompt is assembled](./showcase/prompt-assembly.html) (Chinese).
+
 ### One save, end to end
 
 The settings page writes through one route on the host's own local HTTP server. The text is size-checked *before* any state changes, so an oversized save leaves both files exactly as they were.

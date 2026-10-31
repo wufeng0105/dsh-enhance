@@ -101,6 +101,8 @@ dsh plugin --profile desktop remove dsh-enhance
 
 ![一条消息怎么进到系统提示末尾](./docs/figures/02-prompt-injection.svg)
 
+想看这套装配的完整推演——原版注册表怎么现场排序、我们怎么在最后一档贴一页纸、怎么用会话日志证明它真的进去了——另有一页长文：[系统提示是怎么拼起来的](./showcase/prompt-assembly.html)。
+
 ### 一次保存的全程
 
 设置页走宿主本地 HTTP 服务上唯一那条路由。文字先验大小、**再**改状态，所以超限的保存不会把两个文件改坏。
