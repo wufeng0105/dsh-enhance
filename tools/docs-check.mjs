@@ -125,7 +125,10 @@ for (const file of collectDocs()) {
   for (const { line } of proseLines(text)) {
     for (const match of line.matchAll(/`([^`]+)`/g)) {
       const token = match[1].trim()
-      if (!/^(docs|\.zhll)/.test(token)) continue
+      // 只校验随包发布的 `docs/`。`.zhll/` 是 gitignore 的草稿区：本地有、干净 checkout 里
+      // 永远没有，拿它做「路径存在」判据会让这道门在 CI 上必红——实测：`CONTRIBUTING.md` 那句
+      // 「不要提交 `.zhll/`」的提醒把 docs 门判红，而本机全绿。门禁不该依赖未被跟踪的本地状态。
+      if (!/^docs\//.test(token)) continue
       if (/[<>*{}]/.test(token)) continue
       if (!token.includes('.') && !token.endsWith('/')) continue
       const bare = token.split('#')[0].replace(/(:\d+(-\d+)?(,\d+)*)+$/, '')
