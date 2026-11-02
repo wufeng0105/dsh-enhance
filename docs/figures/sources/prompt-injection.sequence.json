@@ -218,7 +218,7 @@
       "from": "scope",
       "to": "probe",
       "y": 370,
-      "label": "check：sessionContains(文本)",
+      "label": "check：sessionContains / sessionOmits",
       "variant": "dashed"
     },
     {

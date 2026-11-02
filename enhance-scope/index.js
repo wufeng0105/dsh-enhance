@@ -30,7 +30,7 @@ import {
   textStat, fileStat, writeFileAtomic, writeIdentity, writeState, writeText,
 } from '../shared/state.mjs'
 import { ensureEnhanceData } from '../shared/seed.mjs'
-import { sessionContains } from '../shared/session-probe.mjs'
+import { sessionContains, sessionOmits } from '../shared/session-probe.mjs'
 import {
   clearPresetRecord, ensureEnhancedPreset, readPresetRecord, readPresetState,
   removeEnhancedPreset, writePresetRecord,
@@ -454,6 +454,16 @@ export async function compatSnapshot(home) {
 }
 
 /**
+ * 宿主原句。
+ *
+ * 两个用途，别拆成两处字面量：
+ *   1. `keep` 态的预览句——本插件此刻没改任何东西的准确描述；
+ *   2. 「去掉」这一路的**证伪目标**——会话日志的最新一份装配里如果还能读到它，
+ *      说明同名段没顶掉宿主段（失效模式 C）。改一次两处一起改。
+ */
+const HOST_IDENTITY_SENTENCE = 'You are an AI agent powered by DeepSeek Harness.'
+
+/**
  * 预览行：模型将看到的第一句。
  *
  * `keep` 时给的是**宿主原句**——那是本插件此刻没有改任何东西的准确描述。
@@ -464,7 +474,40 @@ export async function compatSnapshot(home) {
 export function identityPreview(effective) {
   if (effective.mode === 'custom') return effective.text.split('\n')[0]
   if (effective.mode === 'remove') return '（已去掉，下一段接上）'
-  return 'You are an AI agent powered by DeepSeek Harness.'
+  return HOST_IDENTITY_SENTENCE
+}
+
+/**
+ * 品牌人设的遮蔽回验（`inject` 检查的第二半）。
+ *
+ * 三条语义与失效模式表 A/B/C 对应：
+ *   - `custom`：会话日志的 `"system-prompt"` 记录里要**找得到** `identity.txt` 的文本；
+ *   - `remove`：同一位置**不应**还有宿主原句（同名段没顶掉宿主段 = 最糟的那一类失效）；
+ *   - `keep`：这一路不判（不是失败，也不是通过——记 `applies: false`）。
+ *
+ * 探针口径全部来自 `shared/session-probe.mjs`（它是唯一实现），这里只做三态分派与措辞。
+ * 没有会话日志时如实说「没有会话日志」，**不说成遮蔽失效**。
+ *
+ * @param {string} sessionsDir
+ * @param {{ mode: 'keep'|'remove'|'custom', text: string }} effective
+ * @returns {Promise<{ applies: boolean, ok: boolean, detail: string }>}
+ */
+export async function identityShadowProof(sessionsDir, effective) {
+  if (effective.mode === 'keep') return { applies: false, ok: true, detail: '品牌人设=保留（这一路不判）' }
+  if (effective.mode === 'custom') {
+    const proof = await sessionContains(sessionsDir, effective.text)
+    return {
+      applies: true,
+      ok: proof.ok,
+      detail: proof.ok ? `品牌人设：自定义文本命中 ${proof.hits} 次` : `品牌人设：${proof.detail}`,
+    }
+  }
+  const proof = await sessionOmits(sessionsDir, HOST_IDENTITY_SENTENCE)
+  return {
+    applies: true,
+    ok: proof.ok,
+    detail: proof.ok ? '品牌人设：最新会话里已经没有宿主原句' : `品牌人设：${proof.detail}`,
+  }
 }
 
 /**
@@ -516,14 +559,26 @@ export function shadowPlan(effective) {
  *
  * 模式是**每条装配现算**的（`text` 是函数），所以设置页改完下一条消息就生效，不需要重启。
  *
+ * **过去这里静默降级**：拿不到可注入的 agent 上下文时直接 `return`，设置页照样显示
+ * 「已替换」。现在同样的降级仍然不抛、不影响其余功能，但会记进 `status()`：
+ * 见过几个 agent、几个真的拿到了作用域、几个明确装不上。设置页与 `/enhance/api`
+ * 的快照据此如实说明——这是审计缺口 1 的「装不上要吭声」。
+ *
  * @param {import('@deepseek-ai/cordis').Context} ctx
  * @param {() => { effective: { mode: 'keep'|'remove'|'custom', text: string, hideHarness: boolean } }} currentIdentity
- * @returns {() => void} 主动同步一次（设置页写完状态后调用，让改动不必等下一次装配）
+ * @returns {{ sync: () => void, status: () => { agentsService: boolean, seen: number, installed: number, scoped: number, shadowed: number, unsupported: number } }}
+ *   `sync` 主动同步一次（设置页写完状态后调用，让改动不必等下一次装配）；
+ *   `status` 只读事实，给快照与设置页说「装上了没有」。
  */
 export function installBrandPersona(ctx, currentIdentity) {
   /** 每个 agent 一份：已注册的遮蔽项、它们的拆解器，以及当前形状的指纹。 */
   const agents = new Map()
+  /** 处理过的 agent（成功或明确失败都算），用来让「见过几个」只数一次。 */
+  const seenAgents = new WeakSet()
+  let seen = 0
+  let unsupported = 0
   let scheduled = false
+  const agentsService = agentsServiceOf(ctx) !== undefined
 
   /** 按当前模式把遮蔽项注册进这个 agent 作用域，返回拆解器数组。 */
   const register = (scope, effective) => {
@@ -581,10 +636,19 @@ export function installBrandPersona(ctx, currentIdentity) {
   }
 
   const install = (agent) => {
-    if (agent === undefined || agent === null || agents.has(agent)) return
+    if (agent === undefined || agent === null) return
+    // 同一个 agent 只处理一次：装上或明确装不上都算处理过，重复事件不该把读数翻倍。
+    if (typeof agent === 'object') {
+      if (seenAgents.has(agent)) return
+      seenAgents.add(agent)
+    }
+    seen += 1
     // 拿不到可注入的 agent 上下文（老宿主 / 非 agent 组合）就降级为「只做内容边界」，
-    // 不抛、也不影响其余功能。
-    if (typeof agent.ctx?.inject !== 'function') return
+    // 不抛、也不影响其余功能——但要记下来，让设置页说得出口。
+    if (typeof agent.ctx?.inject !== 'function') {
+      unsupported += 1
+      return
+    }
     const record = { scope: undefined, shape: '', disposers: [], fiber: undefined }
     agents.set(agent, record)
     record.fiber = agent.ctx.inject(['systemPrompt'], (scope) => {
@@ -593,6 +657,21 @@ export function installBrandPersona(ctx, currentIdentity) {
       record.shape = shapeOf(effective)
       record.disposers = register(scope, effective)
     })
+  }
+
+  /**
+   * 只读事实，不做判定：设置页与快照靠它把「装上了没有 / 几个 agent / 拿不到什么」
+   * 说出口。`installed` 与 `scoped` 是**当前**活着的数；`seen` / `unsupported` 是本进程
+   * 累计处理过的数（同一个 agent 只数一次）。
+   */
+  const status = () => {
+    let scoped = 0
+    let shadowed = 0
+    for (const record of agents.values()) {
+      if (record.scope !== undefined) scoped += 1
+      shadowed += record.disposers.length
+    }
+    return { agentsService, seen, installed: agents.size, scoped, shadowed, unsupported }
   }
 
   const dispose = (agent) => {
@@ -618,22 +697,105 @@ export function installBrandPersona(ctx, currentIdentity) {
     for (const agent of [...agents.keys()]) dispose(agent)
   }, 'enhance-scope brand-persona fibers')
 
-  return schedule
+  return { sync: schedule, status }
+}
+
+/**
+ * 把「品牌人设装上了没有」翻成一句人话，连同可机读的事实一起交给快照。
+ *
+ * 这不是判据，是**可发现性**：过去 `installBrandPersona` 在拿不到可注入的 agent 上下文时
+ * 静默 return，设置页照样显示「已替换」。现在同一份事实有两个出口——`/enhance/api` 的
+ * `state` 快照（机读）与设置页那一行说明（人读）。
+ *
+ * `ok` 是三值的，别压成布尔：`true` 装上了、`false` 明确装不上、`null` 还没有 agent 可判。
+ * 「还没有 agent」不是失败——新装的机器第一次打开设置页时本来就没有会话。
+ *
+ * @param {{ agentsService: boolean, seen: number, installed: number, scoped: number, shadowed: number, unsupported: number }} status
+ * @param {{ mode: 'keep'|'remove'|'custom', hideHarness: boolean }} effective
+ * @returns {{ state: 'installed'|'pending'|'unsupported'|'idle', ok: boolean|null, reason: string|null, text: string, agents: number, installed: number, scoped: number, shadowed: number }}
+ */
+function describeIdentityInstall(status, effective) {
+  const facts = {
+    agents: status.seen,
+    installed: status.installed,
+    scoped: status.scoped,
+    shadowed: status.shadowed,
+  }
+  // 「这一轮该有遮蔽项吗」：keep 且不隐藏时本来就没有要遮的段，谈不上失效。
+  const wanted = effective.mode !== 'keep' || effective.hideHarness === true
+
+  // 明确装不上：有 agent 的宿主上下文不可注入，且没有任何一个 agent 拿到作用域。
+  if (status.unsupported > 0 && status.scoped === 0) {
+    const queued = status.installed > 0 ? `（另有 ${status.installed} 个 agent 已排队，但还没拿到作用域）` : ''
+    return {
+      state: 'unsupported',
+      ok: false,
+      reason: 'agent.ctx.inject 不可用',
+      text: `未生效：本版宿主没有可注入的 agent 上下文（agent.ctx.inject 不可用），品牌人设这一路这轮不生效${queued}。`,
+      ...facts,
+    }
+  }
+  if (status.scoped > 0) {
+    const extra = status.unsupported > 0 ? `；另有 ${status.unsupported} 个 agent 没有可注入的上下文` : ''
+    return {
+      state: 'installed',
+      ok: true,
+      reason: null,
+      text: wanted
+        ? `已生效：${status.scoped} 个 agent 作用域里注册了 ${status.shadowed} 项遮蔽${extra}。`
+        : `已接上：${status.scoped} 个 agent 作用域可用；当前「保留」，没有要遮蔽的段${extra}。`,
+      ...facts,
+    }
+  }
+  if (status.installed > 0) {
+    return {
+      state: 'pending',
+      ok: null,
+      reason: '注入回调还没拿到 systemPrompt 作用域',
+      text: `已接上 ${status.installed} 个 agent，注入回调还没拿到 systemPrompt 作用域（本轮还判断不了）。`,
+      ...facts,
+    }
+  }
+  const why = status.agentsService ? '本进程还没建过会话' : '拿不到宿主的 agents 服务，只能等新的 agent/created'
+  return {
+    state: 'idle',
+    ok: null,
+    reason: '还没见到 agent',
+    text: `还没见到 agent（${why}）；见到就会装上。`,
+    ...facts,
+  }
+}
+
+/**
+ * 拿宿主的 `agents` 服务。没有就返回 `undefined`——**不抛**，也不假装拿到了：
+ * 品牌人设的安装状态需要把「拿不到什么」如实说出来（见 `describeIdentityInstall`），
+ * 所以「拿不到」用返回值表达，而不是吞掉。
+ * @param {import('@deepseek-ai/cordis').Context} ctx
+ */
+function agentsServiceOf(ctx) {
+  try {
+    const service = typeof ctx.get === 'function' ? ctx.get('agents') : undefined
+    if (service !== undefined && typeof service.list === 'function') return service
+  } catch {
+    // 服务不在或不可用：按「没有 agent」处理
+  }
+  return undefined
 }
 
 /**
  * 列出当前活着的 agent。拿不到 `agents` 服务就返回空数组——品牌人设整体降级，
- * 不影响内容边界与审批。
+ * 不影响内容边界与审批。返回空数组**不等于**装不上：`agent/created` 那条路仍然在，
+ * 「装上了没有」由`installBrandPersona` 的状态如实报告。
  * @param {import('@deepseek-ai/cordis').Context} ctx
  */
 export function listAgents(ctx) {
+  const service = agentsServiceOf(ctx)
+  if (service === undefined) return []
   try {
-    const agents = typeof ctx.get === 'function' ? ctx.get('agents') : undefined
-    if (agents !== undefined && typeof agents.list === 'function') return agents.list()
+    return service.list()
   } catch {
-    // 服务不在或不可用：按「没有 agent」处理
+    return []
   }
-  return []
 }
 
 /**
@@ -683,7 +845,8 @@ export function apply(ctx, config = {}) {
   }
 
   // ---- 品牌人设：按 agent 遮蔽宿主同名段 ----
-  const syncBrandPersona = installBrandPersona(ctx, currentIdentity)
+  const brandPersona = installBrandPersona(ctx, currentIdentity)
+  const syncBrandPersona = brandPersona.sync
 
   ctx.effect(() => ctx.systemPrompt.section({
     name: SECTION_NAME,
@@ -739,6 +902,9 @@ export function apply(ctx, config = {}) {
           reason: identityState.effective.reason ?? null,
           preview: identityPreview(identityState.effective),
         },
+        // 「装上了没有」的机读事实 + 一句人话：设置页品牌人设组直接显示 text。
+        // 过去装不上是静默的（这里没有字段，页面也不会提），审计缺口 1 要补的就是它。
+        identityInstall: describeIdentityInstall(brandPersona.status(), identityState.effective),
         updatedAt: state.updatedAt ?? null,
         degraded: state.degraded,
         degradedReason: state.degradedReason ?? null,
@@ -769,13 +935,26 @@ export function apply(ctx, config = {}) {
         detail: text.ok ? `${textBytes(text.text)} B / 上限 ${TEXT_LIMIT} B` : `读不到 ${file}`,
       })
 
-      const proof = await sessionContains(join(home, 'sessions'), text.ok ? text.text : '')
+      // `inject` 仍然是**一项**（四个机检键不许增删），但它现在同时回答两个问题：
+      //   1. 内容边界那段文字进没进提示词（原来的 needle）；
+      //   2. 品牌人设有没有真的顶掉/换上宿主身份句（失效模式 C：注册成功但遮蔽不生效）。
+      // 两路都走同一个探针口径；detail 上点名是哪一路没过，否则用户分不清该修哪个。
+      const sessions = join(home, 'sessions')
+      const identityState = currentIdentity()
+      const [proof, identity] = await Promise.all([
+        sessionContains(sessions, text.ok ? text.text : ''),
+        identityShadowProof(sessions, identityState.effective),
+      ])
+      const contentDetail = effective.injecting
+        ? (proof.detail + (proof.sessionAt ? ` · 最新 ${proof.sessionAt.slice(11, 16)}` : ''))
+        : `没有注入：${effective.reason ?? '未知'}`
+      const parts = [`内容边界：${contentDetail}`]
+      // `keep` 这一路不判：不因为「没命中」造红，也不假装验过。
+      if (identity.applies) parts.push(identity.detail)
       checks.push({
         name: 'inject',
-        pass: effective.injecting && proof.ok,
-        detail: effective.injecting
-          ? (proof.detail + (proof.sessionAt ? ` · 最新 ${proof.sessionAt.slice(11, 16)}` : ''))
-          : `没有注入：${effective.reason ?? '未知'}`,
+        pass: effective.injecting && proof.ok && identity.ok,
+        detail: parts.join(' · '),
       })
 
       // 第四项：Enhanced 档。

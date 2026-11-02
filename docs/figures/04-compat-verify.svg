@@ -140,8 +140,8 @@ svg[data-preset="blueprint"] .c-security-group, svg[data-preset="blueprint"] .c-
         <path data-edge-from="smoke" data-edge-to="declare" data-edge-label="冒烟 exit 0" data-edge-key="7" data-edge-id="smoke-to-declare" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="1002,372;1060.8,372;1060.8,120;1002,120" d="M 1002 372 L 1060.8 372 L 1060.8 120 L 1002 120" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
 
         <!-- Nodes -->
-        <g id="node-recount" data-node-id="recount" data-node-label="重数触点" tabindex="0" role="button" aria-label="聚焦重数触点，grep 重推这张表, 本仓 › 数触点" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="grep 重推这张表" data-node-tag="35 条独立触点" data-node-context="本仓 › 数触点">
-          <title>重数触点 · grep 重推这张表 · 本仓 › 数触点 · 35 条独立触点</title>
+        <g id="node-recount" data-node-id="recount" data-node-label="重数触点" tabindex="0" role="button" aria-label="聚焦重数触点，grep 重推这张表, 本仓 › 数触点" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="grep 重推这张表" data-node-tag="36 条独立触点" data-node-context="本仓 › 数触点">
+          <title>重数触点 · grep 重推这张表 · 本仓 › 数触点 · 36 条独立触点</title>
           <rect x="48" y="86" width="148" height="68" rx="6" class="c-mask"/>
           <rect x="48" y="86" width="148" height="68" rx="6" class="c-frontend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(54 92) scale(0.6875)">
@@ -152,7 +152,7 @@ svg[data-preset="blueprint"] .c-security-group, svg[data-preset="blueprint"] .c-
           </g>
           <text data-node-label="" data-detail-anchor="" x="122" y="107" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">重数触点</text>
           <text data-detail="context" x="122" y="124" class="t-muted" font-size="8" text-anchor="middle">grep 重推这张表</text>
-        <text data-detail="fine" x="122" y="142" class="t-frontend" font-size="7" text-anchor="middle">35 条独立触点</text>
+        <text data-detail="fine" x="122" y="142" class="t-frontend" font-size="7" text-anchor="middle">36 条独立触点</text>
         </g>
 
         <g id="node-declare" data-node-id="declare" data-node-label="改声明" tabindex="0" role="button" aria-label="聚焦改声明，两端一起动, 本仓 › 放行与声明" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="两端一起动" data-node-tag="跑 check.mjs" data-node-context="本仓 › 放行与声明">

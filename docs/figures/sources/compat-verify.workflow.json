@@ -77,7 +77,7 @@
       "type": "frontend",
       "label": "重数触点",
       "sublabel": "grep 重推这张表",
-      "tag": "35 条独立触点",
+      "tag": "36 条独立触点",
       "width": 148,
       "sources": [
         {
@@ -205,7 +205,7 @@
         },
         {
           "path": "package.json",
-          "line": 10,
+          "line": 28,
           "label": "engines.dsh"
         },
         {

@@ -19,6 +19,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkFields } from './field-check.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const enhanceRoot = resolve(here, '..')
@@ -64,8 +65,16 @@ const IGNORED = new Set(['tools/graph.mjs', 'tests'])
  * 走盘时跳过的一级/任意层级目录：`tests` 与 `scripts` 各自有别的门禁守着，
  * 其余是被 `.gitignore` 排除的本地件——本地克隆的 `ZCode/` 有 3 万多文件，
  * 让它进模型比对会把一道结构门禁变成一次全盘扫描。
+ *
+ * **这条豁免与 `CONTRIBUTING.md` 的硬约束必须逐字对得上**（见下面 check() 里那条断言）：
+ * 早先 CONTRIBUTING 写「新源码文件必须登记」，而这里跳过 `scripts/`，两句话各说各话
+ * （审计 §3.3 点过）。现在约束收窄成「常驻源码（不含 `scripts/`、`tests/`）必须登记」，
+ * 由门禁钉住，不靠人记得。
  */
 const SKIP_DIRS = new Set(['node_modules', 'tests', 'scripts', 'design', '.codegraph', '.zhll', '.tmp', '.dsh', 'ZCode', '.git'])
+
+/** CONTRIBUTING.md 里必须逐字出现的那句登记约束（与上面 SKIP_DIRS 的豁免同源）。 */
+const REGISTRATION_EXEMPTION = '常驻源码（不含 `scripts/`、`tests/`）必须登记进 `code-map.json`'
 
 function toPosix(value) {
   return value.split(sep).join('/')
@@ -204,7 +213,25 @@ function check(map, strict = false) {
     }
   }
 
-  return errors
+  // 7. 登记豁免与 CONTRIBUTING.md 逐字对得上（审计 §3.3 那处矛盾）
+  let contributing = ''
+  try {
+    contributing = readFileSync(join(enhanceRoot, 'CONTRIBUTING.md'), 'utf8')
+  } catch (error) {
+    errors.push(`读不到 CONTRIBUTING.md，无法核对 code-map 登记的豁免范围：${String(error?.message ?? error)}`)
+  }
+  if (contributing !== '' && !contributing.includes(REGISTRATION_EXEMPTION)) {
+    errors.push(`CONTRIBUTING.md 的登记约束与 graph 门的豁免不一致：应逐字含「${REGISTRATION_EXEMPTION}」`)
+  }
+  for (const dir of ['scripts', 'tests']) {
+    if (!SKIP_DIRS.has(dir)) errors.push(`graph 的 SKIP_DIRS 不再跳过 ${dir}/，CONTRIBUTING.md 的豁免句要跟着改`)
+  }
+
+  // 8. 未文档化宿主字段（.layers 这类未登记入口）
+  const fields = checkFields(enhanceRoot)
+  errors.push(...fields.errors)
+
+  return { errors, fields }
 }
 
 // ---------- SVG 渲染（无第三方依赖，固定布局） ----------
@@ -308,13 +335,13 @@ if (cli.emit) {
 } else if (cli.check) {
   const strict = cli.strict
   if (!strict && !existsSync(outDir)) console.log('[graph] docs/generated 不存在：跳过图比对（--strict 才会要求图产物）')
-  const errors = check(map, strict)
+  const { errors, fields } = check(map, strict)
   if (errors.length > 0) {
     console.error(`[graph] 模型与代码/产物不一致（${errors.length} 项）：`)
     for (const error of errors) console.error(`  - ${error}`)
     process.exit(1)
   }
-  console.log(`[graph] OK：${map.modules.length} 个模块 / ${map.edges.length} 条边${strict ? ` / ${map.diagrams.length} 张图与模型一致` : '（结构检查；加 --strict 才逐字节比图）'}`)
+  console.log(`[graph] OK：${map.modules.length} 个模块 / ${map.edges.length} 条边 / ${fields.files} 个生产文件无未登记的宿主字段入口${strict ? ` / ${map.diagrams.length} 张图与模型一致` : '（结构检查；加 --strict 才逐字节比图）'}`)
 } else {
   console.error('graph: 用法：node tools/graph.mjs --check [--strict] | --emit [--root <项目根>]')
   process.exit(1)

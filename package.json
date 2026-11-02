@@ -1,6 +1,6 @@
 {
   "name": "dsh-enhance",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -38,7 +38,7 @@
     "compatibility": {
       "tested": "0.2.1-rc.5",
       "basis": "source-level",
-      "verifiedAt": "2026-10-30",
+      "verifiedAt": "2026-11-02",
       "doc": "docs/compatibility.md"
     }
   },

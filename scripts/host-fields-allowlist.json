@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "note": "未文档化宿主字段的允许清单。生产代码（enhance-scope/、shared/、ui/）里出现 .layers 这类入口时，必须在这里按 field 登记（可选 files 收窄到具体文件）并写清为什么非用不可；否则 graph 门（tools/field-check.mjs 挂在 graph 门里）判红。空清单 = 一处都不许用。",
+  "fields": []
+}

@@ -2,6 +2,35 @@
 
 本文件自 `1.1.0` 起维护；版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)，条目格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.2.1] — 2026-11-02
+
+### 新增
+
+- 门禁补齐三处「零门禁」（独立审计 §3.3 的漏挡），**仍是七道门、不加第八道**，新判据都并进现有门里：`tools/host-check.mjs`（宿主原文基准核对——`harness:identity` 仍是 section 座位、开场那句逐字命中宿主原文、`harness:source` / `app:web-surface` 各自 section + context 成对）并进 **version** 门；`tools/counts-check.mjs`（文档计数一致性）并进 **docs** 门；`tools/field-check.mjs`（生产目录里未登记的 `layers` 入口）挂进 **graph** 门。极性一律「坏输入判红、扫不到也判红」，只有「本机没有 asar」才如实跳过；
+- `scripts/known-counts.json`：七个已发布计数（测试 / 负例 / 门数 / README 检查项 / 冒烟断言 / 设置组数 / 宿主触点）的单一来源；其中冒烟断言与触点数显式标 `manual`——算不出来就承认，不假装能机算；
+- `tools/asar-read.mjs`：只读解 `app.asar` 头的读取器，供上面那道宿主核对用（不解包、不写盘）。
+
+### 变更
+
+- [`docs/terminology.md`](docs/terminology.md) 给出「声明层」的定义：它指系统提示里描述 harness 自身的注册项，一共 **5 个注册项落在 3 个名字上**；README 中英据此各给一张同名清单（`harness:identity` / `harness:source` / `app:web-surface`），并写明默认设置下这三处一个都不动；
+- README 中英把 `hideHarness` 的代价挪到能被看见的地方：一并隐去的除品牌外，还有两条 runtime context 与两段带操作约定的文字；
+- 契约数词统一为「**5 个注册项 / 3 个名字**」（原来散写成 3 / 4 / 4 / 5），两条验收判据改写成对得上 `inject` 两路探针的写法；
+- [`docs/brand-persona.md`](docs/brand-persona.md) 回仓三条被否决或挂起的决策：C 与 H′ 两条路线的对比及被挂起的原因、`hideHarness` 已打破宿主 admitted-legacy 投影语义这个已知缺陷、以及「用 AGENTS.md 补偿」被否决的理由；
+- [`docs/compatibility.md`](docs/compatibility.md) 给每条核验记录补上**复跑条件**（本机可复跑 / 不可复跑 / 缺什么），并把例行核验第 5 步要改的位置补全（含 `README.en.md` 与文档自身）。
+
+### 修复
+
+- **品牌人设静默失效现在能发现了**：装不上、或装上了没顶掉时，页面不再照旧显示「已替换」。三处一起改——`state` 快照新增 `identityInstall`（`ok` 是三值：装上 / 明确装不上 / 还没有 agent 可判，不把「还没有证据」报成失败）；`inject` 从只探内容边界扩成「**内容边界 + 品牌人设**」两路（`custom` 要命中 `identity.txt` 的文本、`remove` 不得再出现宿主原句、`keep` 这一路不判）；缺失性走反向探针 `sessionOmits`，只看**最新一份**含系统提示的装配记录，不让切换设置前的旧日志把检查永久判红；
+- 设置页的降级原因不再一律说成「审批回落到先问我」：改按 `degradedFields` 逐字段说，身份坏值就说「品牌人设回落到保留」。
+
+### 验证
+
+- 本地门禁：`node scripts/check.mjs` **7/7**、`--self-test` **17/17**、`node --test` **161** 项（1.2.0 是 152 项，本轮 +9 全在品牌人设探针）；一次性 `DSH_HOME` 真装本包（日志里 `+ dsh-enhance 1.2.1`）后冒烟 `smoke.ps1` **38/38**；
+- 新判据的三证（红灯 / 绿证 / 空转检查）留在 `gates/wp12-gates.log`：宿主核对在真 asar 上命中，假 asar 与路径不存在都 `exit 1`，没有 asar 只打印跳过；把门数改成 8 时计数门 `exit 1`；
+- **未做，留待 V3（WP15）**：干净基线远端机的重装终验**尚未执行**——`VERSION` 已升到 1.2.1，但「远端装上了 1.2.1」这句话现在没有证据，不当已做写；
+- **本轮未复现**：五张图「源 JSON → 成品」的逐字节一致性没有重跑（本机没有 archify），其中 `02-prompt-injection` 与 `04-compat-verify` 是源 JSON 与 SVG 同时手改、`02` 的遮罩宽度按字宽估算；`1.1.2` 那条是那一轮自己的记录，不是本轮的复现凭证；
+- **仍阻塞**：真机会话上的装配层验收——模型凭据余额为 0，本轮只有单测、门禁与合成日志，没有真机会话日志；`hideHarness` 在桌面 / web profile 上的效果同样未验。
+
 ## [1.2.0] — 2026-11-02
 
 ### 新增

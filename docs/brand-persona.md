@@ -2,9 +2,9 @@
 
 **目标**：**在不接管整份系统提示词的前提下，让模型不再把 DeepSeek Harness 当作自己的身份说出来。**
 
-要动的是 harness 的**三处自指**：开场那句自称（①），以及两段提到它名字的说明（② 实现目录、④ 界面）。这一段话是后面所有取舍的准绳——方案、开关、代价都拿它量。
+要动的是 harness 自身自指的 **3 个名字（共 5 个注册项）**：开场那句自称（①），以及两段提到它名字的说明（② 实现目录、④ 界面）。「声明层」的准确定义见 `docs/terminology.md`。这一段话是后面所有取舍的准绳——方案、开关、代价都拿它量。
 
-**做法**：在 agent 作用域内按名遮蔽这三处；只改声明层，其余段落逐字节保留，存盘即生效、一键退回。
+**做法**：在 agent 作用域内按名遮蔽这 3 个名字；只改声明层，其余段落逐字节保留，存盘即生效、一键退回。
 
 这篇文档是这个功能的契约：解决什么、什么算成、为什么用「按 agent 遮蔽同名段」而不是装配瀑布、代价与边界、DSH 升级后核哪一条。落地步骤在最后一节。
 
@@ -16,7 +16,7 @@ DeepSeek Harness 每次请求前现场拼一份系统提示。这份提示以一
 You are an AI agent powered by DeepSeek Harness.
 ```
 
-「品牌人设」让这一句在本插件作用域内可控：保留、去掉、或换成你自己的。它同时可以隐藏另外两段提到宿主名字的内容：`harness:source` 的 checkout 说明、`app:web-surface` 的 Web GUI 说明——这两段各有一个 section 和一条 runtime context，一共四处。
+「品牌人设」让这一句在本插件作用域内可控：保留、去掉、或换成你自己的。它同时可以隐藏另外两段提到宿主名字的内容：`harness:source` 的 checkout 说明、`app:web-surface` 的 Web GUI 说明——这两段各自有一个 section 和一条 runtime context，合起来 4 个注册项；加上 ① 那一项，全功能一共 **5 个注册项、落在 3 个名字上**。
 
 **它不是完整白标，而且「去品牌」的可达范围是有边的。** 下面是模型与用户实际能看到品牌的地方，以及本功能管不管——这句话原来只写「不是完整白标」，太含糊：
 
@@ -72,8 +72,8 @@ You are an AI agent powered by DeepSeek Harness.
 | # | 验收 | 怎么验 |
 |---|---|---|
 | 1 | 三态可选：保留 / 去掉 / 自定义 | 设置页切换后，最新一条 `system/message` 的第一句就是所选结果 |
-| 2 | 附带开关：同时隐藏宿主说明 | `identity` 为 `remove` 或 `custom`（且自定义文本本身不含该名）时，**system 节点**里 `DeepSeek Harness` 出现 0 次；两条 runtime context 也一并消失（它们不在 system 节点里，单独验） |
-| 3 | 随时退回原样 | 选回「保留」后，**最新一条** `system/message` 的文本哈希与未装本插件时一致。历史节点不会被回改，不与历史比 |
+| 2 | 附带开关：同时隐藏宿主说明 | **先打开 `hideHarness=true`**，且 `identity` 为 `remove` 或 `custom`（自定义文本本身不含该名）时，**system 节点**里 `DeepSeek Harness` 出现 0 次。这个前置条件不能省：`harness:source` 段文本自身就含该名，而它只在 `hideHarness=true` 时才被遮蔽——开关关着时该计数必然非 0。两条 runtime context 也一并消失（它们既不在 system 节点里，也在同一个开关下成对处理，单独验） |
+| 3 | 随时退回原样 | 选回「保留」后，**最新一条** `system/message` 的**第一句逐字回到宿主原句**。注意这条比的是**同一配置下的基线**：默认 `contentScope=true` 会在尾部追加一段，所以整条文本的哈希与「未装本插件时」必然不同——要比哈希，基线必须取自**同样开着 `contentScope`** 的未装态（或先关掉 `contentScope` 再比）。历史节点不会被回改，不与历史比 |
 
 自定义文本另有一条验收：文本里含 `{{x}}` 或落单的 `{{` 时，装配不抛错（见「它长什么样」的 `interpolate: false`）。
 
@@ -85,7 +85,7 @@ You are an AI agent powered by DeepSeek Harness.
 | 改工具描述里的品牌 | 工具 schema 在 `request/header.tools`，不在 sections 里；动它会同时改 header 与缓存形状 |
 | 改宿主界面上的产品名、图标 | **本轮范围外**。宿主把侧栏品牌做成了 single slot，官方填充包的 README 明写「使用其他品牌的部署应提供替代品牌包」——宿主**期待**它被替换，所以这不是「打包层资源」（本仓已有浏览器半，技术上够得着）。写成范围外，不是写成做不到 |
 | 改写已有会话的历史提示词 | 改写只对新装配生效；日志里的历史是事实 |
-| 加第 5 个检查项（v1） | 检查页仍四项。品牌人设的验法只有验收 #1/#2，这条要写明，免得读者以为检查覆盖它 |
+| 加第 5 个检查项（v1） | 检查页**仍是四项**，键与标题都不增删。但品牌人设**已合进 `inject` 那一项**验，不再是「只有验收 #1/#2」：`custom` 要命中 `identity.txt` 的文本、`remove` 不得再出现宿主原句、`keep` 这一路不判（记 `applies: false`，不是失败）。另有一条**可发现性**出口：装没装上由状态快照的 `identityInstall` 与设置页那一行如实说明 |
 
 ## 5. 为什么是「按 agent 遮蔽同名段」
 
@@ -137,7 +137,7 @@ You are an AI agent powered by DeepSeek Harness.
 
 `state.json` 从 v3 升到 v4：只加字段，不改旧字段，不写迁移支路。旧文件缺字段时取默认（`keep` + `hideHarness: false`）。
 
-**写盘必须带全四键**：`writeState()` 是整块重建，每个调用点（设置页的 `set`、首装种子）都要带全 `enabled` / `contentScope` / `approval` / `identity` / `hideHarness`，否则用户点一次「总开关」就把品牌人设重置回默认。这条要有一条回归测试：只切 `enabled`，`identity` 不变。
+**写盘必须带全五键**：`writeState()` 是整块重建，每个调用点（设置页的 `set`、首装种子）都要带全 `enabled` / `contentScope` / `approval` / `identity` / `hideHarness`，否则用户点一次「总开关」就把品牌人设重置回默认。这条要有一条回归测试：只切 `enabled`，`identity` 不变。
 
 **失败语义**（全部倒向 `keep`，即宿主原样，不静默改身份）：
 
@@ -147,7 +147,7 @@ You are an AI agent powered by DeepSeek Harness.
 | `identity.txt` 缺失 / 读不到 | `custom` 退化为 `keep`，设置页照实说「读不到自定义文本」 |
 | `identity.txt` 归一后为空 | 同 `remove`（空文本等于不声明），页面标明 |
 | `identity.txt` 超过 2 KB | 拒绝注入，退化为 `keep`，理由写进状态（与内容边界「读路径也拦超限」同一口径） |
-| `includeHarnessIdentity: false` 的部署（无全局 `harness:identity`） | `custom` 时补一段；`remove` 无事可做；设置页**看不出**这个部署差异（见「读不到的宿主事实」） |
+| `includeHarnessIdentity: false` 的部署（无全局 `harness:identity`） | `custom` 时补一段；`remove` 无事可做；**装没装上现在看得见**——`identityInstall` 与设置页那一行会如实说「已接上 / 未生效」；但 `keep` 态**仍不进判据**，页面照旧无法判断这个部署有没有那段全局身份段（见「读不到的宿主事实」） |
 
 **`interpolate: false` 是硬要求**：全局 `harness:identity` 注册时没设 `interpolate`，`renderPrompt()` 会对未声明该标志的段做变量插值；用户文本里一个落单的 `{{` 会让整次装配抛错。自定义段必须显式设 `interpolate: false`（与本仓内容边界段的既有做法一致），并有一条测试。
 
@@ -204,7 +204,8 @@ DSH 自己的口径是：
 | 只对装了本插件的进程生效 | 另一进程（不同 home / profile）不受影响 |
 | 日志显示遮蔽后结果 | 会话日志记装配结果，不记宿主原版；与「只追加」时口径一致 |
 | 不动 `request/header` | config 与 tools 不变，不额外触发 header 记录 |
-| 设置页看不出「某部署关掉了全局身份段」 | 见下方「读得到的宿主事实」 |
+| `keep` 态看不出「某部署关掉了全局身份段」 | 装没装上现在看得见（`identityInstall` 与设置页那一行），但**这个部署有没有那段全局身份段**仍读不到；见下方「读得到的宿主事实」 |
+| 打破宿主「已接纳段落逐字不变」的投影语义 | 身份三态非 `keep` 或 `hideHarness` 打开时，老会话恢复拿到的是当下的遮蔽结果，与它已记录的那一版提示词不同；宿主会写一条新的 prompt 版本。见下方「一条被打破的宿主语义」 |
 
 ### 读得到的宿主事实，以及一个要明写的决策
 
@@ -217,11 +218,41 @@ DSH 自己的口径是：
   harness:identity | order: -1000 | text: "You are an AI agent powered by DeepSeek Harness."
   ```
 
-- `layers` **不是文档化 API**（宿主 README 只声明「没有给终端用户编辑提示词的 API」）。所以用不用它是一个**要明写下来的决策**，而不是一句「没有入口」就能排除的事。三条路线的对比见 `.zhll/04-路线对比.md`（本地账本，不入库）。
+- `layers` **不是文档化 API**（宿主 README 只声明「没有给终端用户编辑提示词的 API」）。所以用不用它是一个**要明写下来的决策**，而不是一句「没有入口」就能排除的事。基于它和其他两条路的对比见下一节「被评估过、现被挂起的路线」。
 
 仍然读不到的是**宿主配置**：想知道某个部署有没有关掉 `includeHarnessIdentity`，只能去解析 profile 各层的 YAML，而配置来自「发行模板 + profile cordis.yml + patch 叠加」多层，本仓没有 YAML 解析器，手搓一层的判断会在别的层上失灵。
 
 所以页面在 `keep` 态一律预览宿主的默认原句。真遇到关掉该开关的部署，预览句与实际不符——这是**已知且已声明**的边界，不是待办的 bug。
+
+### 被评估过、现被挂起的路线（②④）
+
+②④ 那两段说明有三种处理法，用的是**同一套机制**（按 agent 遮蔽同名段），差别只在「覆盖成什么」。现在跑的是第一种；后两种**不是被否决，是挂起**——各有必须先付的代价，而「模型不自称」这个目标已经达成，所以不急着换。
+
+| 路线 | 做法 | 挂起的原因 |
+|---|---|---|
+| 整段删（＝现状 `hideHarness`） | 同名注册空串，②④ 一起变空 | 已实现，无遗留决策。代价是那两段带操作约定的文字一起消失（见 §6 的四行对照表） |
+| C · 自己写文案 | 我们提供无品牌的**等价文案**，同名覆盖 | 选它等于**我们拥有这段文案**：每次 rc 升级要对账「我们的稿子与宿主新措辞差了什么」，而仓里没有给「我们拥有的提示词文案」留核验位；改写稿还要处理技术标识（`dsh web`、`window.__DSH_BOOT__`、`apps/web`、`DSH itself`、`pwd`），品牌词表边界一含糊就出现「半去品牌」 |
+| H′ · 运行时改写 | 读宿主当前注册项 → 逐词替换品牌 → 同名覆盖，并把函数式 provider 一起转发 | 依赖**未文档化的 `layers` 字段**（见上）：rc 一改名或封装就静默失效，所以落地必须带 feature-detect、命中率自检、触点登记三件套。好处是三条路里唯一一条**不打破**宿主投影语义、也不用对账整段文案的 |
+
+三条路都过不了上游网关——网关要的是「那串字换掉」，不是品牌消失；那是 §2.1 那条独立规则的事，别拿本功能替它做承诺。
+
+### 一条被打破的宿主语义：`hideHarness` 与 admitted-legacy
+
+② 的 section 文本不是常量，是函数：`text: (context) => admitted(context).source ?? HARNESS_SOURCE_PROMPT`。宿主专门为它注册了 `harnessDevLegacyPrompt` 投影，注释原话是「A Session whose admitted prompt holds the paragraphs that embedded those values keeps them verbatim, so **resuming it never rewrites its logged prompt**」。
+
+**现状已经打破了这条语义**：按名注册同名项后，老会话恢复时拿到的是**本插件当下的遮蔽结果**，与它当初记录的那一版提示词不同，宿主会为此写一条新的 prompt 版本。整段删（现状）与 C 都打破它；只有 H′ 转发函数式 provider 才能保住。
+
+**为什么暂不改**：这是「按名遮蔽」这条路本身的性质——同名项在装配时近端胜出——不是可以局部修掉的 bug；换 H′ 要引入未文档化字段依赖，代价更大。触发条件明写在上面那条边界行里：身份三态非 `keep`，或 `hideHarness` 打开。
+
+### 「用 AGENTS.md 补偿」：评估过，不采用
+
+曾经评估过的一条路：系统提示不动，转而用 `AGENTS.md` 补偿，让模型从工作区指令里得知自己属于别的产品。**不采用**，理由：
+
+- `AGENTS.md` 由 `@deepseek-ai/dsh-agent-instructions` 以 **user message** 送达（`source.kind === 'agent-instructions'`），**不在系统提示层**。system 节点里的自称句照旧，模型仍会把系统里的声明当作身份。
+- 它自己写明**不覆盖** system / developer / 直接用户指令；让一条低优先级的消息去盖系统提示，方向就是反的。
+- 它按「工作区根 + 两个全局根」候选、有 64 KiB 预算、超了保近丢远并明示截断；对子 agent 一样有效，但作用域与预算都不是本功能能承诺的。
+
+**结论**：本功能的战场是系统提示的声明层；`AGENTS.md` 不在这条链上。别再把它当替代方案重新提出来。
 
 ## 9. 维护：DSH 升级后核这一条
 新 rc 发布后的例行核验多一条触点，也是本功能唯一的宿主依赖：
@@ -235,9 +266,13 @@ DSH 自己的口径是：
 - `renderPrompt()` 丢弃空文本段，`renderContextSections()` 丢弃空文本 context；
 - 先例：`dsh-persona`、`dsh-subagent` 都据此工作。
 
-`docs/compatibility.md` 的改法：在「cordis 插件 API」那一行的接缝清单里加 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」，并按该节自己的计数口径把「共 35 条」重数成 36（该节的 30 + 探测链 5 = 35 公式要同步）。`packages/core/system-prompt/src` 已在 tree-diff 清单里，不新增目录；`packages/interaction/agent`（若存在）视核验结果决定是否加入。
+`docs/compatibility.md` 的改法：在「cordis 插件 API」那一行的接缝清单里加 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」，并按 `docs/compatibility.md` 自己的计数口径把独立触点项总数重数一遍（该节现为 **36 条**；口径与公式以那一节为准，别在这里另立）。`packages/core/system-prompt/src` 已在 tree-diff 清单里，不新增目录；`packages/interaction/agent`（若存在）视核验结果决定是否加入。
 
-任一条不成立 → 本功能失效，其余功能不受影响。降级路径：设置页开关仍在但预览与实况不符，在 `compatibility.md` 记一轮。
+任一条不成立 → 本功能失效，其余功能不受影响。降级路径不再只有「人工记账」一条：
+
+- **装没装上**：状态快照里的 `identityInstall`（机读）与设置页品牌人设组那一行说明（人读）会如实说「已生效 / 已接上 / 未生效」，例如「未生效：本版宿主没有可注入的 agent 上下文（agent.ctx.inject 不可用）」；「还没有 agent 可判」是三态的 `null`，不压成「失败」。
+- **遮蔽是否真的生效**：由「检查」里 `inject` 那一项的第二路证伪——`custom` 要在会话日志里命自定义文本、`remove` 要用反向探针确认最新一份装配记录里已经没有宿主原句；`keep` 不判。
+- **仍要人工记的**：真机验收的限制不变——`hideHarness` 在桌面 / web profile 上的效果仍未核（见 §11），`compatibility.md` 该记的轮次照记。
 
 ## 10. 落地清单
 
@@ -247,7 +282,7 @@ DSH 自己的口径是：
 
 - `shared/state.mjs`：`STATE_VERSION` 3→4；新增 `identity` / `hideHarness` 与 `IDENTITY_LIMIT`；文本读写复用现有 `readText` / `writeText` 口径（加路径与上限参数），不另起第二套实现
 - `shared/seed.mjs`：首装写盘带全 v4 键
-- `enhance-scope/index.js`：`ctx.on('agent/created')` + `agent/disposed`；按名遮蔽四处；`set` op 白名单加 `identity` / `hideHarness` / `identityText`；`state` 快照加三字段与预览句；`writeState` 所有调用点带全键
+- `enhance-scope/index.js`：`ctx.on('agent/created')` + `agent/disposed`；按名遮蔽 5 项（3 个名字）；`set` op 白名单加 `identity` / `hideHarness` / `identityText`；`state` 快照加三字段与预览句；`writeState` 所有调用点带全键
 - `ui/client.js`：新增「品牌人设」组（三档 + 开关 + 输入框 + 预览），`errorLine` 加 `identity` 段，页面自身「四组」文案与注释同步改
 - `code-map.json`：`events` 加 `agent/created`、`agent/disposed`（owner `plugin.scope`）；新增「agent 作用域遮蔽」接缝边；`state.fields` 补齐（含今天已缺的 `enabled`）；`plugin.ui-client` 的 `owns` 文案
 
@@ -271,7 +306,7 @@ DSH 自己的口径是：
 
 ## 11. 落地状态（2026-11-02）
 
-- **已核验**：`node scripts/check.mjs` 7/7（152 项测试 / 9 个文件）；`--self-test` 17/17；
+- **已核验**：`node scripts/check.mjs` 7/7（**161** 项测试 / 9 个文件；含「装没装上」与「遮蔽有没有真生效」这两路可发现性的用例）；`--self-test` 17/17；
   `tools/smoke.ps1` 38/38（真装 bundle + 真组合树 + 八条品牌人设断言）；
   **真宿主首启**落盘的 `state.json` 确为 v4 五键（`gates/wp4-live-seed.log`）。
 - **装配层验收（「做到什么算成」第 1、3 条）已在真机会话日志上验成**，这一条此前一直欠着：远端机全量重置后

@@ -166,11 +166,11 @@ svg[data-preset="blueprint"] .c-lane { stroke-dasharray: 7 3; }
         </g>
         </g>
 
-        <g data-edge-from="scope" data-edge-to="probe" data-edge-label="check：sessionContains(文本)" data-edge-key="7" data-edge-id="scope-asks-probe">
+        <g data-edge-from="scope" data-edge-to="probe" data-edge-label="check：sessionContains / sessionOmits" data-edge-key="7" data-edge-id="scope-asks-probe">
           <path data-composition-edge-from="scope" data-composition-edge-to="probe" data-composition-edge-id="scope-asks-probe" data-composition-points="280.3,370;721.7,370" d="M 280.3 370 L 721.7 370" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <g data-detail="context">
-          <rect x="402.6" y="350" width="196.79999999999998" height="18" rx="3" class="c-mask"/>
-          <text x="501" y="360" class="t-edge-dashed" font-size="11" text-anchor="middle">check：sessionContains(文本)</text>
+          <rect x="353" y="350" width="296" height="18" rx="3" class="c-mask"/>
+          <text x="501" y="360" class="t-edge-dashed" font-size="11" text-anchor="middle">check：sessionContains / sessionOmits</text>
         </g>
         </g>
 

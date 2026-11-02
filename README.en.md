@@ -12,11 +12,21 @@ DeepSeek Harness assembles a long system prompt before every reply: who it is, w
 
 `dsh-enhance` is a cordis plugin bundle that adds one prompt section and replaces the opening brand line at the **declaration layer** (it can also hide two further passages the host writes about itself). **With the default settings**, apart from those spots in the declaration layer, the host's own prompt stays byte-for-byte untouched.
 
-- **Brand persona** — the first line of the system prompt (`You are an AI agent powered by DeepSeek Harness.`) can be kept, removed, or replaced with your own; two further passages that mention the host by name can be hidden along with it. It changes what the model sees, never the host's files. Its boundaries and costs are in [this contract](./docs/brand-persona.md) (Chinese).
+The declaration layer is the set of registrations in the system prompt that describe the harness itself — the definition lives in exactly one place, [docs/terminology.md](./docs/terminology.md). "Those spots" above are these **5 registrations under 3 names**, no more:
+
+| Name | Seat | What |
+| --- | --- | --- |
+| `harness:identity` | section | the opening self-description |
+| `harness:source` | section + runtime context | the implementation-checkout passage (two entries under one name) |
+| `app:web-surface` | section + runtime context | the web-interface passage (two entries under one name) |
+
+With the default settings none of the three names is touched; they are only replaced when you change the identity mode or turn on **hide host notes**.
+
+- **Brand persona** — the first line of the system prompt (`You are an AI agent powered by DeepSeek Harness.`) can be kept, removed, or replaced with your own; two further passages that mention the host by name can be hidden along with it. **What that hides is not the brand alone: it also drops two runtime contexts and two passages carrying operational rules** — the `pwd` rule (do not infer the working directory from the checkout path), "do not start another server just to make a change take effect", and when client-plugin changes take effect (HMR depends on `pnpm run dev:web` running). It changes what the model sees, never the host's files. Its boundaries and costs are in [this contract](./docs/brand-persona.md) (Chinese).
 - **Content boundary** — one text file, up to 8 KB, injected at the end of every system prompt.
 - **Out-of-scope approval** — when an action exceeds the current permission preset, answer it automatically, ask the user, or refuse.
 - **Enhanced preset** *(optional)* — add a "sandbox fully open, still asks" permission preset to your profile.
-- **Check** — read the session log back and prove the text really reached the prompt.
+- **Check** — read the session log back and prove that **both the content boundary and the brand persona** really reached the prompt: the content-boundary text and `custom` text must be found, `remove` must confirm the newest assembly record no longer contains the host's line (`keep` is not judged). When it could not be installed, the settings page says so plainly instead of showing "replaced".
 - **Bounded compatibility** — one `engines.dsh` range, verified against `DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）`. The host itself enforces it at install and at startup.
 
 ## Contents
@@ -66,7 +76,7 @@ notepad "$env:USERPROFILE\.dsh\enhance\content-scope.txt"
 notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 ```
 
-`state.json` holds five switches:
+`state.json` holds five switches (the three boolean fields also accept the strings `"true"` / `"false"`; extra keys are ignored):
 
 | Field | Default | Meaning |
 | --- | --- | --- |
@@ -74,7 +84,7 @@ notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 | `contentScope` | on | Off detaches the trailing text from the prompt. |
 | `approval` | depends | `allow` / `ask` / `deny` — how to answer an out-of-scope approval request. |
 | `identity` | `keep` | `keep` / `remove` / `custom` — the opening line: keep it, drop it, or replace it. |
-| `hideHarness` | off | On also hides the two passages the host writes about itself. |
+| `hideHarness` | off | On also hides the two passages the host writes about itself. Those passages carry **two runtime contexts** and the operational rules that come with them (`pwd`, "do not start another server", when HMR applies) — a real regression for anyone changing DSH or writing plugins. |
 
 A damaged `state.json` never grants silent permission: approval falls back to `ask`, brand persona to `keep`.
 

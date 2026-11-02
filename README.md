@@ -13,11 +13,21 @@ DeepSeek Harness 每次回答前，都会先读一段很长的系统提示：它
 
 `dsh-enhance` 是一个 cordis 插件 bundle：它往宿主的提示装配里加一段，并在**声明层**换掉开头那一句（也可以再隐去两段讲宿主自己的说明）。**默认设置下**，除声明层那几处之外，宿主自己的提示词一个字节不动。
 
-- **品牌人设**——系统提示的第一句（`You are an AI agent powered by DeepSeek Harness.`）可保留、可去掉、可换成你自己的；还能一并隐藏另外两段提到宿主名字的说明。改的是模型看到的结果，不碰宿主文件。边界与代价见[这份契约](./docs/brand-persona.md)。
+「声明层」指系统提示里描述 harness 自身的注册项——准确定义只有一处，在 [docs/terminology.md](./docs/terminology.md)。这句话里「那几处」就是下面这 **5 个注册项、3 个名字**，一个不多：
+
+| 名字 | 座位 | 是什么 |
+| --- | --- | --- |
+| `harness:identity` | section | 开头那句自称 |
+| `harness:source` | section + runtime context | 实现目录说明（同一名字下两项） |
+| `app:web-surface` | section + runtime context | 界面说明（同一名字下两项） |
+
+默认设置下这三个名字一个都不动；只有你改了身份三态、或打开「隐藏宿主说明」，才会顶掉对应的注册项。
+
+- **品牌人设**——系统提示的第一句（`You are an AI agent powered by DeepSeek Harness.`）可保留、可去掉、可换成你自己的；还能一并隐藏另外两段提到宿主名字的说明。**这一并隐去的除了品牌，还有两条 runtime context 与两段带操作约定的文字**：`pwd` 那条（不要从 checkout 路径推断工作目录）、「别为了让改动生效另起服务器」、以及客户端插件改动何时才生效（HMR 要看 `pnpm run dev:web` 在不在跑）。改的是模型看到的结果，不碰宿主文件。边界与代价见[这份契约](./docs/brand-persona.md)。
 - **内容边界**——一个文本文件，最多 8 KB，接在每条系统提示的末尾。
 - **越界审批**——动作超出当前档位允许的范围时，自动放行、问你要么直接回绝，你选。
 - **Enhanced 权限档**（可选）——往你的 profile 里多加一个「沙箱全开、越界仍问你」的档位。
-- **检查**——读会话日志读回来，证明这段文字真的进了提示词。
+- **检查**——读会话日志读回来，证明**内容边界与品牌人设**真的进了提示词：内容边界与 `custom` 文本要命中，`remove` 要确认最新的装配记录里已经没有宿主原句（`keep` 不判）。装不上时设置页会如实说「未生效」，不会照旧显示「已替换」。
 - **有界的兼容性**——一条 `engines.dsh` 区间，已对 `DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）` 核验过。宿主自己在装的时候和启动的时候都执行这条声明。
 
 
@@ -51,7 +61,7 @@ notepad "$env:USERPROFILE\.dsh\enhance\content-scope.txt"
 notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 ```
 
-`state.json` 放五个开关：
+`state.json` 放五个开关（三个布尔字段也认字符串 `"true"` / `"false"`；多写的键会被忽略）：
 
 | 字段 | 默认 | 管什么 |
 | --- | --- | --- |
@@ -59,7 +69,7 @@ notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 | `contentScope` | 开 | 关掉 = 不接末尾那段文字。 |
 | `approval` | 看情况 | `allow` / `ask` / `deny`——越界时自动同意、先问我、自动回绝。 |
 | `identity` | `keep` | `keep` / `remove` / `custom`——开头那句：保留、去掉、换成你的。 |
-| `hideHarness` | 关 | 打开 = 再隐去两段讲宿主自己的说明。 |
+| `hideHarness` | 关 | 打开 = 再隐去两段讲宿主自己的说明。这两段连同**两条 runtime context** 一起没，`pwd`、「别另起服务器」、HMR 何时生效这些操作约定也跟着消失——对改 DSH / 写插件的人是行为退化。 |
 
 `state.json` 坏了不会静默放行：审批回落到「先问我」，品牌人设回落到「保留」。
 

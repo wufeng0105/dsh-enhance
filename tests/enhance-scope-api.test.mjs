@@ -16,10 +16,11 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { zstdCompressSync } from 'node:zlib'
 import { apply, identityPreview, readAsarManifestVersion, resolveProfilePatch, shadowPlan } from '../enhance-scope/index.js'
 
 /** 一个够 `apply()` 用的假 cordis 上下文；`profile` 为 undefined 时模拟「没有 profile 上下文」。 */
@@ -660,6 +661,204 @@ test('品牌人设回归：活着的 agent 上「去掉 → 自定义」必须�
     await probe.call({ op: 'set', identityText: 'You are Nova.' })
     await settle()
     assert.equal(sections[0].text(), 'You are Nova.', '只改文本时，动态读函数本身就该跟上')
+  } finally {
+    await probe.close()
+  }
+})
+
+// ───────────────────────────────────────────── 品牌人设：装上了没有 / 遮蔽有没有生效（T25，审计缺口 1）
+//
+// 这一节钉三件事：
+//   1. 装不上要吭声——拿不到可注入的 agent 上下文时，快照里有可读状态，设置页能如实说明；
+//   2. 装上了但没顶掉要能证伪——`inject` 一项扩成「内容边界 + 品牌人设」，detail 点名是哪一路；
+//   3. 不许假绿——keep 不判、没有会话日志不判成「遮蔽失效」。
+
+/** 宿主原句：`remove` 这一路的证伪目标，与 `enhance-scope/index.js` 里那一个常量逐字一致。 */
+const HOST_SENTENCE = 'You are an AI agent powered by DeepSeek Harness.'
+
+/**
+ * 造一份假会话日志：`<home>/sessions/workspace/<name>/session.v4.jsonl.zstd`。
+ *
+ * 只放要验的那一行——`"system-prompt"` 是探针唯一认的标记，payload 是那一行里真正
+ * 喂给模型的文本。`mtimeMs` 用来摆新旧顺序（`sessionOmits` 只判最新一份）。
+ */
+function writeSession(home, name, payload, mtimeMs) {
+  const dir = join(home, 'sessions', 'workspace', name)
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, 'session.v4.jsonl.zstd')
+  writeFileSync(file, zstdCompressSync(Buffer.from(`${JSON.stringify({ type: 'system-prompt', payload })}\n`, 'utf8')))
+  if (mtimeMs !== undefined) utimesSync(file, new Date(mtimeMs), new Date(mtimeMs))
+  return file
+}
+
+/** 一个可注入的假 agent：`agent.ctx.inject` 立刻回调，把遮蔽项记进数组。 */
+function injectableAgent() {
+  const sections = []
+  const contexts = []
+  const agent = {
+    ctx: {
+      inject(names, callback) {
+        if (!names.includes('systemPrompt')) return { dispose: () => {} }
+        callback({
+          systemPrompt: {
+            getSectionOrder: () => -1000,
+            getContextOrder: () => 200,
+            section(spec) {
+              sections.push(spec)
+              return () => { const i = sections.indexOf(spec); if (i >= 0) sections.splice(i, 1) }
+            },
+            context(spec) {
+              contexts.push(spec)
+              return () => { const i = contexts.indexOf(spec); if (i >= 0) contexts.splice(i, 1) }
+            },
+          },
+        })
+        return { dispose: () => {} }
+      },
+    },
+  }
+  return { agent, sections, contexts }
+}
+
+/** 取 check 结果里的 `inject` 项。 */
+async function injectCheck(probe) {
+  const { json } = await probe.call({ op: 'check' })
+  return json.checks.find((item) => item.name === 'inject')
+}
+
+test('identityInstall：拿不到可注入的 agent 上下文时，快照如实报「未生效」且不把整页判红', async () => {
+  // 失效模式 B：`agent.ctx.inject` 不是函数。过去这里静默 return，页面照样显示「已替换」。
+  const agent = { ctx: {} }
+  const probe = await harness({ patch: '[]\n', agents: { list: () => [agent] } })
+  try {
+    const { status, json } = await probe.call({ op: 'state' })
+    assert.equal(status, 200)
+    // 「不是页面级红」：快照本身 ok、状态文件没坏、内容边界照常注入。
+    assert.equal(json.ok, true)
+    assert.equal(json.degraded, false)
+    assert.equal(json.injecting, true)
+    // 「装不上要吭声」：可机读状态 + 一句人话，都点明拿不到什么。
+    assert.equal(json.identityInstall.state, 'unsupported')
+    assert.equal(json.identityInstall.ok, false)
+    assert.match(json.identityInstall.text, /^未生效/)
+    assert.match(json.identityInstall.text, /agent\.ctx\.inject/)
+    assert.equal(json.identityInstall.agents, 1)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('identityInstall：没有 agent 时是「还没见到」而不是失败（ok 为 null，不是红）', async () => {
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const install = (await probe.call({ op: 'state' })).json.identityInstall
+    assert.equal(install.state, 'idle')
+    assert.equal(install.ok, null, '还没见到 agent 不是失败，别压成 false')
+    assert.equal(install.scoped, 0)
+    assert.match(install.text, /还没见到 agent/)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('identityInstall：装上之后报出 agent 数与遮蔽项数，keep 与 remove 的措辞不同', async () => {
+  const { agent } = injectableAgent()
+  const probe = await harness({ patch: '[]\n', agents: { list: () => [agent] } })
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+  try {
+    const keep = (await probe.call({ op: 'state' })).json.identityInstall
+    assert.equal(keep.state, 'installed')
+    assert.equal(keep.ok, true)
+    assert.equal(keep.agents, 1)
+    assert.equal(keep.scoped, 1)
+    assert.equal(keep.shadowed, 0, 'keep 时没有要遮蔽的段')
+    assert.match(keep.text, /已接上/)
+
+    await probe.call({ op: 'set', identity: 'remove' })
+    await settle()
+    const remove = (await probe.call({ op: 'state' })).json.identityInstall
+    assert.equal(remove.shadowed, 1, 'remove 应当在作用域里注册一条身份遮蔽')
+    assert.match(remove.text, /已生效/)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('inject：identity=custom 但最新会话里没有自定义文本 → 判红并点名「品牌人设」；补上后变绿', async () => {
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const contentText = (await probe.call({ op: 'state' })).json.text
+    assert.ok(contentText.length > 0, '首装种下的内容边界文本不该为空')
+    await probe.call({ op: 'set', identity: 'custom', identityText: 'You are Aria, a private assistant.' })
+    // 会话里有内容边界文本、没有自定义文本：内容边界那一路应当过，红在品牌人设。
+    writeSession(probe.home, 'custom-red', contentText, Date.now() - 1000)
+    const red = await injectCheck(probe)
+    assert.equal(red.pass, false)
+    assert.match(red.detail, /内容边界：命中/, '内容边界那一路应当过了')
+    assert.match(red.detail, /品牌人设：/, 'detail 必须点名是哪一路没过')
+    assert.match(red.detail, /没有这段文本/)
+
+    // 再来一份更新的会话，里面真的有自定义文本：同一项必须变绿。
+    writeSession(probe.home, 'custom-green', `You are Aria, a private assistant.\n${contentText}`, Date.now())
+    const green = await injectCheck(probe)
+    assert.equal(green.pass, true)
+    assert.match(green.detail, /品牌人设：自定义文本命中/)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('inject：identity=remove 但最新会话里仍有宿主原句 → 判红；只看最新一份，新日志干净就变绿', async () => {
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const contentText = (await probe.call({ op: 'state' })).json.text
+    await probe.call({ op: 'set', identity: 'remove' })
+    // 更旧的一份日志带着宿主原句（模拟「切换设置之前的会话」）——它不该把判定拉红。
+    writeSession(probe.home, 'stale', `${HOST_SENTENCE}\n${contentText}`, Date.now() - 5000)
+    writeSession(probe.home, 'current', `${HOST_SENTENCE}\n${contentText}`, Date.now())
+    const red = await injectCheck(probe)
+    assert.equal(red.pass, false)
+    assert.match(red.detail, /品牌人设：/)
+    assert.match(red.detail, /仍有宿主原句/)
+
+    // 新起一份不含宿主原句的会话：最新一份干净，就该绿（也证明判定不是「最近 N 份任一含」）。
+    writeSession(probe.home, 'newer', contentText, Date.now() + 1000)
+    const green = await injectCheck(probe)
+    assert.equal(green.pass, true)
+    assert.match(green.detail, /品牌人设：最新会话里已经没有宿主原句/)
+
+    // hideHarness 打开与否不影响本判据（它管另外两段说明）。
+    await probe.call({ op: 'set', hideHarness: true })
+    const stillGreen = await injectCheck(probe)
+    assert.equal(stillGreen.pass, true)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('inject：identity=keep 时品牌人设不参与判定——会话里没有宿主原句也不判红', async () => {
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const contentText = (await probe.call({ op: 'state' })).json.text
+    // 日志里只有内容边界文本，没有宿主原句。若把 keep 误当 remove 判，这里会假红。
+    writeSession(probe.home, 'keep', contentText, Date.now())
+    const inject = await injectCheck(probe)
+    assert.equal(inject.pass, true)
+    assert.doesNotMatch(inject.detail, /品牌人设/, 'keep 这一路不判，detail 不该出现品牌人设结论')
+  } finally {
+    await probe.close()
+  }
+})
+
+test('inject：没有会话日志时如实说「没有会话日志」，不判成遮蔽失效', async () => {
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    await probe.call({ op: 'set', identity: 'remove' })
+    const inject = await injectCheck(probe)
+    // 现有口径：没有证据就是红（提示先发一条消息），但理由必须是「没有日志」而不是「失效」。
+    assert.equal(inject.pass, false)
+    assert.match(inject.detail, /没有会话日志/)
+    assert.doesNotMatch(inject.detail, /遮蔽没有生效/)
   } finally {
     await probe.close()
   }

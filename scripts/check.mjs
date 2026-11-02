@@ -3,11 +3,17 @@
  * 门禁总入口。
  *
  * 分层：
- *   fast  version、syntax、tests、graph（结构）、docs、readme、bundle
+ *   fast  version、syntax、tests、graph（结构 + 宿主字段禁令）、docs（文档机械残渣 + 计数一致性）、
+ *         readme、bundle
  *   full  fast + 有 docs/generated 时的 graph --strict
  *
  * 每道门禁都必须能红。`--self-test` 用一次性副本证明这一点：坏语法文件、坏测试、
  * 未登记的源文件、死链、坏 README 里的图路径、坏 bundle 声明、超限文本。
+ *
+ * **仍是七道门、仍是 17 个负例**（这两个数是已发布计数，见 `scripts/known-counts.json`）。
+ * 2026-11-02 的门禁加固没有新增第八道门：宿主原文核对并进 `version` 门，文档计数一致性并进
+ * `docs` 门，未文档化宿主字段禁令并进 `graph` 门，CHANGELOG/CONTRIBUTING 并进 `docs` 的收集范围，
+ * README.en.md 并进 `version` 的适用版本句校验。
  *
  * 用法：
  *   node scripts/check.mjs [--layer fast|full] [--self-test]
@@ -31,6 +37,24 @@ const node = process.execPath
 
 /** 仓库的 tests 数有一个地板：防「大批删除仍 exit 0」。 */
 const TEST_FLOOR = 50
+
+/**
+ * 读单一来源 `scripts/known-counts.json` 里的一个计数。
+ *
+ * 读不到返回 undefined：读数缺失由 `docs` 门（tools/counts-check.mjs）判红，
+ * 不在这里编一个默认值——「按缺省值放过」正是这次要消掉的坑。
+ * @param {string} name
+ * @returns {number|undefined}
+ */
+function knownCount(name) {
+  try {
+    const parsed = JSON.parse(readFileSync(join(here, 'known-counts.json'), 'utf8'))
+    const value = parsed?.counts?.[name]?.value
+    return Number.isInteger(value) && value >= 0 ? value : undefined
+  } catch {
+    return undefined
+  }
+}
 
 const args = process.argv.slice(2)
 const layerIndex = args.indexOf('--layer')
@@ -134,20 +158,37 @@ function gateVersion(base = root, options = {}) {
     }
   }
 
-  // ---- README 派生句（声明是权威，README 是派生文本） ----
+  // ---- README 派生句：中英两份都必须逐字包含（2026-11-02 起纳入 README.en.md） ----
   if (parsed !== null) {
     const sentence = compatibilitySentence(declared, parsed)
-    let readme = ''
-    try {
-      readme = readFileSync(join(base, 'README.md'), 'utf8')
-    } catch {
-      problems.push('README.md 读不到，无法核对适用版本句')
+    for (const file of ['README.md', 'README.en.md']) {
+      const label = file === 'README.md' ? 'README' : file
+      let readme = ''
+      try {
+        readme = readFileSync(join(base, file), 'utf8')
+      } catch {
+        problems.push(`${label} 读不到，无法核对适用版本句`)
+        continue
+      }
+      // 空 README 也必须判红：`readme !== '' &&` 那个短路会让「把 README 删空」
+      // 变成静默关掉这道门（2026-10-31 实测：0 字节 README 时 version 门仍 PASS）。
+      if (!readme.includes(sentence)) {
+        problems.push(`${label} 缺由声明生成的适用版本句（应逐字包含）：${sentence}`)
+      }
     }
-    // 空 README 也必须判红：`readme !== '' &&` 那个短路会让「把 README 删空」
-    // 变成静默关掉这道门（2026-10-31 实测：0 字节 README 时 version 门仍 PASS）。
-    if (!readme.includes(sentence)) {
-      problems.push(`README 缺由声明生成的适用版本句（应逐字包含）：${sentence}`)
-    }
+  }
+
+  // ---- 宿主原文基准核对（不新增第八道门：作为 version 门的一个步骤） ----
+  // tools/host-check.mjs 自己负责「没有 asar 时如实跳过、坏 asar 判红」的极性；
+  // 这里只把它的退出码并进本门，跳过（exit 0 且打印「跳过」）不算红。
+  const host = run(['tools/host-check.mjs'], base)
+  const hostFirst = host.output.split(/\r?\n/).find((line) => line.trim() !== '') ?? ''
+  const hostNote = host.code !== 0
+    ? '宿主核对：红'
+    : (hostFirst.includes('跳过') ? '宿主核对：跳过（没有 asar）' : '宿主核对：命中')
+  if (host.code !== 0) {
+    const detail = host.output.split(/\r?\n/).filter((line) => line.trim() !== '').slice(0, 2).join(' | ')
+    problems.push(`宿主原文基准核对没过：${detail}`)
   }
 
   // ---- 本机 DSH 版本超出声明范围 ----
@@ -156,7 +197,7 @@ function gateVersion(base = root, options = {}) {
     if (local === undefined) {
       return {
         pass: problems.length === 0,
-        detail: problems.length === 0 ? `${pkg.name}@${version}（未探测到本机 DSH 版本）` : problems.join(' | '),
+        detail: problems.length === 0 ? `${pkg.name}@${version} · README.md + README.en.md 适用版本句一致（未探测到本机 DSH 版本）· ${hostNote}` : problems.join(' | '),
       }
     }
     if (!inRange(parsed, local)) {
@@ -165,13 +206,13 @@ function gateVersion(base = root, options = {}) {
         + '先按 docs/compatibility.md 的例行核验跑一遍（约 15 分钟），核验过了再扩 package.json 的 engines.dsh 区间',
       )
     }
-    if (problems.length === 0) return { pass: true, detail: `${pkg.name}@${version} · DSH ${local}` }
+    if (problems.length === 0) return { pass: true, detail: `${pkg.name}@${version} · DSH ${local} · README.md + README.en.md 适用版本句一致 · ${hostNote}` }
     return { pass: false, detail: problems.join(' | ') }
   }
 
   return {
     pass: problems.length === 0,
-    detail: problems.length === 0 ? `${pkg.name}@${version}` : problems.join(' | '),
+    detail: problems.length === 0 ? `${pkg.name}@${version} · ${hostNote}` : problems.join(' | '),
   }
 }
 
@@ -231,24 +272,52 @@ function gateTests(base = root) {
   const result = run(['--test', ...files], base)
   const ran = Number((/^ℹ tests (\d+)$/m.exec(result.output) ?? [])[1] ?? 0)
   if (ran < TEST_FLOOR) return { pass: false, detail: `${ran} tests ran, floor is ${TEST_FLOOR}` }
-  if (result.code === 0) return { pass: true, detail: `${ran} tests in ${files.length} files` }
+  // 条数既要在地板之上，也要与单一来源一致：测试数变了就逼着改 known-counts.json + 文档声明，
+  // 不许「测试悄悄变多、文档里的 161 却没人动」。
+  const expected = knownCount('tests')
+  const countProblem = expected !== undefined && ran !== expected
+    ? `测试条数 ${ran} != 单一来源 scripts/known-counts.json 的 ${expected}（改条数要连文档一起改）`
+    : undefined
+  if (result.code === 0) {
+    if (countProblem !== undefined) return { pass: false, detail: countProblem }
+    return { pass: true, detail: `${ran} tests in ${files.length} files` }
+  }
   const failed = result.output.split(/\r?\n/).filter((line) => /^not ok|^✖/.test(line.trim())).slice(0, 3)
-  return { pass: false, detail: failed.join(' | ') || 'test runner exited non-zero' }
+  return {
+    pass: false,
+    detail: [failed.join(' | ') || 'test runner exited non-zero', countProblem].filter(Boolean).join(' | '),
+  }
 }
 
 function gateGraph(base = root, strict = false) {
   const graphArgs = ['tools/graph.mjs', '--check', ...(strict ? ['--strict'] : [])]
   const result = run(graphArgs, base)
-  if (result.code === 0) return { pass: true, detail: strict ? 'structure + diagrams' : 'structure' }
-  const failed = result.output.split(/\r?\n/).filter((line) => line.trim().startsWith('- ')).slice(0, 3)
+  if (result.code === 0) {
+    // 把 graph 的读数带进门禁行：模块/边/生产文件数都是现场核过的事实，不只是「structure」
+    const line = result.output.split(/\r?\n/).find((item) => item.startsWith('[graph] OK'))
+    const detail = line === undefined ? (strict ? 'structure + diagrams' : 'structure') : line.replace(/^\[graph\] OK：/, '').replace(/（[^）]*）$/, '')
+    return { pass: true, detail }
+  }
+  const failed = result.output.split(/\r?\n/).filter((line) => line.trim().startsWith('- ')).slice(0, 3).map((line) => line.trim())
   return { pass: false, detail: failed.join(' | ') || 'graph exited non-zero' }
 }
 
-function gateDocs(base = root) {
-  const result = run(['tools/docs-check.mjs', '--root', base], base)
-  if (result.code === 0) return { pass: true, detail: result.output.split(/\r?\n/)[0] ?? 'docs' }
-  const failed = result.output.split(/\r?\n/).filter((line) => line.trim().startsWith('- ')).slice(0, 3)
-  return { pass: false, detail: failed.join(' | ') || 'docs-check exited non-zero' }
+function gateDocs(base = root, options = {}) {
+  const problems = []
+  const docs = run(['tools/docs-check.mjs', '--root', base], base)
+  const countsArgs = ['tools/counts-check.mjs', '--root', base]
+  if (Number.isInteger(options.gateCount)) countsArgs.push('--gates', String(options.gateCount))
+  const counts = run(countsArgs, base)
+  const dashes = (result) => {
+    const lines = result.output.split(/\r?\n/).filter((line) => line.trim().startsWith('- ')).slice(0, 3)
+    return lines.length > 0 ? lines : [result.output.split(/\r?\n/).filter((line) => line.trim() !== '')[0] ?? 'exited non-zero']
+  }
+  if (docs.code !== 0) problems.push(...dashes(docs))
+  if (counts.code !== 0) problems.push(...dashes(counts))
+  if (problems.length > 0) return { pass: false, detail: problems.join(' | ') }
+  const docsLine = docs.output.split(/\r?\n/).find((line) => line.startsWith('[docs]')) ?? 'docs'
+  const countsLine = counts.output.split(/\r?\n/).find((line) => line.startsWith('[counts]')) ?? 'counts'
+  return { pass: true, detail: `${docsLine}；${countsLine}` }
 }
 
 /**
@@ -259,8 +328,23 @@ function gateDocs(base = root) {
  * 适用版本」，这里管其余部分。
  */
 function gateReadmeGate(base = root) {
-  const result = gateReadme(base)
-  return { pass: result.pass, detail: result.detail }
+  let result
+  try {
+    result = gateReadme(base)
+  } catch (error) {
+    // 门禁偶发抛错也得是「红」而不是整条 check 崩掉：README.en.md 被删时 gateReadme 会抛。
+    return { pass: false, detail: `readme 门抛错：${String(error?.message ?? error)}` }
+  }
+  // 结构检查项数也是已发布计数：与单一来源对不上就红（README 加了检查项要同步 known-counts.json）
+  const expected = knownCount('readmeChecks')
+  const countProblem = expected !== undefined && result.total !== expected
+    ? `README 结构检查项 ${result.total} != 单一来源 scripts/known-counts.json 的 ${expected}`
+    : undefined
+  if (result.pass && countProblem === undefined) return { pass: true, detail: result.detail }
+  return {
+    pass: false,
+    detail: [result.pass ? undefined : result.detail, countProblem].filter(Boolean).join(' | '),
+  }
 }
 
 /**
@@ -565,8 +649,12 @@ if (selfTest) {
     console.log(`${item.pass ? 'PASS' : 'FAIL'}  ${item.name.padEnd(32)} ${item.detail}`)
     if (!item.pass) failed += 1
   }
+  // 负例条数也是已发布计数：不新增、也不许悄悄少。这条不进 cases，免得把「17」本身撑大。
+  const expectedCases = knownCount('selfTestCases')
+  const countOk = expectedCases === undefined || cases.length === expectedCases
+  if (!countOk) console.error(`FAIL  ${'self-test case count'.padEnd(32)} cases.length=${cases.length} != 单一来源 scripts/known-counts.json 的 ${expectedCases}`)
   console.log(`summary  pass=${cases.length - failed} fail=${failed} total=${cases.length}`)
-  process.exit(failed === 0 ? 0 : 1)
+  process.exit(failed === 0 && countOk ? 0 : 1)
 }
 
 const gates = [
@@ -582,12 +670,24 @@ if (layer === 'full') {
   gates.push(['graph-strict', gateStrict])
 }
 
+/**
+ * 已发布计数「七道门」指的是 fast 层。`graph-strict` 是 full 层附加的一步，
+ * 不算进这个数——否则 `--layer full` 会让 docs 门的门数比对误红。
+ */
+const coreGateCount = gates.filter(([name]) => name !== 'graph-strict').length
+
 let failed = 0
 let skipped = 0
 const started = Date.now()
 for (const [name, gate] of gates) {
   const at = Date.now()
-  const result = name === 'version' ? gate(root, { dshVersion }) : gate()
+  // 只给需要上下文的门传第二个参数：version 要 --dsh-version，docs 要本次运行的门数
+  // （与单一来源比对）；其余门显式只传 root，免得把 options 误当 gateGraph 的 strict。
+  const result = name === 'version'
+    ? gate(root, { dshVersion, gateCount: coreGateCount })
+    : name === 'docs'
+      ? gate(root, { gateCount: coreGateCount })
+      : gate(root)
   const ms = Date.now() - at
   if (result.skipped) skipped += 1
   if (!result.pass) failed += 1

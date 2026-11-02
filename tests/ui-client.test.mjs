@@ -48,22 +48,27 @@ function fakeReact() {
         run()
       }
     },
+    /** 假 React 不会在 setState 后自己重渲染：测试要取「落地后的树」时先归零 hook 游标再调一次。 */
+    reset() { cursor = 0 },
   }
 }
 
 /** 把 bundle 装进一个假装载器，返回它导出的模块。 */
 function loadBundle() {
   let spec
+  let react
   const window = { __ModuleLoader__: { load(captured) { spec = captured } } }
   // eslint-disable-next-line no-new-func -- 就是要在沙箱里跑这段浏览器代码
   const run = new Function('window', source)
   run(window)
   assert.ok(spec !== undefined, 'bundle 没有调用 window.__ModuleLoader__.load')
   const require = (name) => {
-    if (name === 'react') return fakeReact()
+    if (name === 'react') { react = fakeReact(); return react }
     throw new Error(`unexpected require: ${name}`)
   }
-  return spec.factory(require)
+  const module = spec.factory(require)
+  module.__react = react
+  return module
 }
 
 /** 一次典型的 snapshot：字段与 `enhance-scope/index.js` 的 snapshot() 对齐。 */
@@ -90,6 +95,16 @@ const SNAPSHOT = {
     degraded: false,
     reason: null,
     preview: 'You are an AI agent powered by DeepSeek Harness.',
+  },
+  identityInstall: {
+    state: 'installed',
+    ok: true,
+    reason: null,
+    text: '已接上：1 个 agent 作用域可用；当前「保留」，没有要遮蔽的段。',
+    agents: 1,
+    installed: 1,
+    scoped: 1,
+    shadowed: 0,
   },
   updatedAt: '2026-10-28T14:32:00.000Z',
   degraded: false,
@@ -752,4 +767,65 @@ test('品牌人设：组内副标题要覆盖三处自指，不能只说开场�
 test('品牌人设：开关开着时，后果行不许再说「一个字不动」', () => {
   assert.ok(!source.includes('本插件一个字不动'), '只有开关关着才成立的话，不许无条件写出来')
   assert.ok(source.includes('另外两段说明也已隐藏'), '开关开着时要补一句，说明另外两段也被处理了')
+})
+
+// ───────────────────────────────────────────── 品牌人设：装上了没有（T25，审计缺口 1）
+
+test('品牌人设：装不上时状态词说「未生效」，不说「已替换」；keep 且没开隐藏时不虚惊', () => {
+  const { identityStatusOf } = loadBundle().__testing
+  const unsupported = { state: 'unsupported', ok: false, text: '未生效：本版宿主没有可注入的 agent 上下文。' }
+  // 用户选了「自定义/去掉」却装不上：页面必须在状态词上就改口，不能继续说「已替换」。
+  assert.deepEqual(
+    identityStatusOf({ enabled: true, identity: 'custom', hideHarness: false, identityEffective: { mode: 'custom' }, identityInstall: unsupported }),
+    { word: '未生效', tone: 'warn' },
+  )
+  assert.deepEqual(
+    identityStatusOf({ enabled: true, identity: 'remove', hideHarness: false, identityEffective: { mode: 'remove' }, identityInstall: unsupported }),
+    { word: '未生效', tone: 'warn' },
+  )
+  // keep 且没开隐藏：本来就没有要遮蔽的段，报「未生效」是虚惊。
+  assert.equal(identityStatusOf({ enabled: true, identity: 'keep', hideHarness: false, identityEffective: { mode: 'keep' }, identityInstall: unsupported }).word, '原样')
+  // keep + 隐藏说明：那时确实有要装的遮蔽项。
+  assert.equal(identityStatusOf({ enabled: true, identity: 'keep', hideHarness: true, identityEffective: { mode: 'keep' }, identityInstall: unsupported }).word, '未生效')
+  // 总开关关着优先，且不因为装不上而变红。
+  assert.equal(identityStatusOf({ enabled: false, identity: 'custom', hideHarness: false, identityEffective: {}, identityInstall: unsupported }).word, '不生效')
+  // 装上了 / 旧快照没有这个字段：原判定一个都不变。
+  assert.equal(identityStatusOf({ enabled: true, identity: 'custom', hideHarness: false, identityEffective: { mode: 'custom' }, identityInstall: { ok: true } }).word, '已替换')
+  assert.equal(identityStatusOf({ enabled: true, identity: 'custom', hideHarness: false, identityEffective: { mode: 'custom' } }).word, '已替换')
+})
+
+test('品牌人设：安装状态那一行会渲染出来（服务端给了才画）', async () => {
+  const module = loadBundle()
+  let component
+  module.apply({
+    slots: {
+      inject: (_name, run) => run(),
+      register: (_spec, registered) => { component = registered; return () => {} },
+    },
+  })
+  const line = '未生效：本版宿主没有可注入的 agent 上下文（agent.ctx.inject 不可用），品牌人设这一路这轮不生效。'
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ ...SNAPSHOT, identityInstall: { state: 'unsupported', ok: false, text: line } }),
+  })
+  try {
+    // 首帧只负责触发 state 请求；假 React 不会自己在 setState 后重渲染，
+    // 所以第二次调用组件取「已落地的快照」渲染出来的树。
+    component({})
+    await new Promise((resolve) => setImmediate(resolve))
+    module.__react.reset()
+    const tree = component({})
+    const strings = []
+    const walk = (node) => {
+      if (typeof node === 'string') { strings.push(node); return }
+      if (node === null || node === undefined || typeof node !== 'object') return
+      if (Array.isArray(node)) { node.forEach(walk); return }
+      for (const child of node.children ?? []) walk(child)
+    }
+    walk(tree)
+    assert.ok(strings.includes(line), '安装状态行没有出现在渲染树里')
+  } finally {
+    delete globalThis.fetch
+  }
 })

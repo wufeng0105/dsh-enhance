@@ -10,9 +10,14 @@
  * 三条检查，都只读：
  *   1. 正文（代码块与行内代码之外）里的字面 `反斜杠+n` / `反斜杠+t`——写盘转义没生效的痕迹
  *   2. 相对链接指向的文件必须存在
- *   3. 反引号里点名的 `docs/...` 路径必须存在；只扫 README 与 `docs/` 下的 markdown，
- *      草稿区 `.zhll/` 根本不在收集范围（见 `collectDocs`）。只扫正文（代码块里的命令
- *      不按路径查），带 `<...>` 或 `*` 占位的不查，带 `:行号` 的按路径查
+ *   3. 反引号里点名的 `docs/...` 路径必须存在
+ *
+ * 收集范围：README.md、CHANGELOG.md、CONTRIBUTING.md、`docs/**` 下的 markdown。
+ * 后两份是 2026-11-02 补进来的（审计 §3.3：`CHANGELOG.md`、`CONTRIBUTING.md` 根本不在
+ * 收集范围，于是它们里面的死路径与字面转义没人管）。三份根文档必须存在：删掉一份不是
+ * 「没写坏」，是门禁瞎了——所以缺文件也判红。
+ * 草稿区 `.zhll/` 仍不在收集范围（不入库、不随包发布）。只扫正文（代码块里的命令
+ * 不按路径查），带 `<...>` 或 `*` 占位的不查，带 `:行号` 的按路径查
  *
  * 退出码：0 全过；1 有问题或用法错（用法错只打一行消息，不吐栈）。
  *
@@ -51,6 +56,9 @@ try {
 
 const projectRoot = options.root
 
+/** 必须存在的根文档：少一份就是门禁瞎了，不是「没写坏」。 */
+const REQUIRED_DOCS = ['README.md', 'CHANGELOG.md', 'CONTRIBUTING.md']
+
 /** 参与检查的文档。 */
 function collectDocs() {
   const out = []
@@ -64,9 +72,12 @@ function collectDocs() {
       if (entry.isFile() && entry.name.endsWith('.md')) out.push(path)
     }
   }
-  if (existsSync(join(projectRoot, 'README.md'))) out.push(join(projectRoot, 'README.md'))
+  for (const name of REQUIRED_DOCS) {
+    const path = join(projectRoot, name)
+    if (existsSync(path)) out.push(path)
+  }
   if (existsSync(join(projectRoot, 'docs'))) add(join(projectRoot, 'docs'))
-  // 只收 README 与 docs/ 这两处：草稿区（.zhll/）与宿主仓库不在收集范围，本来就不会被扫到
+  // 草稿区（.zhll/）与宿主仓库不在收集范围，本来就不会被扫到
   return out
 }
 
@@ -85,6 +96,11 @@ function proseLines(text) {
 }
 
 const problems = []
+
+// 缺必需文档 = 门禁静默失效，先判红：后面三条检查都只对「收到的文件」负责
+for (const name of REQUIRED_DOCS) {
+  if (!existsSync(join(projectRoot, name))) problems.push(`缺必需文档：${name}（不在收集范围不是「没写坏」，是门禁瞎了）`)
+}
 
 for (const file of collectDocs()) {
   const text = readFileSync(file, 'utf8')
@@ -123,4 +139,4 @@ if (problems.length > 0) {
   for (const problem of problems) console.error(`  - ${problem}`)
   process.exit(1)
 }
-console.log(`[docs] OK：${collectDocs().length} 份文档，字面转义 / 死链 / 死路径三项都过`)
+console.log(`[docs] OK：${collectDocs().length} 份文档（README + CHANGELOG + CONTRIBUTING + docs/**），字面转义 / 死链 / 死路径三项都过`)

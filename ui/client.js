@@ -211,11 +211,19 @@ window.__ModuleLoader__.load({
 		 * 品牌人设的现状词。判定顺序从上到下：
 		 * 「总开关关着」和「降级」都排在模式词前面——那两种情况下，
 		 * 「已替换」这个结论根本不成立（实际发出去的还是宿主原句）。
+		 *
+		 * 「装不上」排在降级之前，但要先排除 keep 且没开隐藏的情况：那时本来就没有
+		 * 要遮蔽的段，报「未生效」是虚惊。装不上又说了「已替换」，就是这一页最不该出的错。
 		 */
 		function identityStatusOf(state) {
 			if (state === null) return { word: "—", tone: "mute" };
 			if (state.enabled === false) return { word: "不生效", tone: "mute" };
 			var effective = state.identityEffective || {};
+			var install = state.identityInstall || null;
+			if (install !== null && install.ok === false
+				&& (effective.mode === "custom" || effective.mode === "remove" || state.hideHarness === true)) {
+				return { word: "未生效", tone: "warn" };
+			}
 			if (effective.degraded === true) return { word: "降级运行", tone: "warn" };
 			// 这一组管三处自指（开场白 + 两段说明），所以「原样」只有在**两件都没动**时才成立。
 			// 只看三态会让「开关开着、三态是保留」显示成「原样」——可那四段其实已经被隐藏，
@@ -602,6 +610,13 @@ window.__ModuleLoader__.load({
 			} else if (state !== null && identityEffective.degraded === true) {
 				identityDetail.push(h("p", { className: "enh-hint", key: "deg" }, "没有按设置生效：" + (identityEffective.reason || "未知原因") + "；此刻发出去的仍是宿主原句。"));
 			}
+			// 「装上了没有」单独一行，服务端给了才显示：过去装不上是静默的，
+			// 页面照样说「已替换」——这一行就是补那个缺口。errorLine 不在这里用：
+			// 宿主 API 不在不是用户能修的错误，说清事实即可，不把整页判红。
+			var identityInstall = state === null ? null : (state.identityInstall || null);
+			var identityInstallLine = identityInstall !== null && typeof identityInstall.text === "string"
+				? h("p", { className: "enh-hint" }, identityInstall.text)
+				: null;
 
 			var identityActions = [];
 			if (identityEffective !== null && identityEffective.preview !== undefined) {
@@ -679,6 +694,7 @@ window.__ModuleLoader__.load({
 						),
 					),
 					identityActions.length === 0 ? null : h("div", null, identityActions),
+					identityInstallLine,
 					errorLine("identity"),
 				),
 				[state === null
@@ -851,7 +867,7 @@ window.__ModuleLoader__.load({
 
 			// ---- 05 检查 ----
 			var blockCheck = group("enh-block-check", "检查",
-				"扫最近的会话日志（一次 10 份，任一命中即过）读回系统提示，看这段文字在不在末尾。只读，不改任何东西。",
+				"扫最近的会话日志（一次 10 份，任一命中即过）读回系统提示：看内容边界这段文字在不在末尾；品牌人设选了「去掉」或「自定义」时，再核一遍宿主原句有没有真的被换掉。只读，不改任何东西。",
 				checks === null ? "还没查过" : (allPass ? "全部通过" : "有失败项"),
 				checks === null ? "mute" : (allPass ? "ok" : "bad"),
 				h("div", { className: "enh-stack" },
@@ -876,7 +892,7 @@ window.__ModuleLoader__.load({
 				[checks === null
 					? null
 					: allPass
-						? "四项都过了：插件在进程里、文字合规、真的进了系统提示、Enhanced 档状态明确。"
+						? "四项都过了：插件在进程里、文字合规、真的进了系统提示（内容边界 + 品牌人设）、Enhanced 档状态明确。"
 						: "有项没过，现在还确认不了它真的生效；证据列写的是卡在哪。",
 				]);
 
@@ -932,6 +948,7 @@ window.__ModuleLoader__.load({
 			checkRows: checkRows,
 			approvalOf: approvalOf,
 			presetStatusOf: presetStatusOf,
+			identityStatusOf: identityStatusOf,
 		};
 		return module.exports;
 	},

@@ -16,7 +16,7 @@
       "id": "plugin.scope",
       "layer": "plugin",
       "path": "enhance-scope/index.js",
-      "owns": "内容边界注入 + 品牌人设（按 agent 遮蔽宿主同名段与 context）+ /enhance/api 路由（state / set / check / preset）+ 本机版本探测（只读 app.asar 清单）"
+      "owns": "内容边界注入 + 品牌人设（按 agent 遮蔽宿主同名段与 context，含安装状态 identityInstall 与 identityShadowProof 遮蔽回验）+ /enhance/api 路由（state / set / check / preset）+ 本机版本探测（只读 app.asar 清单）"
     },
     {
       "id": "plugin.approve",
@@ -28,7 +28,7 @@
       "id": "core.session-probe",
       "layer": "core",
       "path": "shared/session-probe.mjs",
-      "owns": "会话日志探针：证明边界文本真的进了系统提示"
+      "owns": "会话日志探针：正向证明边界/人设文本真的进了系统提示（sessionContains），反向证明宿主原句真的被顶掉（sessionOmits）"
     },
     {
       "id": "plugin.ui",
@@ -46,7 +46,31 @@
       "id": "tool.docs-check",
       "layer": "cli",
       "path": "tools/docs-check.mjs",
-      "owns": "文档门禁：字面转义 / 死链 / 死路径"
+      "owns": "文档门禁：字面转义 / 死链 / 死路径（收集 README + CHANGELOG + CONTRIBUTING + docs/**；根文档缺一份也判红）"
+    },
+    {
+      "id": "tool.asar-read",
+      "layer": "cli",
+      "path": "tools/asar-read.mjs",
+      "owns": "asar 只读读取器（零依赖）：解析头、列条目、按路径取字节；宿主原文核对共用这一份实现"
+    },
+    {
+      "id": "tool.host-check",
+      "layer": "cli",
+      "path": "tools/host-check.mjs",
+      "owns": "宿主原文基准核对：只读 asar，查 harness:identity 座位、HOST_IDENTITY_SENTENCE 逐字命中、harness:source / app:web-surface 的 section+context 成对；没有 asar 如实跳过，坏 asar 判红"
+    },
+    {
+      "id": "tool.counts-check",
+      "layer": "cli",
+      "path": "tools/counts-check.mjs",
+      "owns": "文档计数一致性：读 scripts/known-counts.json 单一来源，扫文档里的测试/负例/门数/检查项/断言/组数/触点声明；生产事实（设置组数、门数）先自证，历史核验记录不按现值校验"
+    },
+    {
+      "id": "tool.field-check",
+      "layer": "cli",
+      "path": "tools/field-check.mjs",
+      "owns": "未文档化宿主字段禁令：生产代码里出现 layers / *.layers / layers.* 入口即红，除非登记在 scripts/host-fields-allowlist.json；目录缺失或扫不到文件也判红"
     },
     {
       "id": "tool.smoke",
@@ -187,6 +211,11 @@
       "to": "host.agentScope",
       "kind": "seam",
       "via": "ctx.on('agent/created') → agent.ctx.inject(['systemPrompt']) → 按名遮蔽 harness:identity / harness:source / app:web-surface"
+    },
+    {
+      "from": "tool.host-check",
+      "to": "tool.asar-read",
+      "kind": "import"
     }
   ],
   "events": [
@@ -218,7 +247,8 @@
     ],
     "derived": [
       "injecting",
-      "identityEffective"
+      "identityEffective",
+      "identityInstall"
     ],
     "pluginScoped": [
       "active"

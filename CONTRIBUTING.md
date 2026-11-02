@@ -2,7 +2,9 @@
 
 ## 这个仓库是什么
 
-一个 DeepSeek Harness 的**插件 bundle**：在声明层换掉系统提示开头那句品牌声明、往末尾追加一段用户自己写的文本，另配越界审批三态、一个可选的自定义权限档、以及一次性的「它到底进没进提示词」检查。它不碰宿主程序；默认设置下，除声明层那几处外，也不碰宿主自带的提示词。
+一个 DeepSeek Harness 的**插件 bundle**：在声明层（系统提示里描述 harness 自身的 5 个注册项、3 个名字，定义见 [docs/terminology.md](docs/terminology.md)）换掉系统提示开头那句品牌声明、往末尾追加一段用户自己写的文本，另配越界审批三态、一个可选的自定义权限档、以及一次性的「它到底进没进提示词」检查。它不碰宿主程序；默认设置下，除声明层那几处外，也不碰宿主自带的提示词。
+
+可选的「隐藏宿主说明」不是纯品牌改动：它会连着抹掉两段带操作约定的文字与**两条 runtime context**——`pwd`（不要从 checkout 路径推断工作目录）、「别为了让改动生效另起服务器」、客户端插件改动何时才生效（HMR 要看 `pnpm run dev:web` 在不在跑）。对改 DSH / 写插件的人是实打实的行为退化，改文案时别写成「只是换个名字」。
 
 ## 环境
 
@@ -14,14 +16,14 @@
 
 ```powershell
 node scripts/check.mjs              # 七道闸：version / syntax / tests / graph / docs / readme / bundle
-node scripts/check.mjs --self-test  # 15 个负例，证明每道闸都真的能红
+node scripts/check.mjs --self-test  # 17 个负例，证明每道闸都真的能红
 ```
 
 CI 在 `windows-latest` 上跑 `--layer fast`（`.github/workflows/ci.yml`）。**PR 要让这两条都 exit 0。**
 
 ## 四条硬约束（踩了必红）
 
-1. **新源码文件必须登记进 `code-map.json`。** `graph` 门会列出「源码未登记」的文件。登记时写 `id` / `layer` / `path` / `owns`；前三个是判据，别随手改。
+1. **常驻源码（不含 `scripts/`、`tests/`）必须登记进 `code-map.json`。** `graph` 门会列出「源码未登记」的文件。登记时写 `id` / `layer` / `path` / `owns`；前三个是判据，别随手改。`scripts/` 与 `tests/` 由语法门与测试门自己守着，不进模型比对——**这句话与 `tools/graph.mjs` 的 `SKIP_DIRS` 逐字对齐，由 graph 门断言钉住**（改豁免范围要两处一起改）。
 2. **`VERSION` 与 `package.json` 的 `version` 必须逐字相同**，且 `private` 必须是 `true`——这不是 npm 包，是 profile bundle。
 3. **README 的「适用版本」句由 `package.json` 派生**，`version` 门逐字校验。要扩区间就改 `engines.dsh` 与 `dsh.compatibility`，README 那句会被门禁逼着你同步。
 4. **文档里的相对链接与反引号路径必须真实存在**。`docs` 门查死链、死路径，也查正文里写坏的字面 `\n` / `\t`。

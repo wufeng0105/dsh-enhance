@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "note": "文档计数的唯一来源。改测试条数 / 负例数 / 门数 / README 检查项 / 冒烟断言 / 设置组数 / 触点条数时，先改这里，再让门禁逼着文档一起改（docs 门跑 tools/counts-check.mjs）。历史核验记录里的旧读数不按现值校验：那是当时的事实。",
+  "counts": {
+    "tests": {
+      "value": 161,
+      "kind": "computed",
+      "computedBy": "tests 门的 `ℹ tests N`（scripts/check.mjs 现场比对，不等就判红）"
+    },
+    "selfTestCases": {
+      "value": 17,
+      "kind": "computed",
+      "computedBy": "`node scripts/check.mjs --self-test` 的 cases.length（现场比对；已发布计数，增删都要走文档批）"
+    },
+    "gates": {
+      "value": 7,
+      "kind": "computed",
+      "computedBy": "scripts/check.mjs 的 gates 数组长度（docs 门通过 --gates 现场比对）"
+    },
+    "readmeChecks": {
+      "value": 132,
+      "kind": "computed",
+      "computedBy": "scripts/check-readme.mjs 的 total（readme 门现场比对）。当前没有文档声明这个数，所以它只有运行期比对、没有文档声明位"
+    },
+    "smokeAssertions": {
+      "value": 38,
+      "kind": "manual",
+      "note": "tools/smoke.ps1 要 pwsh + dsh CLI，不在 fast 层跑；这个数是人工维护值（判据：冒烟日志的 `# summary … total=38`）"
+    },
+    "settingsGroups": {
+      "value": 5,
+      "kind": "computed",
+      "computedBy": "ui/client.js 里 group(\"enh-block-…\") 的调用数（counts-check 现场数，不等就判红）"
+    },
+    "hostContacts": {
+      "value": 36,
+      "kind": "manual",
+      "note": "人工维护值：口径见 docs/compatibility.md「宿主触点」节（按「、」分段 31 + 探测链多出 5 = 36）；只校验各文档之间互相一致，并假装不了能机算"
+    }
+  }
+}

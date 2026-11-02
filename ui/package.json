@@ -2,7 +2,7 @@
   "name": "dsh-enhance-ui",
   "version": "0.1.0",
   "private": true,
-  "description": "dsh-enhance 的设置页（浏览器半）：四组设置——内容边界、越界审批、Enhanced 权限档、检查。",
+  "description": "dsh-enhance 的设置页（浏览器半）：五组设置——品牌人设、内容边界、越界审批、Enhanced 权限档、检查。",
   "type": "module",
   "exports": { ".": "./index.js", "./client": "./client.js" },
   "files": ["index.js", "client.js"],
