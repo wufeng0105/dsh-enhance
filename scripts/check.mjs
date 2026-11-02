@@ -10,7 +10,7 @@
  * 每道门禁都必须能红。`--self-test` 用一次性副本证明这一点：坏语法文件、坏测试、
  * 未登记的源文件、死链、坏 README 里的图路径、坏 bundle 声明、超限文本。
  *
- * **仍是七道门、仍是 17 个负例**（这两个数是已发布计数，见 `scripts/known-counts.json`）。
+ * **仍是七道门、20 个负例**（这两个数是已发布计数，见 `scripts/known-counts.json`）。
  * 2026-11-02 的门禁加固没有新增第八道门：宿主原文核对并进 `version` 门，文档计数一致性并进
  * `docs` 门，未文档化宿主字段禁令并进 `graph` 门，CHANGELOG/CONTRIBUTING 并进 `docs` 的收集范围，
  * README.en.md 并进 `version` 的适用版本句校验。
@@ -630,6 +630,53 @@ function runSelfTest() {
     (copy) => expectRed('图片存在')(gateReadmeGate(copy)),
   ))
 
+  // ---- 内嵌 check 组件各自的负例 ----
+  // 这三条挡的是「组件自己静默退化成永远绿」：实测过一次——把 `counts-check` 的比对
+  // 改成永远通过、同时把 `docs/compatibility.md` 的「共 36 条」写成 35，七道门与
+  // 原来的 17 条负例**全绿**，没有任何东西会响。组件的红态必须由负例钉住，
+  // 不能只靠「改的时候手工验过一次」。
+
+  cases.push(withCopy(
+    'counts-check red',
+    // 文档里的计数与单一来源不符 → docs 门的计数一致性必须判红并点名位置
+    (copy) => {
+      const file = join(copy, 'docs', 'compatibility.md')
+      const text = readFileSync(file, 'utf8')
+      const broken = text.replace('共 36 条', '共 35 条')
+      assertMutated(copy, 'docs/compatibility.md', text, broken)
+    },
+    (copy) => expectRed('hostContacts')(gateDocs(copy)),
+  ))
+
+  cases.push(withCopy(
+    'field-check red',
+    // 生产代码里写未登记的宿主字段入口 → graph 门的禁令必须判红（fail-closed）
+    (copy) => {
+      const file = join(copy, 'enhance-scope', 'index.js')
+      const text = readFileSync(file, 'utf8')
+      appendFileSync(file, '\n// probe: ctx.systemPrompt.layers\n')
+      assertMutated(copy, 'enhance-scope/index.js', text, readFileSync(file, 'utf8'))
+    },
+    (copy) => expectRed('未文档化宿主字段入口')(gateGraph(copy)),
+  ))
+
+  cases.push(withCopy(
+    'host-check red',
+    // 宿主 asar 读不出来时必须判红、**不能**当成「跳过」（跳过是「没有 asar」，不是「坏了」）
+    (copy) => {
+      const bad = join(copy, 'not-an-asar.bin')
+      writeFileSync(bad, 'garbage-not-asar', 'utf8')
+      process.env.DSH_ASAR = bad
+    },
+    (copy) => {
+      try {
+        return expectRed('asar 读不出来')(gateVersion(copy, { dshVersion: '0.2.1-rc.5' }))
+      } finally {
+        delete process.env.DSH_ASAR
+      }
+    },
+  ))
+
   return cases
 }
 
@@ -642,12 +689,39 @@ if (selfTest) {
     console.log(`${item.pass ? 'PASS' : 'FAIL'}  ${item.name.padEnd(32)} ${item.detail}`)
     if (!item.pass) failed += 1
   }
-  // 负例条数也是已发布计数：不新增、也不许悄悄少。这条不进 cases，免得把「17」本身撑大。
+  // 负例条数也是已发布计数：不新增、也不许悄悄少。这条不进 cases，免得把「20」本身撑大。
   const expectedCases = knownCount('selfTestCases')
   const countOk = expectedCases === undefined || cases.length === expectedCases
   if (!countOk) console.error(`FAIL  ${'self-test case count'.padEnd(32)} cases.length=${cases.length} != 单一来源 scripts/known-counts.json 的 ${expectedCases}`)
+
+  // 元检查：每一个内嵌 check 组件（tools/*-check.mjs）都必须至少有一条负例。
+  // 这条挡的是今天实测过一次的情形——三个新组件实现都对、但没有任何负例钉住它们的
+  // 红态；把它们改成永远绿，七道门与原来的负例**全绿、无人发现**。
+  // 加新组件时忘了配负例，这里直接红，而不是等下次退化才后悔。
+  // 约定：组件 `tools/<stem>.mjs` 的负例名是「<stem> red」去掉结尾 `-check`
+  // （`counts-check.mjs` → `counts-check red`；`docs-check.mjs` → `docs red`）；
+  // 也接受带 `-check` 的名字，两种都认。
+  const covered = (stem) => {
+    const short = stem.replace(/-check$/, '')
+    return cases.some((item) => item.name === `${stem} red` || item.name === `${short} red`)
+  }
+  const uncovered = embeddedCheckModules().filter((stem) => !covered(stem))
+  const coverageOk = uncovered.length === 0
+  if (!coverageOk) console.error(`FAIL  ${'self-test coverage'.padEnd(32)} 这些内嵌 check 组件没有负例：${uncovered.join(', ')}——加一条「<组件名> red」负例`)
+
   console.log(`summary  pass=${cases.length - failed} fail=${failed} total=${cases.length}`)
-  process.exit(failed === 0 && countOk ? 0 : 1)
+  process.exit(failed === 0 && countOk && coverageOk ? 0 : 1)
+}
+
+/** `tools/*-check.mjs` 的基名（去扩展名，保留 `-check`）：必须自带负例的内嵌组件。 */
+function embeddedCheckModules() {
+  try {
+    return readdirSync(join(root, 'tools'))
+      .filter((name) => name.endsWith('-check.mjs'))
+      .map((name) => name.slice(0, -'.mjs'.length))
+  } catch {
+    return []
+  }
 }
 
 const gates = [

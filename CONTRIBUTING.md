@@ -16,7 +16,7 @@
 
 ```powershell
 node scripts/check.mjs              # 七道闸：version / syntax / tests / graph / docs / readme / bundle
-node scripts/check.mjs --self-test  # 17 个负例，证明每道闸都真的能红
+node scripts/check.mjs --self-test  # 20 个负例，证明每道闸与每个内嵌 check 组件都真的能红
 ```
 
 CI 在 `windows-latest` 上跑 `--layer fast`（`.github/workflows/ci.yml`）。**PR 要让这两条都 exit 0。**

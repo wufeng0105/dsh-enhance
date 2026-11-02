@@ -8,9 +8,9 @@
       "computedBy": "tests 门的 `ℹ tests N`（scripts/check.mjs 现场比对，不等就判红）"
     },
     "selfTestCases": {
-      "value": 17,
+      "value": 20,
       "kind": "computed",
-      "computedBy": "`node scripts/check.mjs --self-test` 的 cases.length（现场比对；已发布计数，增删都要走文档批）"
+      "computedBy": "`node scripts/check.mjs --self-test` 的 cases.length（现场比对；已发布计数，增删都要走文档批）。其中 3 条专钉内嵌 check 组件的红态：counts-check / field-check / host-check"
     },
     "gates": {
       "value": 7,
