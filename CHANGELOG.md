@@ -27,9 +27,9 @@
 
 - 本地门禁：`node scripts/check.mjs` **7/7**、`--self-test` **17/17**、`node --test` **161** 项（1.2.0 是 152 项，本轮 +9 全在品牌人设探针）；一次性 `DSH_HOME` 真装本包（日志里 `+ dsh-enhance 1.2.1`）后冒烟 `smoke.ps1` **38/38**；
 - 新判据的三证（红灯 / 绿证 / 空转检查）留在 `gates/wp12-gates.log`：宿主核对在真 asar 上命中，假 asar 与路径不存在都 `exit 1`，没有 asar 只打印跳过；把门数改成 8 时计数门 `exit 1`；
-- **未做，留待 V3（WP15）**：干净基线远端机的重装终验**尚未执行**——`VERSION` 已升到 1.2.1，但「远端装上了 1.2.1」这句话现在没有证据，不当已做写；
+- **干净基线远端机的重装终验已执行**（WP15）：远端测试机先全量重置为干净 `0.2.1-rc.5`，随后真装本包 **1.2.1**——`dsh plugin --profile smoke add` **exit 0**、一次性 home 冒烟 **`pass=38 fail=0 total=38`**、持久装进 `headless` profile 后 `--dump-config` 三入口齐（`enhance-scope` / `auto-approve` / `enhance-ui`）、`cordis.patch.yml` 仍 `[]`；核验前后远端仓库 68 文件的 sha256 清单无差异。**设置页四项只有结构证据**：冒烟只断言 `checks` 的名字与顺序恰为 `["plugins","text","inject","preset"]`，四项各自的 `pass`/`na` 取值没有断言，也没有 GUI 证据（该机只装 `headless` profile，组合里没有 web 服务宿主）；
 - **本轮未复现**：五张图「源 JSON → 成品」的逐字节一致性没有重跑（本机没有 archify），其中 `02-prompt-injection` 与 `04-compat-verify` 是源 JSON 与 SVG 同时手改、`02` 的遮罩宽度按字宽估算；`1.1.2` 那条是那一轮自己的记录，不是本轮的复现凭证；
-- **仍阻塞**：真机会话上的装配层验收——模型凭据余额为 0，本轮只有单测、门禁与合成日志，没有真机会话日志；`hideHarness` 在桌面 / web profile 上的效果同样未验。
+- **仍阻塞**：真机会话上的装配层验收——远端真会话跑一次即 `QUOTA: Insufficient Balance`（exit 1，未重试），模型凭据余额为 0，本轮只有单测、门禁与合成日志，没有真机会话日志；要复跑缺**一次有余额的会话**。`hideHarness` 在桌面 / web profile 上的效果同样未验。
 
 ## [1.2.0] — 2026-11-02
 

@@ -22,11 +22,13 @@
   "compatibility": {
     "tested": "0.2.1-rc.5",
     "basis": "source-level",
-    "verifiedAt": "2026-10-30",
+    "verifiedAt": "2026-11-02",
     "doc": "docs/compatibility.md"
   }
 }
 ```
+
+上面片段里的 `verifiedAt`（`2026-11-02`）与 `package.json` 的 `dsh.compatibility.verifiedAt` 逐字一致，**与本文件核验记录的最新一轮一致**——这个片段记的是现值，不是历史样例。
 
 README 里那句适用版本是这份声明的派生文本，`node scripts/check.mjs` 要求两处逐字一致。它同时核对声明形状（区间解析与成员判定在 `shared/compat.mjs`，唯一实现）；探测到本机 DSH 版本不在区间内时判红，提示先跑本文的例行核验再扩区间。
 
@@ -287,18 +289,18 @@ Remove-Item -LiteralPath $env:DSH_HOME -Recurse -Force
 | 组合树 `config.presets` 三档全表、不含 `defaultPreset` | **本机可复跑**：`dsh --profile <p> --dump-config`（冒烟 4.5/4.6 覆盖） | 无 |
 | 真会话仍未验（`QUOTA`，只记录不下结论） | **不可复跑** | 需要一次**有余额的会话**才能复跑；`QUOTA` 是凭据余额状态，不是插件行为 |
 
-两段记录的差异来自**会话可用性**，不是产品行为变了：10-30 那次机器上有可用会话，才看得到「注入命中真实会话系统提示」；10-31 这次重置后无可用会话，`inject` 项因此为红。别把两段混着读成「行为回退了」。补一句口径：`inject` 仍是**一项**（键与标题都不动），但现在同时探**内容边界**与**品牌人设**两路——有装配日志却两路都不命中才是真红；没有日志时按「还没有证据」如实说，不冒充失败。
+两段记录的差异来自**会话可用性**，不是产品行为变了：10-30 那次机器上有可用会话，才看得到「注入命中真实会话系统提示」；10-31 这次重置后无可用会话，`inject` 项因此为红。别把两段混着读成「行为回退了」。补一句口径：`inject` 仍是**一项**（键与标题都不动），但它现在同时探**内容边界**与**品牌人设**两路——这两路探针是 **1.2.1 才进工作树**的，10-31 那轮还没有它们（那轮的 `inject` 只探内容边界）。有装配日志却两路都不命中才是真红；没有日志时按「还没有证据」如实说，不冒充失败。
 
 ### 2026-11-02（1.2.0 品牌人设；36 条触点那一轮）
 
 触点表加了一条（`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽），独立触点项由 35 条重数为 36 条。这一轮核的就是这条新触点，做法与结论：
 
 - **宿主侧逐条核对（本机 `0.2.1-rc.5` 的 `app.asar` 只读）**：`@deepseek-ai/dsh-system-prompt` 里 `HARNESS_IDENTITY` 座位与 `"You are an AI agent powered by DeepSeek Harness."` 原文、`@deepseek-ai/dsh-harness-dev-context` 里 `harness:source` / `app:web-surface` 两个名字同时用于 section 与 context、`@deepseek-ai/dsh-agent` 的 `agent/created` 载荷为 `{ agent, source, signal }` 且 `agent.ctx` 是可注入的 agent 作用域上下文、`@deepseek-ai/dsh-file-reference-local` 就是 `agent.ctx.inject(['systemPrompt'], …)` 的现成先例——全部与契约「为什么是「按 agent 遮蔽同名段」」的假设一致。**复跑条件**：本机可复跑（只读解 asar 头，读法见「例行核验」第 3 步末尾；「21 个文件含 `engines.dsh`」按同一读法复算）。但**基准不是原封发行件**：本机 `app.asar` 与同目录 `app.asar.bak-2026-10-31T09-42-57-481Z` 等长（182766714 B）而内容差一个条目——`dsh-sandbox-windows-acl` 的 `types-*.js` 一行等长替换（改动者不是本插件）。它与这一轮核对的四个包无关，所以结论不变；要拿干净基准，先用安装器重装一次再核。
-- **真机端到端（远端机全量重置后）**：静默重装 `0.2.1-rc.5` → `dsh plugin --profile headless add` 与 `--profile desktop add`（均 exit 0）→ `--dump-config` 组合出三个入口；`headless` 首启种下 `state.json` **v4 五键**；设置页后端 `/enhance/api` 的 `state` 快照在桌面端 GUI 上返回 `version=4 / identityLimit=2048`，并带上 `identityInstall`（装没装上如实上报：`state` 取 `installed`/`pending`/`unsupported`/`idle`，`ok` 是三值——`true` 装上、`false` 明确装不上、`null` 还没有 agent 可判，`text` 是给页面那一行的人话）；`check` 四项全绿——其中 `inject` 同时探**内容边界**与**品牌人设**两路（`custom` 要命中 `identity.txt` 的文本、`remove` 不得再出现宿主原句、`keep` 这一路不判；缺失性走 `sessionOmits` 反向探针，只看最新一份含 `"system-prompt"` 装配记录的日志）；桌面端 GUI 的「增强」一节实际渲染出五组（用户截图确认）。**复跑条件**：**不可复跑**——需要那台可整机重置的远端测试机、桌面 GUI 与一次**有余额的会话**，三样缺一样都复不了；本机 `desktop` profile 装的是 1.1.2，连「装的是本轮代码」这个前提都不成立。
-- **装配层验收（契约「做到什么算成」的第 1、3 条）在真机会话日志上成立**——这是 10-31 那次欠下的那项，这次补上了。做法：把 `identity` 设成 `custom`、写 `identity.txt`、`hideHarness=true`，跑一次 `dsh --profile headless headless "…"`，再解压会话日志看 `system/message` 的文本：
+- **真机端到端（远端机全量重置后）**：静默重装 `0.2.1-rc.5` → `dsh plugin --profile headless add` 与 `--profile desktop add`（均 exit 0）→ `--dump-config` 组合出三个入口；`headless` 首启种下 `state.json` **v4 五键**；设置页后端 `/enhance/api` 的 `state` 快照在桌面端 GUI 上返回 `version=4 / identityLimit=2048`；`check` 四项全绿——按**这一轮的探针口径**读：那一轮的 `inject` 只探**内容边界**一路，还没有品牌人设那一路（**1.2.1 起 `inject` 另加品牌人设一路**，该轮口径与实测见下面「2026-11-02（1.2.1 收口轮）」）；桌面端 GUI 的「增强」一节实际渲染出五组（用户截图确认）。**复跑条件**：**不可复跑**——需要那台可整机重置的远端测试机、桌面 GUI 与一次**有余额的会话**，三样缺一样都复不了；本机 `desktop` profile 装的是 1.1.2，连「装的是本轮代码」这个前提都不成立。
+- **装配层验收（契约「做到什么算成」的第 1、3 条）在真机会话日志上成立**——这是 10-31 那次欠下的那项，这次补上了。做法是**手工**的：把 `identity` 设成 `custom`、写 `identity.txt`、`hideHarness=true`，跑一次 `dsh --profile headless headless "…"`，再解压会话日志看 `system/message` 的文本：
   - `custom` 态：system 节点第一句是 `You are Aria, a private assistant.`，宿主原句 `You are an AI agent powered by DeepSeek Harness.` **在整份会话里 0 命中**；
   - 切回 `keep` 态：第一句**逐字回到**宿主原句，自定义文本 0 命中。
-  两条都只改声明层——内容边界那句在两种状态下都在。**复跑条件**：**不可复跑**——要改完 `identity` 后**新起一次真会话**，而那需要一次**有余额的会话**（本机余额 0，`dsh --profile headless headless "…"` 直接 `QUOTA` exit 1）；还要 `custom` 与 `keep` 两次会话日志作对照，才能复跑。
+  两条都只改声明层——内容边界那句在两种状态下都在。这条路径**不依赖任何 1.2.1 才进工作树的能力**（它是改设置 + 跑一次 headless + 解压日志，那几件新探针一件都没用上），所以它是这一轮的记录，不下移到别轮。**复跑条件**：**不可复跑**——要改完 `identity` 后**新起一次真会话**，而那需要一次**有余额的会话**（本机余额 0，`dsh --profile headless headless "…"` 直接 `QUOTA` exit 1）；还要 `custom` 与 `keep` 两次会话日志作对照，才能复跑。**这条限制的是「今天能不能重跑一遍」，不是「那一轮验没验过」**——当时读的那两份会话日志的读数就记在上面这两行。
 - **仍然没验的**：`hideHarness` 在**桌面/web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，所以那两段在 `headless` 上本来就注册不到（基线里也是 0 命中），无从对比。这一项留给一次桌面端真会话。**复跑条件**：**不可复跑**——需要一次**桌面端真会话**才复得了；本机没有桌面会话可跑。
 - **顺带纠正一处旧记录**：`dsh --version` **不会**重建 `.dsh`（10-31 那次记反了）。真正重建的是一次 profile 引导：`dsh headless "…"` 即便因 `QUOTA` 退出码 1，`~/.dsh` 也已生成。本次实测确认（2026-11-02 本机复核：临时 `DSH_HOME` 下 `dsh --version` 后目录仍不存在；`dsh plugin --profile t list` 之后 `profiles/t/` 就出现了）。**复跑条件**：**本机可复跑**，命令即这两步。
 
@@ -308,9 +310,30 @@ Remove-Item -LiteralPath $env:DSH_HOME -Recurse -Force
 |---|---|---|
 | 宿主侧 asar 逐条核对（`0.2.1-rc.5` 只读） | **本机可复跑**：只读解 asar 头 + 上面那四个包的条目对照 | 步骤上不缺；但**基准不是原封发行件**（本机差一个 `dsh-sandbox-windows-acl` 条目），要干净基准得先重装 |
 | 真机端到端（远端重置 + 双 profile 装包 + 设置页五组 + `check` 四项全绿） | **不可复跑** | 需要一台可整机重置的远端测试机（规格与连接方式见 10-31 那轮开头）、桌面 GUI、一次**有余额的会话**；本机 `desktop` profile 装的是 1.1.2 |
-| 装配层验收：`custom` 命中自定义句 / `remove` 后宿主原句 0 命中 / 切回 `keep` 逐字回原句 | **不可复跑** | 需要改完 `identity` 后**新起真会话** + `custom`/`keep` 两份会话日志作对照，而真会话要**有一次有余额的会话** |
+| 装配层验收：`custom` 态第一句是自定义文本、宿主原句 0 命中 / 切回 `keep` 逐字回原句 | **不可复跑** | 需要改完 `identity` 后**新起真会话** + `custom`/`keep` 两份会话日志作对照，而真会话要**有一次有余额的会话** |
 | `hideHarness` 在桌面 / web profile 上的效果 | **不可复跑** | 需要一次**桌面端真会话**；本机没有桌面会话可跑 |
 | 「`dsh --version` 不重建 `.dsh`」这处纠正 | **本机可复跑**：临时 `DSH_HOME` 下 `dsh --version` 后目录不存在，再跑一次带 `--profile` 的命令就出现 | 无 |
+
+### 2026-11-02（1.2.1 收口轮；干净基线远端机真装 1.2.1）
+
+这一节记的是 **1.2.1** 的能力归属与它在真机上的读数。上面 1.2.0 那一轮装进去的包**不含**下面这些能力，所以它们不写在那轮里。
+
+**先勘时段归属。** `identityInstall`（`state` 快照的上报字段，由 `describeIdentityInstall` 派生）、`inject` 的「内容边界 + 品牌人设」两路（由 `identityShadowProof` 判定）、反向探针 `sessionOmits` 都是 **1.2.1 才进工作树**的（本轮改动之前，这四个名字在上一版代码里各 0 命中）。原先挂在 1.2.0 那轮的两处说法（`state` 快照带 `identityInstall`、`inject` 两路与 `sessionOmits`）因此从那轮叙述里移出，改按下面的实测重写。**这次移出只覆盖上面这两个字段，不覆盖那一轮的装配层验收**：那轮的装配层验收走的是**手工路径**（设 `identity=custom`、写 `identity.txt`、跑 headless、解压会话日志看 `system/message`），不碰上面任何一件新探针，所以它**不属时段错位**——它已按原记录恢复在上一节；那轮的「`check` 四项全绿」在当时的口径（`inject` 只探内容边界）下也成立，同样保留。
+
+- **能力进树（1.2.1）**：`state` 快照新增 `identityInstall`——`ok` 是三值：`true` 装上、`false` 明确装不上、`null` 还没有 agent 可判，不把「还没有证据」报成失败；`inject` 从只探内容边界扩成「**内容边界 + 品牌人设**」两路（`custom` 要命中 `identity.txt` 的文本、`remove` 不得再出现宿主原句、`keep` 这一路不判）；缺失性走反向探针 `sessionOmits`，只看**最新一份**含 `"system-prompt"` 装配记录的日志（按 mtime 倒序取第一份，不让切换设置前的旧日志把检查永久判红）。
+- **干净基线远端机真装 1.2.1（本轮实测）**：远端测试机已全量重置为干净 `0.2.1-rc.5`（重置过程见 10-31 那轮开头）。本轮真装 **1.2.1**：`dsh plugin --profile smoke add <仓库>` → **exit 0**（输出 `+ dsh-enhance 1.2.1`）；一次性 home 冒烟 **`pass=38 fail=0 total=38`**（进程内驱动真实插件入口，含 `3.5.7` 在同一个活 agent 上「去掉 → 自定义」真的换上自定义文本）；持久装进 `headless` profile 后 `--dump-config` 三个入口齐——`enhance-scope` / `auto-approve` / `enhance-ui` 各命中一次；`profiles/headless/cordis.patch.yml` 仍是 `[]`（本包不替用户改 patch）；核验前后两次算的远端仓库 **68 文件** sha256 清单无差异、**820967 B** 不变（本包没动被核对的源码）。
+- **设置页四项只到结构证据**：冒烟 `3.4` 断到的是 `op=check` 返回的 `checks` **名字与顺序**恰为 `["plugins","text","inject","preset"]`；四项**各自的 `pass`/`na` 取值本轮没有任何断言**，而且这一次性 home 里没有会话日志，`inject` 本来就不可能绿。可以说的只有一句：四项经**插件自己的真实路由 handler** 返回（合成 ctx 只补上 `webServer` 的 `register`，请求解析、判定与 JSON 响应都是真的），名字与顺序已断言。**四项各自是绿是红，到今天没有任何证据**，也没有浏览器 / DOM 证据——本轮只装了 `headless` profile，组合树里没有 web 服务宿主，设置页的 HTTP 端点在这台机上起不来。
+- **真机会话仍是阻塞**：`dsh --profile headless headless "hi"` 跑一次即 **`QUOTA: Insufficient Balance`**（exit 1），**未重试、未动凭据**。所以**本轮想再跑一次真会话、补一份 1.2.1 装配结果的读数**这件事没有做成：这一轮**没有新增**任何真机会话读数，只记录、不下结论——这不改变 1.2.0 那轮已成立的那对读数（见上一节），也不拿它当「当时没验成」的凭据。**复跑条件**：**不可复跑**——需要**一次有余额的会话**才能复跑（`QUOTA` 是凭据余额状态，不是插件行为），且要 `custom` 与 `keep` 两次会话日志作对照。
+
+**本轮逐条复跑条件**：
+
+| 记录条目 | 复跑条件 | 缺什么 |
+|---|---|---|
+| 远端重置为干净 `0.2.1-rc.5` 后真装 1.2.1（`plugin --profile smoke add` exit 0） | **不可复跑** | 需要一台可整机重置的测试机与连接方式（规格见 10-31 那轮开头），本机是日常机、不能当重置对象 |
+| 冒烟 `pass=38 fail=0 total=38`（含 `3.5.7` 的活 agent 换文） | **本机可复跑**：`pwsh -NoProfile -File tools/smoke.ps1` | 无 |
+| `--dump-config` 三入口齐 + `cordis.patch.yml` 仍 `[]` | **本机可复跑**：冒烟 `0.3`/`0.4` 与 `3.3` 覆盖 | 无 |
+| 远端仓库 68 文件 sha256 清单前后无差异 | **不可复跑** | 需要那台测试机（清单是对远端仓库逐文件算 `Get-FileHash`） |
+| 真会话 `QUOTA`（只记录、不下结论） | **不可复跑** | 需要**一次有余额的会话** |
 
 ## 两个与「写入 Enhanced 档」按钮直接相关的宿主事实
 
