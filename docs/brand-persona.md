@@ -89,24 +89,35 @@ You are an AI agent powered by DeepSeek Harness.
 
 ## 5. 为什么是「按 agent 遮蔽同名段」
 
-本插件现有能力都挂在宿主接缝上。要把全局注册的 `harness:identity` 换掉，宿主提供了两条路，官方口径是**用够用的最弱机制**：
+本插件现有能力都挂在宿主接缝上。要把全局注册的 `harness:identity` 换掉，先看宿主给的是什么形状的机制谱。官方口径是一句**强度谱**（不是「两条路」），完整原文如下——**注意它排的是「介入装配管线的强度」，`ctx.tools.guard()` 这一级不能省**：
 
-> From weakest to strongest: `ctx.tools.restrict()` … waterfall listeners can rewrite …
-> `system-prompt/assemble` replaces the whole assembly. The stronger the mechanism,
-> the more of other plugins' contributions you must preserve.
+> **Extension points are shared; use the weakest mechanism that suffices.** From weakest to strongest: `ctx.tools.restrict()` can only remove tools; `ctx.tools.guard()` can only deny; waterfall listeners can rewrite and depend on registration order; `system-prompt/assemble` replaces the whole assembly. The stronger the mechanism, the more of other plugins' contributions you must preserve.
 > —— `@deepseek-ai/dsh-agent-preset/skills/cordis-plugin-development/references/practices.md`
 
-同一份文件还写明：**不要**监听 `system-prompt/assemble` 去增删工具或文本。
+**这张谱上没有「同名段遮蔽」这一项。** 遮蔽不在这根轴上——谱排的是「介入装配管线的强度」，遮蔽是**作用域维度**（近作用域同名项覆盖外层同名项），两者不同轴。所以本功能不是「在谱上挑了最弱的一级」，而是**选了谱之外的另一种机制**；「用最弱机制」这条官方原则对它只构成方向性约束（别去碰瀑布），不构成排序依据。
 
-而「同名段遮蔽」是宿主的一等公民能力，官方三个先例都在用它：
+同一份文件还写明了**禁止**的范围，条件完整保留：**不要**监听 `system-prompt/assemble` 去增删工具或文本（`Do not listen to system-prompt/assemble to add or remove tools or text.`）——禁止的是「增删 tools/text」这一用法，不是所有用量。本功能不是瀑布监听器，落在允许侧；同一份文件另外推荐「用 `ctx.systemPrompt.section()` 加提示词文本」与「在 `agent/created` 里往 `agent.ctx` 注册 per-agent 行为」，正是本功能的做法。
+
+「同名段遮蔽」是宿主**明确支持**的能力，但**它的出处不是 practices.md**（那份文件全文没有 shadow/override 字样）。出处是宿主自己的 README 与 JSDoc：
+
+- `@deepseek-ai/dsh-system-prompt/README.md`：「Agent-scoped contributions override same-named global defaults without affecting other agents.」；「registering through `agent.ctx` affects that agent alone and shadows a same-named global.」；「creator plugins may register agent-scoped shadows」
+- 同包 `lib/index.js` 的 JSDoc：「A scoped section shadows a global section with the same name」
+- `@deepseek-ai/dsh-scope/README.md`：「`merge()` materializes insertion-ordered named shadows along the scope chain」
+
+宿主自己的**两个**使用实例（不是三个——第三项是报错串，见下）：
 
 | 先例 | 做法 |
 |---|---|
-| `@deepseek-ai/dsh-persona` | preset 内用同名 `deployment:persona-prefix` 遮蔽部署人设；挂到全局才会撞名报错 |
-| `@deepseek-ai/dsh-subagent` | 在子 agent 的 ctx 里注册同名 `deployment:persona-prefix` |
-| 宿主错误串本身 | 重复注册报错时提示「for a per-agent override, register through that agent's `agent.ctx` instead」 |
+| `@deepseek-ai/dsh-persona` | preset 内用同名 `deployment:persona-prefix` 遮蔽部署人设；挂到全局才会撞名报错。其 JSDoc 自己写明「Mounted inside an agent preset it shadows the deployment persona for that one session, **exactly like the per-child persona `dsh-subagent` installs**」 |
+| `@deepseek-ai/dsh-subagent` | 在子 agent 的 `childCtx` 里注册同名 `deployment:persona-prefix` |
+
+**第三项不是先例，是诊断信息**：在全局层重复注册同名项时，宿主会报
+`prompt section "${name}" is already registered (for a per-agent override, register through that agent's \`agent.ctx\` instead)`。它证明宿主**预期**你这么干，但不构成使用实例。
 
 所以本功能走这条：监听 `agent/created`，在 `agent.ctx` 上注册**同名**段遮蔽全局段。`ctx.systemPrompt.section()` 的 scope 取自调用方上下文，因此在 agent 作用域内注册即落在该 agent 的层上。
+
+**一处需要说清的边界**：`harness:identity`（本功能要遮的那道名）在宿主里**没有先例**——宿主自己的两处遮蔽都用 `deployment:persona-prefix`。所以这道名靠的是上面那条**通则**（README：「creator plugins may register agent-scoped shadows」），不是靠某个包先遮过它。
+
 
 要注册的是 **5 个注册项，落在 3 个名字上**（按名定位，不按文本匹配——`harness-dev-context` 会给旧会话返回历史措辞，按文本找会漏）。① 是一个名字一项；②④ 各自 section 与 context 同名，所以各两项：
 

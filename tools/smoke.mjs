@@ -29,6 +29,18 @@ function check(name, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`)
 }
 
+/**
+ * 期望的断言条数，与 `scripts/known-counts.json` 的 `smokeAssertions` 是同一个数。
+ *
+ * 为什么在这里再声明一次：这个数原先在单一来源里标 `manual`，判据是「冒烟日志里写着
+ * total=44」——而日志不进仓，等于**自己证明自己**（谁把 44 改成任意数、文档跟着改，全绿）。
+ * 现在改成：脚本跑完自校 `results.length` 与这个常量，不等就红。于是这个数有了机器来源，
+ * 且真跑时会自己咬住；`scripts/known-counts.json` 那边只是这个常量的副本。
+ *
+ * 加/删断言时**只改这一个常量**，`node scripts/check.mjs` 会告诉你文档里哪几处要跟。
+ */
+const EXPECTED_ASSERTIONS = 44
+
 /** 跑一次 dsh CLI，返回 { status, output }。 */
 function dsh(args) {
   const result = spawnSync(`"${cli}" ${args.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg)).join(' ')}`, {
@@ -315,5 +327,11 @@ mkdirSync(join(home, 'enhance'), { recursive: true })
 check('6.1 <home>/enhance/ 由插件自动补齐', existsSync(join(home, 'enhance', 'state.json')) && existsSync(join(home, 'enhance', 'content-scope.txt')))
 
 console.log()
+// 自校：断言条数与 EXPECTED_ASSERTIONS 不符就红——这个数不再依赖「日志里写着什么」。
+const countOk = results.length === EXPECTED_ASSERTIONS
+if (!countOk) {
+  failures += 1
+  console.log(`FAIL  assertion count  实际 ${results.length} != 期望 ${EXPECTED_ASSERTIONS}（加删断言要改 EXPECTED_ASSERTIONS，并同步 scripts/known-counts.json 与文档）`)
+}
 console.log(`# summary pass=${results.length - failures} fail=${failures} total=${results.length}`)
 process.exit(failures === 0 ? 0 : 1)

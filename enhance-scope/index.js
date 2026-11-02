@@ -49,8 +49,14 @@ const SECTION_NAME = 'enhance:content-scope'
 /**
  * 品牌人设要遮蔽的宿主名字。
  *
- * 四个名字都是**全局注册的第一方段/上下文**；按 agent 作用域用同名项遮蔽它们，
- * 是宿主自己的一等公民能力（`dsh-persona`、`dsh-subagent`、`file-reference-local` 都这么做）。
+ * **三个**名字（不是四个）都是**全局注册的第一方段/上下文**；按 agent 作用域用同名项
+ * 遮蔽它们，是宿主自己明确支持的能力（`@deepseek-ai/dsh-system-prompt/README.md`：
+ * 「creator plugins may register agent-scoped shadows」）。
+ * 宿主自己的使用实例只有**两个**：`dsh-persona` 与 `dsh-subagent`，都在遮
+ * `deployment:persona-prefix`。**不要把 `dsh-file-reference-local` 列进来**——实测它
+ * 注册的是唯一名 `context:file-reference`，不是同名遮蔽（2026-11-02 核对 asar 时发现的
+ * 早期注释错误）。`harness:identity` 在本仓之前没有宿主内先例，靠的是上面那条通则。
+ *
  * `harness:source` 与 `app:web-surface` 各自**同时**是 section 与 context 的名字，
  * 两个表都要遮——只遮一处，另一处会照原样出现。
  *

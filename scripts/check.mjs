@@ -308,16 +308,21 @@ function gateDocs(base = root, options = {}) {
   const countsArgs = ['tools/counts-check.mjs', '--root', base]
   if (Number.isInteger(options.gateCount)) countsArgs.push('--gates', String(options.gateCount))
   const counts = run(countsArgs, base)
+  // 两个「人工维护值」各自的可机算来源：它们原先标 manual，判据是「某份日志里写着
+  // total=NN」——日志不进仓，等于没人核。这里让它们现场数出来与单一来源对账。
+  const contacts = run(['tools/contacts-count.mjs', '--root', base], base)
   const dashes = (result) => {
     const lines = result.output.split(/\r?\n/).filter((line) => line.trim().startsWith('- ')).slice(0, 3)
     return lines.length > 0 ? lines : [result.output.split(/\r?\n/).filter((line) => line.trim() !== '')[0] ?? 'exited non-zero']
   }
   if (docs.code !== 0) problems.push(...dashes(docs))
   if (counts.code !== 0) problems.push(...dashes(counts))
+  if (contacts.code !== 0) problems.push(...dashes(contacts))
   if (problems.length > 0) return { pass: false, detail: problems.join(' | ') }
   const docsLine = docs.output.split(/\r?\n/).find((line) => line.startsWith('[docs]')) ?? 'docs'
   const countsLine = counts.output.split(/\r?\n/).find((line) => line.startsWith('[counts]')) ?? 'counts'
-  return { pass: true, detail: `${docsLine}；${countsLine}` }
+  const contactsLine = contacts.output.split(/\r?\n/).find((line) => line.startsWith('[contacts]')) ?? 'contacts'
+  return { pass: true, detail: `${docsLine}；${countsLine}；${contactsLine}` }
 }
 
 /**

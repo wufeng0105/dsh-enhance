@@ -37,13 +37,32 @@ const CN_DIGITS = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八:
 /** 英文数字（`README.en.md` 写 `seven gates` / `five groups`）。 */
 const EN_DIGITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
 
-/** 把捕获到的数字串（阿拉伯/中文/英文）转成数字；转不了返回 NaN（不猜）。 */
+/**
+ * 把捕获到的数字串（阿拉伯/中文/英文）转成数字；**转不了返回 NaN，由调用方判红**。
+ *
+ * 中文按「百/十/个位」拆，覆盖到千（`二百`、`三十五`、`一百零八`）。原先只认十以内，
+ * 于是 `self-test 二百个负例` 这种写法会匹配到、转不出数、被静默跳过——**不猜 = 放过**，
+ * 那是比算错更坏的一种静默（独立审计实测过这一条）。
+ */
 function toNumber(raw) {
   const text = String(raw).trim()
   if (/^\d+$/.test(text)) return Number(text)
-  if (Object.prototype.hasOwnProperty.call(CN_DIGITS, text)) return CN_DIGITS[text]
+
   const lower = text.toLowerCase()
   if (Object.prototype.hasOwnProperty.call(EN_DIGITS, lower)) return EN_DIGITS[lower]
+
+  // 纯中文数字：按位权累加，支持 百 / 十 / 个位；允许「两」= 2。
+  if (/^[一二三四五六七八九十百两零]+$/.test(text)) {
+    const digit = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 }
+    let total = 0
+    let current = 0
+    for (const ch of text) {
+      if (ch === '百') { total += (current === 0 ? 1 : current) * 100; current = 0 }
+      else if (ch === '十') { total += (current === 0 ? 1 : current) * 10; current = 0 }
+      else current = digit[ch] ?? 0
+    }
+    return total + current
+  }
   return Number.NaN
 }
 
@@ -52,25 +71,38 @@ function toNumber(raw) {
  * 每条 `{ count, regex }`；regex 的第 1 组是数字，若有第 2 组则必须与第 1 组同值（`17/17` 形）。
  */
 const SCAN = [
+  // ---- tests：测试条数 ----
+  // 光认「NN 项测试」会漏掉实测过的四种写法（独立审计抓到的）：`999 条测试`、
+  // `999 个用例`、`验证结果 999/999`、以及英文 `999 tests`。量词必须是「测试/用例」，
+  // 不能用裸「条」或「个」——那两个在中文里遍地都是（`一条消息`、`一个开关`），
+  // 扩成裸量词会把正常表达判红。这是「枚举合法说法」而不是「模糊匹配」。
+  { count: 'tests', regex: /(\d+)\s*(?:条|项|个)\s*(?:测试|用例)/g },
   { count: 'tests', regex: /(\d+)\s*项测试/g },
-  { count: 'tests', regex: /(\d+)\s*tests\b/gi },
-  { count: 'selfTestCases', regex: /(\d+)\s*个负例/g },
+  { count: 'tests', regex: /(\d+)\s*tests?\b/gi },
+  { count: 'tests', regex: /(?:验证结果|测试结果)[^\d\n]{0,6}(\d+)\s*\/\s*(\d+)/g },
+
+  // ---- selfTestCases：负例条数（中文数字也要认，`二百` 这类先按十位内处理） ----
+  { count: 'selfTestCases', regex: /([一二三四五六七八九十百两\d]+)\s*个负例/g },
   { count: 'selfTestCases', regex: /(\d+)\s*negative (?:cases|examples)/gi },
   { count: 'selfTestCases', regex: /--self-test[^\n\d]{0,12}(\d+)\s*\/\s*(\d+)/g },
+
   { count: 'gates', regex: /([一二三四五六七八九十\d]+)\s*道(?:闸|门|门禁)/g },
   { count: 'gates', regex: /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+gates?\b/gi },
   // readmeChecks 不再参与比对（见文件头口径边界），所以它那两个扫描式也一并去掉：
   // 留着只会让「文档里写了 N 项结构检查」指向一个不存在的来源值。
-  { count: 'smokeAssertions', regex: /(\d+)\s*条断言/g },
+  { count: 'smokeAssertions', regex: /([一二三四五六七八九十\d]+)\s*(?:条|项)\s*断言/g },
   { count: 'smokeAssertions', regex: /(\d+)\s*assertions?\b/gi },
   { count: 'smokeAssertions', regex: /smoke[^\n]{0,30}?(\d+)\s*\/\s*(\d+)/gi },
   { count: 'settingsGroups', regex: /([一二三四五六七八九十\d]+)\s*组[：:]/g },
   { count: 'settingsGroups', regex: /([一二三四五六七八九十\d]+)\s*个组(?:名|设置)?/g },
   { count: 'settingsGroups', regex: /([一二三四五六七八九十\d]+)\s*组设置/g },
   { count: 'settingsGroups', regex: /\b(five|four|three|six|\d+)\s+groups?\b/gi },
-  { count: 'hostContacts', regex: /(\d+)\s*条(?:独立)?触点/g },
-  { count: 'hostContacts', regex: /(?:共|合计|总共|正好)\s*(\d+)\s*条/g },
-  { count: 'hostContacts', regex: /(?:现为|重数为)\s*(\d+)\s*条/g },
+  { count: 'hostContacts', regex: /([二三四五六七八九十\d]+)\s*条(?:独立)?触点/g },
+  { count: 'hostContacts', regex: /(?:共|合计|总共|正好)\s*([二三四五六七八九十\d]+)\s*条/g },
+  { count: 'hostContacts', regex: /(?:现为|重数为)\s*([二三四五六七八九十\d]+)\s*条/g },
+  // 注意：中文「一」不进这些族。`一条触点`、`一组设置` 是叙述量词，不是计数声明；
+  // 实测过一次误报（`brand-persona.md:258` 的「一条触点」被当成 hostContacts=1）。
+  // 「一」作为计数只出现在「一 项测试」这类英文式写法里，而那种写法在中文文档里不存在。
   { count: 'hostContacts', regex: /(\d+)\s*(?:independent )?host contacts?/gi },
 ]
 
@@ -182,11 +214,15 @@ function collectDocs() {
     const path = join(root, name)
     if (existsSync(path)) out.push(path)
   }
+  // 除 `.md` 之外，还要收文档型产物：SVG 与图源 JSON 里也写着计数（实测漏过——
+  // `docs/figures/sources/compat-verify.workflow.json` 把「36 条独立触点」改成 35，
+  // 只收 `.md` 时这里 exit 0）。这些文件抽纯文本比对即可，不需要解析结构。
+  const DOC_EXT = /\.(md|svg|json)$/i
   const add = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name)
       if (entry.isDirectory()) add(path)
-      else if (entry.isFile() && entry.name.endsWith('.md')) out.push(path)
+      else if (entry.isFile() && DOC_EXT.test(entry.name)) out.push(path)
     }
   }
   if (existsSync(join(root, 'docs'))) add(join(root, 'docs'))
@@ -213,11 +249,38 @@ function datedLineFlags(lines) {
   return flags
 }
 
+/**
+ * 豁免：这些位置上的「N <量词>」是**另一个意思**，不是计数声明。
+ *
+ * 每条必须写 `reason`：豁免本身就是新的静默通道，没有理由的豁免等于把门禁开个洞。
+ * 只允许按「文件 + 精确文本片段」豁免，不许按文件整体豁免（那会把整份文档放空）。
+ * 豁免片段在扫描时先被抹掉，抹掉后照常扫其余部分。
+ */
+const EXEMPT = [
+  {
+    file: 'docs/figures/sources/save-roundtrip.sequence.json',
+    text: '三道门',
+    reason: '图里的标题指「文本进系统提示要过的三道判定」，不是门禁道数',
+  },
+]
+
 let scanned = 0
+const exempted = []
 for (const file of docs) {
   const rel = show(file)
   // 去掉 markdown 的强调标记：「**161** 项测试」与「161 项测试」是同一句声明
-  const lines = readFileSync(file, 'utf8').replace(/\*/g, '').split(/\r?\n/)
+  let raw = readFileSync(file, 'utf8').replace(/\*/g, '')
+  for (const rule of EXEMPT) {
+    if (rule.file !== rel) continue
+    if (!raw.includes(rule.text)) {
+      // 豁免失效也要吭声：文档改过之后豁免就该删掉，否则它会掩盖真问题
+      problems.push(`豁免失效：${rel} 里已找不到「${rule.text}」，把这条从 EXEMPT 删掉（${rule.reason}）`)
+      continue
+    }
+    raw = raw.split(rule.text).join('　') // 全角空格占位，保持行号不变
+    exempted.push(`${rel}「${rule.text}」`)
+  }
+  const lines = raw.split(/\r?\n/)
   const dated = datedLineFlags(lines)
   lines.forEach((line, index) => {
     if (dated[index]) return
@@ -227,7 +290,11 @@ for (const file of docs) {
       for (const match of line.matchAll(regex)) {
         const first = toNumber(match[1])
         const second = match[2] === undefined ? first : toNumber(match[2])
-        if (Number.isNaN(first) || Number.isNaN(second)) continue
+        // 认不出数字就必须报：`二百个负例` 原先匹配到但 toNumber 返回 NaN，被静默放过。
+        if (Number.isNaN(first) || Number.isNaN(second)) {
+          problems.push(`${rel}:${index + 1} 的「${match[0].trim()}」认得是计数声明、但解析不出数字——要么改写成阿拉伯数字，要么进 EXEMPT`)
+          continue
+        }
         scanned += 1
         if (first !== expected || second !== expected) {
           problems.push(`${rel}:${index + 1} 的「${match[0].trim()}」与单一来源不一致：${count} 应为 ${expected}，这里是 ${first}${second === first ? '' : `/${second}`}`)
