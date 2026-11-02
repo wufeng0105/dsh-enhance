@@ -732,3 +732,24 @@ test('品牌人设：隐藏的代价要说清（那两段不纯是品牌，含�
   assert.ok(source.includes('不要另起服务器'), '要说清第二段丢的是什么')
   assert.ok(source.includes('自己在改 DSH 或写插件时，它们正是防错规则'), '要点明对开发场景是防错规则')
 })
+
+test('品牌人设：开关开着时状态词不许说「原样」（页面说的要和实际发的一致）', () => {
+  // 这一组管三处自指。只看三态会让「开关开 + 三态保留」显示成「原样」，
+  // 可那四段其实已经被隐藏 —— 发出去的并不是原样。
+  const fn = source.slice(source.indexOf('function identityStatusOf'), source.indexOf('function degradedTextOf'))
+  assert.ok(fn.includes('state.hideHarness === true'), '状态词必须读开关，不能只看三态')
+  assert.ok(fn.includes('"说明已隐藏"'), '只隐藏说明（开场白没动）时要有自己的词')
+  const hiddenAt = fn.indexOf('if (hidden)')
+  const plainAt = fn.indexOf('return { word: "原样"')
+  assert.ok(hiddenAt > 0 && plainAt > hiddenAt, '「原样」必须排在开关判断之后，否则会说出与事实相反的结论')
+})
+
+test('品牌人设：组内副标题要覆盖三处自指，不能只说开场白', () => {
+  assert.ok(source.includes('提到宿主名字的三处'), '副标题要说清这一组管三处')
+  assert.ok(!source.includes('系统提示的第一句，模型用它回答「你是谁」。'), '旧的单处说法应已替换')
+})
+
+test('品牌人设：开关开着时，后果行不许再说「一个字不动」', () => {
+  assert.ok(!source.includes('本插件一个字不动'), '只有开关关着才成立的话，不许无条件写出来')
+  assert.ok(source.includes('另外两段说明也已隐藏'), '开关开着时要补一句，说明另外两段也被处理了')
+})

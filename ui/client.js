@@ -85,7 +85,7 @@ window.__ModuleLoader__.load({
 			keep: {
 				word: "保留",
 				tone: "mute",
-				note: "宿主怎么写就怎么发，本插件一个字不动。",
+				note: "开场那句按宿主原样发。",
 			},
 			remove: {
 				word: "去掉",
@@ -217,8 +217,14 @@ window.__ModuleLoader__.load({
 			if (state.enabled === false) return { word: "不生效", tone: "mute" };
 			var effective = state.identityEffective || {};
 			if (effective.degraded === true) return { word: "降级运行", tone: "warn" };
-			if (effective.mode === "custom") return { word: "已替换", tone: "ok" };
-			if (effective.mode === "remove") return { word: "已去掉", tone: "ok" };
+			// 这一组管三处自指（开场白 + 两段说明），所以「原样」只有在**两件都没动**时才成立。
+			// 只看三态会让「开关开着、三态是保留」显示成「原样」——可那四段其实已经被隐藏，
+			// 发出去的并不是原样。页面说的和实际发的不一致，正是这一页最不该出的错。
+			var hidden = state.hideHarness === true;
+			var suffix = hidden ? " · 说明已隐藏" : "";
+			if (effective.mode === "custom") return { word: "已替换" + suffix, tone: "ok" };
+			if (effective.mode === "remove") return { word: "已去掉" + suffix, tone: "ok" };
+			if (hidden) return { word: "说明已隐藏", tone: "ok" };
 			return { word: "原样", tone: "mute" };
 		}
 
@@ -606,7 +612,7 @@ window.__ModuleLoader__.load({
 			}
 
 			var blockIdentity = group("enh-block-identity", "品牌人设",
-				"系统提示的第一句，模型用它回答「你是谁」。",
+				"系统提示里提到宿主名字的三处：开头那句自称，以及讲实现目录与界面的两段说明。",
 				state === null ? "—" : identityWord.word,
 				state === null ? "mute" : identityWord.tone,
 				h("div", { className: "enh-stack" },
@@ -681,8 +687,11 @@ window.__ModuleLoader__.load({
 						? "总开关关着，宿主原句照常发。"
 						: identityEffective.degraded === true
 							? "没有生效，卡在：" + (identityEffective.reason || "未知原因") + "。"
-							: IDENTITY[identityMode].note,
-				"改的是模型看到的第一句；下一条消息生效，不用重启。改一次，下一条请求要重算一次系统提示，之后恢复正常。",
+							// 开关开着时，「开场那句按宿主原样发」只说了三处里的一处——
+							// 不补一句，读者会以为整组都是原样。
+							: IDENTITY[identityMode].note
+								+ (state !== null && state.hideHarness === true ? "另外两段说明也已隐藏。" : ""),
+				"改的是模型看到的这几处；下一条消息生效，不用重启。改一次，下一条请求要重算一次系统提示，之后恢复正常。",
 				]);
 
 			// ---- 02 内容边界 ----
