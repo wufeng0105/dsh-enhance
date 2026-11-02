@@ -23,9 +23,9 @@
       "computedBy": "scripts/check-readme.mjs 的 total（readme 门现场比对）。当前没有文档声明这个数，所以它只有运行期比对、没有文档声明位"
     },
     "smokeAssertions": {
-      "value": 38,
+      "value": 44,
       "kind": "manual",
-      "note": "tools/smoke.ps1 要 pwsh + dsh CLI，不在 fast 层跑；这个数是人工维护值（判据：冒烟日志的 `# summary … total=38`）"
+      "note": "tools/smoke.ps1 要 pwsh + dsh CLI，不在 fast 层跑；这个数是人工维护值（判据：冒烟日志的 `# summary … total=44`）"
     },
     "settingsGroups": {
       "value": 5,

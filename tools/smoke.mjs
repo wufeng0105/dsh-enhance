@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { zstdCompressSync } from 'node:zlib'
 
 const repo = process.cwd()
 const home = process.env.DSH_HOME
@@ -140,8 +141,87 @@ check('3.3 初始状态：patch 里没有 enhanced 档', stateBefore.json.preset
 // ↑ 断言名里的小写 enhanced 指 patch 字面键；档位展示名是 Enhanced。
 
 const checkResult = await api({ op: 'check' })
-const names = (checkResult.json?.checks ?? []).map((item) => item.name)
+const checksNow = checkResult.json?.checks ?? []
+const names = checksNow.map((item) => item.name)
 check('3.4 检查项是四项且最后一项是 preset', JSON.stringify(names) === JSON.stringify(['plugins', 'text', 'inject', 'preset']), JSON.stringify(names))
+
+/**
+ * 断言某一项的取值：**哪一项 / 期望什么 / 实际什么** 一起打出来。
+ *
+ * 比较一律用 `===`（不是 truthy）：字段被删掉、缺省成 `undefined` 时必须判红，
+ * 不许「没这个字段就当默认值放过」——设置页那四项此前只有名字与顺序的证据，缺的正是取值。
+ *
+ * @param {string} assertionName 断言名
+ * @param {string} itemName 检查项名（`plugins` / `text` / `inject` / `preset` 之一）
+ * @param {Record<string, unknown>} expectations 期望的取值（逐键严格相等）
+ */
+function checkItemValues(assertionName, itemName, expectations) {
+  const item = checksNow.find((entry) => entry.name === itemName)
+  const keys = Object.keys(expectations)
+  const wanted = keys.map((key) => `${key}=${JSON.stringify(expectations[key])}`).join(' ')
+  const actual = item === undefined
+    ? '(响应里没有这一项)'
+    : keys.map((key) => `${key}=${JSON.stringify(item[key])}`).join(' ')
+  const detail = item?.detail === undefined ? '' : ` · detail=${item.detail}`
+  check(assertionName, item !== undefined && keys.every((key) => item[key] === expectations[key]), `期望 ${wanted} · 实际 ${actual}${detail}`)
+}
+
+// 一次性的 home、**还没有任何会话日志**：这是「刚装好、还没发过消息」的真实初态。
+// 四项取值在这里各自钉一条（本批 T33 之前只有名字与顺序的结构证据）。
+checkItemValues('3.4.1 plugins 取值：pass=true（两个插件都进了组合树）', 'plugins', { pass: true })
+checkItemValues('3.4.2 text 取值：pass=true（内容边界文本读得到且不超上限）', 'text', { pass: true })
+// `inject` 在这一态必须是**如实红**：没有会话日志 = 还没有证据。既不是静默绿，
+// 也不能把 detail 写成「遮蔽没有生效」——那会把人骗去修一个没坏的东西。
+const injectNoLog = checksNow.find((entry) => entry.name === 'inject')
+const injectNoLogDetail = String(injectNoLog?.detail ?? '')
+check('3.4.3 inject 取值：没有会话日志时 pass=false 且 detail 点明「没有会话日志」（还没证据，不是遮蔽失效）',
+  injectNoLog?.pass === false && injectNoLogDetail.includes('没有会话日志') && !injectNoLogDetail.includes('遮蔽没有生效'),
+  `期望 pass=false 且 detail 含「没有会话日志」、不含「遮蔽没有生效」 · 实际 pass=${JSON.stringify(injectNoLog?.pass)} · detail=${injectNoLog?.detail}`)
+checkItemValues('3.4.4 preset 取值：pass=true 且 na=true（用户没 opt-in，不是坏了）', 'preset', { pass: true, na: true })
+
+// ---- 3.4.5 `inject` 的绿路：**合成**会话日志（不是真机会话证据）----
+// 这里自己造一份 `<home>/sessions/<ws>/<session>/session.v4.jsonl.zstd`：只含一条
+// `"system-prompt"` 记录、正文就是当前 `content-scope.txt` 的文本；再跑一次 `op=check`，
+// 断言 `inject` 变绿。
+//
+// **这是合成日志，不是真机会话。** 它证明的是「探针判定链路通」：文件落盘 → zstd 解码
+// （探针按帧切，见 `shared/session-probe.mjs`）→ 只认 `"system-prompt"` 行 → 字面命中。
+// 它**不**证明真会话里注入过，也**不**替代真机会话证据——文档里「真机会话还缺一次有余额
+// 的会话」这个口径不因这一段改口。
+//
+// 前提：默认 `content-scope.txt` 是单行、不含引号与反斜杠，JSON 编码后仍是逐字原文。
+// 探针按字面 `includes` 找（多行文本走 `\n` 转义那条分支），换文本后要复核这一点。
+const sessionsRoot = join(home, 'sessions')
+const syntheticDir = join(sessionsRoot, 'synthetic-workspace', 'synthetic-session')
+mkdirSync(syntheticDir, { recursive: true })
+const scopeText = readFileSync(join(home, 'enhance', 'content-scope.txt'), 'utf8').replace(/\r\n?/g, '\n').trim()
+const syntheticPromptLine = `${JSON.stringify({ type: 'system-prompt', sessionId: 'synthetic-session', text: scopeText })}\n`
+writeFileSync(join(syntheticDir, 'session.v4.jsonl.zstd'), zstdCompressSync(Buffer.from(syntheticPromptLine, 'utf8')))
+const checkAfterSynthetic = await api({ op: 'check' })
+const injectSynthetic = (checkAfterSynthetic.json?.checks ?? []).find((entry) => entry.name === 'inject')
+check('3.4.5 合成日志下 inject 取值：pass=true（探针链路通；不是真机会话证据）',
+  injectSynthetic?.pass === true,
+  `期望 pass=true · 实际 pass=${JSON.stringify(injectSynthetic?.pass)} · detail=${injectSynthetic?.detail}`)
+
+// ---- 3.4.6 品牌人设的第二路（`identity=custom`）也走一遍合成日志 ----
+// 同样用**合成**日志（第二份，只含自定义文本，与上面那份内容边界日志分开——这样探针
+// 必须真的按文本去找，而不是靠哪份日志都能命中）。它证明 custom 这一路的判定链路通，
+// 仍然**不**是真机会话证据。
+const customIdentityText = 'You are Aria, a private assistant (synthetic-log probe).'
+await api({ op: 'set', identity: 'custom', identityText: customIdentityText })
+const syntheticCustomDir = join(sessionsRoot, 'synthetic-workspace', 'synthetic-session-custom')
+mkdirSync(syntheticCustomDir, { recursive: true })
+writeFileSync(
+  join(syntheticCustomDir, 'session.v4.jsonl.zstd'),
+  zstdCompressSync(Buffer.from(`${JSON.stringify({ type: 'system-prompt', sessionId: 'synthetic-session-custom', text: customIdentityText })}\n`, 'utf8')),
+)
+const checkAfterCustom = await api({ op: 'check' })
+const injectCustom = (checkAfterCustom.json?.checks ?? []).find((entry) => entry.name === 'inject')
+check('3.4.6 合成日志下 inject 的第二路（identity=custom）取值：pass=true（同样不是真机会话证据）',
+  injectCustom?.pass === true && String(injectCustom?.detail ?? '').includes('品牌人设'),
+  `期望 pass=true 且 detail 含「品牌人设」 · 实际 pass=${JSON.stringify(injectCustom?.pass)} · detail=${injectCustom?.detail}`)
+// 还原成默认 keep：下面 3.5.1 要从「默认 keep 不注册任何遮蔽项」起步。
+await api({ op: 'set', identity: 'keep' })
 
 // ---- 3.5 品牌人设：agent/created 把遮蔽项装进 agent 作用域 ----
 // 这一段验的是「按 agent 遮蔽」这条路线在真宿主组合里接通了：默认 keep 不注册任何东西；
