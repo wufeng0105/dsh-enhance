@@ -2,6 +2,37 @@
 
 本文件自 `1.1.0` 起维护；版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)，条目格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.2.0] — 2026-11-02
+
+### 新增
+
+- **品牌人设**（设置页第 1 组）：系统提示开头那句 `You are an AI agent powered by DeepSeek Harness.` 可保留、可去掉、可换成你自己的；顺带能把另外两段提到宿主名字的说明（安装位置、图形界面）连它们的运行时上下文一起隐藏。改的是**模型看到的装配结果**，存盘即生效、不用重启，选回「保留」即逐字节回到宿主原样；
+- [`docs/brand-persona.md`](docs/brand-persona.md)：这份契约——解决什么、三条验收、明确不做哪四件事、为什么走「按 agent 遮蔽同名段」而不是装配瀑布、缓存代价、边界、以及 DSH 升级后该核哪一条；
+- 自定义身份文本独立成文件 `<DSH_HOME>/enhance/identity.txt`，上限 2 KB（与内容边界的 8 KB 分开）。
+
+### 变更
+
+- `state.json` 从 v3 升到 v4：新增 `identity`（`keep` / `remove` / `custom`）与 `hideHarness`，只加字段、不写迁移支路；旧文件缺这两个键是正常的，不标降级，只有「写了但认不出」才算坏；
+- `readState` 新增 `degradedFields`：坏的是哪个字段要能说清——原来只写「审批回落」会把身份坏值说成审批的事；
+- 文本读写收敛成唯一实现（`readTextFile` / `writeTextFile`），品牌人设不另起第二套；`readIdentity` / `writeIdentity` 是其薄包装；
+- 公开承诺句统一为「**除声明层那一句之外**，宿主提示词一个字节不动」——原来那句「一个字节不动」被本功能打破，README（中英）、`CONTRIBUTING.md` 与 `showcase/prompt-assembly.html` 已同步；
+- `docs/terminology.md` 新增「人设一名三义」：品牌人设 / 部署人设 / 尾巴文字必须分写；内容边界提示语里的「写人设」改为「写行为规矩、写内容要求、写补充说明」；
+- `docs/compatibility.md` 触点表加一条（`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽），独立触点项由 35 条重数为 36 条；
+- `package.json` 的 `files` 收录 `docs/brand-persona.md`。
+
+### 修复
+
+- **「去掉 → 自定义」在活着的 agent 上不生效**（独立审计 B1，本版发出前修掉）。重装指纹原先只记「有哪些座」，不看座上文本是哪一种实现：`remove` 注册常量空串、`custom` 注册动态读函数，两者座名相同 → 指纹相同 → 不重装，座上留着旧空串。表现是设置页显示「已替换」、预览行也显示自定义文本，而模型实际收到的是**被删掉**的身份句；新起的 agent 正常，所以症状是「有的会话对、有的不对」。修法：身份座一律用动态读函数（`remove` 时 `deriveIdentity` 本就返回空串），两种模式共用同一次注册。补了三条回归——纯函数层「两种模式必须产出同一份计划」、接口层「同一个活 agent 上三步连做」、冒烟 `3.5.7`；
+- 设置页的降级原因不再一律说成「审批回落到先问我」，改按 `degradedFields` 逐字段说（身份坏值说成「品牌人设回落到保留」，认不出的字段名照原样抖出来）。
+
+### 验证
+
+- 本地门禁：`node scripts/check.mjs` **7/7**、`--self-test` **17/17**；
+- 测试：由 130 项增至 **147** 项；冒烟由 30 条增至 **38** 条断言。新增覆盖三态派生、`identity.txt` 独立上限、遮蔽计划、agent 生命周期端到端、五组顺序、品牌人设界面约束、以及 B1 的三层回归；
+- **装配层验收在真机上成立**（契约 §3 第 1、3 条，此前一直欠着）：远端机全量重置后装 `0.2.1-rc.5` + 本包，`custom` 态下会话 `system/message` 的第一句是自定义文本、宿主原句在整份会话里 0 命中；切回 `keep` 后第一句逐字回到宿主原句。内容边界在两种状态下都在。详见 `docs/compatibility.md` 的 2026-11-02 记录；
+- 过程中被门禁挡下的两处：新增的 `agent/created`/`agent/disposed` 未登记进 `code-map.json` 时 `graph` 门直接判红；预览行初版用了 10px 间距，布局门禁按刻度判红。
+- 审计另外指出两处**测试自身的弱锁**，一并修掉：`tests/ui-client.test.mjs` 里「不该出现非 token 字体族」那条正则写成 `\\s`（正则字面量里是「字面反斜杠 + s」），连 `font-family:Arial` 都不匹配、永不红；`cssRules()` 抽到 0 条规则时会让两条排版断言在空集合上静默全绿。前者改为真能红的检测器并加自检，后者改为空集合直接抛。
+
 ## [1.1.2] — 2026-10-31
 
 ### 新增

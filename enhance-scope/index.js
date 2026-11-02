@@ -25,8 +25,9 @@ import { closeSync, openSync, readdirSync, readFileSync, readSync, writeFileSync
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  APPROVALS, TEXT_LIMIT, derive, isPluginActive, markPluginActive, paths,
-  readState, readText, resolveHome, textBytes, textSha256, textStat, writeFileAtomic, writeState, writeText,
+  APPROVALS, IDENTITY_LIMIT, IDENTITY_MODES, TEXT_LIMIT, derive, deriveIdentity, isPluginActive,
+  markPluginActive, paths, readIdentity, readState, readText, resolveHome, textBytes, textSha256,
+  textStat, fileStat, writeFileAtomic, writeIdentity, writeState, writeText,
 } from '../shared/state.mjs'
 import { ensureEnhanceData } from '../shared/seed.mjs'
 import { sessionContains } from '../shared/session-probe.mjs'
@@ -45,6 +46,36 @@ export const inject = ['systemPrompt']
 /** 段名与官方 persona suffix 不同名（同名二次注册会抛）。order 相同；同 order 时宿主按段名定序（`comparePromptSections`），`enhance:` 在 `deployment:` 之后，所以仍落在 persona suffix 之后。 */
 const SECTION_NAME = 'enhance:content-scope'
 
+/**
+ * 品牌人设要遮蔽的宿主名字。
+ *
+ * 四个名字都是**全局注册的第一方段/上下文**；按 agent 作用域用同名项遮蔽它们，
+ * 是宿主自己的一等公民能力（`dsh-persona`、`dsh-subagent`、`file-reference-local` 都这么做）。
+ * `harness:source` 与 `app:web-surface` 各自**同时**是 section 与 context 的名字，
+ * 两个表都要遮——只遮一处，另一处会照原样出现。
+ *
+ * 只按名定位，不按文本匹配：`harness-dev-context` 会给旧会话返回历史措辞，
+ * 按文本找必然漏掉那些会话。
+ */
+const IDENTITY_SECTION = 'harness:identity'
+const HARNESS_SOURCE = 'harness:source'
+const WEB_SURFACE = 'app:web-surface'
+
+/**
+ * 这些段在宿主里的位置。改身份段用宿主自己的座位号，不写死数字。
+ * @param {object} scope 作用域上下文（`scope.systemPrompt`）
+ */
+function shadowSections(scope) {
+  const sp = scope.systemPrompt
+  return {
+    identity: { name: IDENTITY_SECTION, order: sp.getSectionOrder('HARNESS_IDENTITY') },
+    source: { name: HARNESS_SOURCE, order: sp.getSectionOrder('HARNESS_SOURCE') },
+    web: { name: WEB_SURFACE, order: sp.getSectionOrder('WEB_SURFACE') },
+    sourceContext: { name: HARNESS_SOURCE, order: sp.getContextOrder('HARNESS_SOURCE') },
+    webContext: { name: WEB_SURFACE, order: sp.getContextOrder('WEB_SURFACE') },
+  }
+}
+
 /** 路由路径。设置页与探针都用这一条。 */
 const ROUTE_PATH = '/enhance/api'
 
@@ -57,7 +88,7 @@ const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache
 const BODY_LIMIT = TEXT_LIMIT * 4 + 1024
 
 /** `set` 认的键；多一个就 `EBADOP`，不静默忽略。 */
-const SET_KEYS = new Set(['op', 'enabled', 'contentScope', 'approval', 'text'])
+const SET_KEYS = new Set(['op', 'enabled', 'contentScope', 'approval', 'text', 'identity', 'hideHarness', 'identityText'])
 
 /** `preset` 认的键。**路径不许从请求体来**——只认服务端解析出的 patchPath。 */
 const PRESET_KEYS = new Set(['op', 'action', 'dryRun'])
@@ -423,6 +454,189 @@ export async function compatSnapshot(home) {
 }
 
 /**
+ * 预览行：模型将看到的第一句。
+ *
+ * `keep` 时给的是**宿主原句**——那是本插件此刻没有改任何东西的准确描述。
+ * `remove` 时明说「已去掉」，不伪造一句话：去掉之后第一句由宿主的下一个段接管，
+ * 具体是哪一句属于宿主装配的事，本插件不猜。
+ * @param {{ mode: 'keep'|'remove'|'custom', text: string }} effective
+ */
+export function identityPreview(effective) {
+  if (effective.mode === 'custom') return effective.text.split('\n')[0]
+  if (effective.mode === 'remove') return '（已去掉，下一段接上）'
+  return 'You are an AI agent powered by DeepSeek Harness.'
+}
+
+/**
+ * 计算「按当前状态要注册哪些遮蔽项」。纯函数，便于单测。
+ *
+ * 返回空数组表示**什么都不注册**——`keep` 且不隐藏时，让宿主的原样段自己渲染。
+ * 这一点是 `keep` 与 `remove` 的分界：同名遮蔽一旦注册就顶掉宿主段，返回空串只会让它消失，
+ * 那正是 `remove` 的效果，不是保留。
+ *
+ * `harness:source` 与 `app:web-surface` 各自有 section 与 context 两条，**必须成对**：
+ * 只遮 section 的话，`refreshContext()` 会在准入前按名字把 context 重新求值出来，
+ * 那两行宿主名字照样进 user 快照。
+ *
+ * @param {{ mode: 'keep'|'remove'|'custom', hideHarness: boolean }} effective
+ * @returns {{ kind: 'section'|'context', seat: 'identity'|'source'|'sourceContext'|'web'|'webContext', text: 'custom'|'empty' }[]}
+ */
+export function shadowPlan(effective) {
+  const plan = []
+  // 身份座无论 `remove` 还是 `custom` 都用 `live`（每次装配现读文本）。
+  //
+  // 别按模式分成「常量空串 / 动态函数」两种实现：那样两边的座名一样、重装指纹一样，
+  // `sync()` 会认为形状没变而不重装，于是「去掉 → 自定义」之后座上留着旧的空串——
+  // 设置页显示「已替换」，模型收到的却是删掉的身份句。`deriveIdentity` 在 `remove`
+  // 时本来就返回空串，所以一个动态读函数同时满足两种模式，指纹也就只需要看座。
+  if (effective.mode === 'custom' || effective.mode === 'remove') {
+    plan.push({ kind: 'section', seat: 'identity', text: 'live' })
+  }
+  if (effective.hideHarness) {
+    plan.push({ kind: 'section', seat: 'source', text: 'empty' })
+    plan.push({ kind: 'context', seat: 'sourceContext', text: 'empty' })
+    plan.push({ kind: 'section', seat: 'web', text: 'empty' })
+    plan.push({ kind: 'context', seat: 'webContext', text: 'empty' })
+  }
+  return plan
+}
+
+/**
+ * 把品牌人设装到每个 agent 的作用域上。
+ *
+ * 为什么是「按 agent 遮蔽」而不是监听 `system-prompt/assemble`：宿主官方实践文档把瀑布列为
+ * **最强机制**并明写「不要用它增删文本」（`cordis-plugin-development/references/practices.md`），
+ * 而「同名段遮蔽」是宿主自己一等公民的用法——`dsh-persona`、`dsh-subagent`、
+ * `file-reference-local` 都在 agent 作用域里注册同名项。本函数照抄 `file-reference-local` 的
+ * 生命周期写法：`agent.ctx.inject([...], cb)` 建 fiber，按 agent 记账，`agent/disposed`
+ * 与插件卸载两边都拆。
+ *
+ * **`keep` 必须「不注册」**：同名遮蔽一旦注册就顶掉宿主段，返回空串只会让它消失——
+ * 那是 `remove` 的效果，不是保留。所以遮蔽项按当前模式**动态增删**，见 `sync`。
+ *
+ * 模式是**每条装配现算**的（`text` 是函数），所以设置页改完下一条消息就生效，不需要重启。
+ *
+ * @param {import('@deepseek-ai/cordis').Context} ctx
+ * @param {() => { effective: { mode: 'keep'|'remove'|'custom', text: string, hideHarness: boolean } }} currentIdentity
+ * @returns {() => void} 主动同步一次（设置页写完状态后调用，让改动不必等下一次装配）
+ */
+export function installBrandPersona(ctx, currentIdentity) {
+  /** 每个 agent 一份：已注册的遮蔽项、它们的拆解器，以及当前形状的指纹。 */
+  const agents = new Map()
+  let scheduled = false
+
+  /** 按当前模式把遮蔽项注册进这个 agent 作用域，返回拆解器数组。 */
+  const register = (scope, effective) => {
+    const seats = shadowSections(scope)
+    const disposers = []
+    for (const item of shadowPlan(effective)) {
+      const seat = seats[item.seat]
+      // 用户写的是散文：一个落单的 `{{` 会让整次装配抛错，所以 `interpolate: false`。
+      // `live` 的座每次装配都重读当前派生的文本（`remove` 时它天然是空串）；
+      // `empty` 的座恒空串——渲染器会丢弃空段，等于把那一段去掉。
+      const spec = {
+        name: seat.name,
+        order: seat.order,
+        interpolate: false,
+        text: item.text === 'live' ? () => currentIdentity().effective.text : () => '',
+      }
+      const api = scope.systemPrompt
+      disposers.push(item.kind === 'context' ? api.context(spec) : api.section(spec))
+    }
+    return disposers
+  }
+
+  /** 当前状态要求注册哪些项。形状没变就不重装——重装会打断那一步的装配。 */
+  const shapeOf = (effective) => shadowPlan(effective).map((item) => `${item.kind}:${item.seat}`).join(',')
+
+  /** 重装一个 agent 的遮蔽项（仅当形状变了）。 */
+  const sync = (agent) => {
+    const record = agents.get(agent)
+    if (record === undefined || record.scope === undefined) return
+    const { effective } = currentIdentity()
+    const shape = shapeOf(effective)
+    if (record.shape === shape) return
+    for (const dispose of record.disposers) {
+      try {
+        dispose()
+      } catch (error) {
+        console.error('[enhance-scope] brand-persona unregister failed:', error)
+      }
+    }
+    record.shape = shape
+    record.disposers = register(record.scope, effective)
+  }
+
+  /**
+   * 装配期间不就地改注册表（那一刻 sections 已经物化），推迟到微任务。
+   * 下一次装配一定看得到新状态，用户感知仍是「下一条消息生效」。
+   */
+  const schedule = () => {
+    if (scheduled) return
+    scheduled = true
+    queueMicrotask(() => {
+      scheduled = false
+      for (const agent of agents.keys()) sync(agent)
+    })
+  }
+
+  const install = (agent) => {
+    if (agent === undefined || agent === null || agents.has(agent)) return
+    // 拿不到可注入的 agent 上下文（老宿主 / 非 agent 组合）就降级为「只做内容边界」，
+    // 不抛、也不影响其余功能。
+    if (typeof agent.ctx?.inject !== 'function') return
+    const record = { scope: undefined, shape: '', disposers: [], fiber: undefined }
+    agents.set(agent, record)
+    record.fiber = agent.ctx.inject(['systemPrompt'], (scope) => {
+      record.scope = scope
+      const { effective } = currentIdentity()
+      record.shape = shapeOf(effective)
+      record.disposers = register(scope, effective)
+    })
+  }
+
+  const dispose = (agent) => {
+    const record = agents.get(agent)
+    if (record === undefined) return
+    agents.delete(agent)
+    for (const unregister of record.disposers) {
+      try {
+        unregister()
+      } catch {
+        // 单项拆除失败不拦住宿主处置 agent
+      }
+    }
+    Promise.resolve(record.fiber?.dispose?.()).catch((error) => {
+      console.error('[enhance-scope] brand-persona fiber cleanup failed:', error)
+    })
+  }
+
+  for (const agent of listAgents(ctx)) install(agent)
+  ctx.on('agent/created', ({ agent }) => install(agent))
+  ctx.on('agent/disposed', ({ agent }) => dispose(agent))
+  ctx.effect(() => () => {
+    for (const agent of [...agents.keys()]) dispose(agent)
+  }, 'enhance-scope brand-persona fibers')
+
+  return schedule
+}
+
+/**
+ * 列出当前活着的 agent。拿不到 `agents` 服务就返回空数组——品牌人设整体降级，
+ * 不影响内容边界与审批。
+ * @param {import('@deepseek-ai/cordis').Context} ctx
+ */
+export function listAgents(ctx) {
+  try {
+    const agents = typeof ctx.get === 'function' ? ctx.get('agents') : undefined
+    if (agents !== undefined && typeof agents.list === 'function') return agents.list()
+  } catch {
+    // 服务不在或不可用：按「没有 agent」处理
+  }
+  return []
+}
+
+/**
  * @param {import('@deepseek-ai/cordis').Context} ctx
  * @param {{ enabled?: boolean, file?: string, interpolate?: boolean, onMissing?: 'fail' | 'warn' }} [config]
  */
@@ -459,6 +673,18 @@ export function apply(ctx, config = {}) {
     }
   }
 
+  // 品牌人设也每步现算：读 identity.txt，与 state 一起派生实际生效的模式
+  let lastGoodIdentity = readIdentity({ ...p, identity: p.identity })
+  const currentIdentity = () => {
+    const text = readIdentity({ ...p, identity: p.identity })
+    if (text.ok) lastGoodIdentity = text
+    const state = readState(p)
+    return { state, text: lastGoodIdentity, effective: deriveIdentity(state, lastGoodIdentity) }
+  }
+
+  // ---- 品牌人设：按 agent 遮蔽宿主同名段 ----
+  const syncBrandPersona = installBrandPersona(ctx, currentIdentity)
+
   ctx.effect(() => ctx.systemPrompt.section({
     name: SECTION_NAME,
     order: ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX'),
@@ -466,6 +692,9 @@ export function apply(ctx, config = {}) {
     interpolate: config.interpolate === true,
     text: () => {
       const { effective } = current()
+      // 顺带把品牌人设的同步排上：这一段每次装配都会求值，所以手改 state.json 也能在
+      // 下一次装配被接住，不必等设置页的某次点击。副作用推迟到微任务，不影响本次装配。
+      syncBrandPersona()
       return effective.injecting ? lastGood.text : ''
     },
   }), 'enhance-scope.section()')
@@ -483,7 +712,9 @@ export function apply(ctx, config = {}) {
 
     const snapshot = async () => {
       const { state, text, active, effective } = current()
+      const identityState = currentIdentity()
       const meta = textStat({ ...p, text: file })
+      const identityMeta = fileStat(p.identity)
       return {
         ok: true,
         version: state.version,
@@ -496,9 +727,22 @@ export function apply(ctx, config = {}) {
         text: text.ok ? text.text : '',
         bytes: text.ok ? textBytes(text.text) : (meta?.bytes ?? 0),
         sha256: text.ok ? textSha256(text.text) : null,
+        identity: state.identity,
+        hideHarness: state.hideHarness,
+        identityText: identityState.text.ok ? identityState.text.text : '',
+        identityBytes: identityState.text.ok ? textBytes(identityState.text.text) : (identityMeta?.bytes ?? 0),
+        identitySha256: identityState.text.ok ? textSha256(identityState.text.text) : null,
+        identityLimit: IDENTITY_LIMIT,
+        identityEffective: {
+          mode: identityState.effective.mode,
+          degraded: identityState.effective.degraded,
+          reason: identityState.effective.reason ?? null,
+          preview: identityPreview(identityState.effective),
+        },
         updatedAt: state.updatedAt ?? null,
         degraded: state.degraded,
         degradedReason: state.degradedReason ?? null,
+        degradedFields: state.degradedFields ?? [],
         home,
         limit: TEXT_LIMIT,
         preset: presetSnapshot(resolveProfilePatch(ctx), p),
@@ -684,20 +928,37 @@ export function apply(ctx, config = {}) {
           if (body.approval !== undefined && !APPROVALS.includes(body.approval)) {
             return fail(res, 400, 'EBADOP', `approval must be one of ${APPROVALS.join('|')}`)
           }
+          if (body.identity !== undefined && !IDENTITY_MODES.includes(body.identity)) {
+            return fail(res, 400, 'EBADOP', `identity must be one of ${IDENTITY_MODES.join('|')}`)
+          }
+          if (body.hideHarness !== undefined && typeof body.hideHarness !== 'boolean') {
+            return fail(res, 400, 'EBADOP', 'hideHarness must be a boolean')
+          }
 
           const before = readState(p)
+          // writeState 是整块重建：五键必须带全，漏一个就等于把它重置回默认
           const next = {
             enabled: typeof body.enabled === 'boolean' ? body.enabled : before.enabled,
             contentScope: typeof body.contentScope === 'boolean' ? body.contentScope : before.contentScope,
             approval: typeof body.approval === 'string' ? body.approval : before.approval,
+            identity: typeof body.identity === 'string' ? body.identity : before.identity,
+            hideHarness: typeof body.hideHarness === 'boolean' ? body.hideHarness : before.hideHarness,
           }
           // 先验文本再落盘：超限时状态不该先被改掉
           const text = typeof body.text === 'string' ? normalizeForWrite(body.text) : undefined
+          const identityText = typeof body.identityText === 'string'
+            ? normalizeForWriteIdentity(body.identityText)
+            : undefined
           const changed = next.enabled !== before.enabled
             || next.contentScope !== before.contentScope
             || next.approval !== before.approval
+            || next.identity !== before.identity
+            || next.hideHarness !== before.hideHarness
           if (changed) writeState(p, next)
           if (text !== undefined) writeText({ ...p, text: file }, text)
+          if (identityText !== undefined) writeIdentity(p, identityText)
+          // 模式或隐藏开关变了：立刻让已装好的 agent 重装遮蔽项，不必等下一次装配
+          if (changed) syncBrandPersona()
           return json(res, 200, await snapshot())
         } catch (error) {
           const tooLarge = error?.code === 'ETOOLARGE'
@@ -711,10 +972,17 @@ export function apply(ctx, config = {}) {
   })
 }
 
-/** 文本写入口的预校验：超限先抛，避免状态已被改动而文本落不下。 */
+/** 内容边界文本写入口的预校验：超限先抛，避免状态已被改动而文本落不下。 */
 function normalizeForWrite(text) {
   const bytes = textBytes(text)
   if (bytes > TEXT_LIMIT) throw Object.assign(new Error(`text exceeds ${TEXT_LIMIT} bytes`), { code: 'ETOOLARGE' })
+  return text
+}
+
+/** 品牌人设文本写入口的预校验：上限独立，是 2 KB。 */
+function normalizeForWriteIdentity(text) {
+  const bytes = textBytes(text)
+  if (bytes > IDENTITY_LIMIT) throw Object.assign(new Error(`text exceeds ${IDENTITY_LIMIT} bytes`), { code: 'ETOOLARGE' })
   return text
 }
 

@@ -69,7 +69,7 @@ function loadBundle() {
 /** 一次典型的 snapshot：字段与 `enhance-scope/index.js` 的 snapshot() 对齐。 */
 const SNAPSHOT = {
   ok: true,
-  version: 3,
+  version: 4,
   active: true,
   enabled: true,
   injecting: true,
@@ -79,9 +79,22 @@ const SNAPSHOT = {
   text: 'hello',
   bytes: 5,
   sha256: 'abc123def456',
+  identity: 'keep',
+  hideHarness: false,
+  identityText: '',
+  identityBytes: 0,
+  identitySha256: null,
+  identityLimit: 2048,
+  identityEffective: {
+    mode: 'keep',
+    degraded: false,
+    reason: null,
+    preview: 'You are an AI agent powered by DeepSeek Harness.',
+  },
   updatedAt: '2026-10-28T14:32:00.000Z',
   degraded: false,
   degradedReason: null,
+  degradedFields: [],
   home: 'C:/x',
   limit: 8192,
   compat: {
@@ -192,16 +205,19 @@ test('call：HTTP 层失败与结构化错误都要抛', async () => {
 
 // ───────────────────────────────────────────── 结构
 
-test('结构：四组按顺序排列（内容边界 → 越界审批 → Enhanced → 检查）', () => {
-  const ids = ['enh-block-scope', 'enh-block-approval', 'enh-block-preset', 'enh-block-check']
+test('结构：五组按顺序排列（品牌人设 → 内容边界 → 越界审批 → Enhanced → 检查）', () => {
+  const ids = ['enh-block-identity', 'enh-block-scope', 'enh-block-approval', 'enh-block-preset', 'enh-block-check']
   const at = ids.map((id) => source.indexOf(`"${id}"`))
   at.forEach((index, i) => assert.ok(index >= 0, `缺组：${ids[i]}`))
-  assert.deepEqual(at, [...at].sort((a, b) => a - b), '四组的顺序变了')
+  assert.deepEqual(at, [...at].sort((a, b) => a - b), '五组的顺序变了')
 
-  // 第 2 组的切片里两个名字各出现一次：组标题「越界审批」与控件标签「越界时怎么办」。
+  // 品牌人设必须排在内容边界之前：它管系统提示的第一句，内容边界管末尾
+  assert.ok(at[0] < at[1], '品牌人设应排在内容边界之前')
+
+  // 第 3 组的切片里两个名字各出现一次：组标题「越界审批」与控件标签「越界时怎么办」。
   // 断言只要求「标题串出现在切片里」，所以只改其中一处时测试仍会绿（弱锁）；
   // 把两处都改掉才会红。别为了「统一」把控件标签也改成「越界审批」。
-  const titles = ['内容边界', '越界审批', 'Enhanced 权限档', '检查']
+  const titles = ['品牌人设', '内容边界', '越界审批', 'Enhanced 权限档', '检查']
   titles.forEach((title, i) => {
     const slice = source.slice(at[i], i + 1 < at.length ? at[i + 1] : source.length)
     assert.ok(slice.includes(title), `第 ${i + 1} 组的标题不对：缺「${title}」`)
@@ -396,7 +412,12 @@ test('布局：间距只用 8/12/16/24 四档，允许 2/4px 的微调', () => {
 
 test('字体：显式继承宿主字体族，等宽只用在代码位', () => {
   assert.ok(source.includes('font-family:var(--dsw-font-family)'), '.enh 根节点应显式继承宿主字体族')
-  assert.doesNotMatch(source, /font-family:\\s*[\"']?(?!var\()/, '不该出现非 token 的字体族')
+  // 检测器自己先验一次，否则它可能是一条永远为真的断言。
+  // 原先写成 `/font-family:\\s*…/`：在正则字面量里 `\\s` 是「字面反斜杠 + 字母 s」，
+  // 连 `font-family:Arial` 都不匹配 —— 写进违规也永不红。
+  const nonTokenFont = /font-family:\s*(?!var\()/
+  assert.ok(nonTokenFont.test('.x{font-family:Arial}'), '检测器必须能认出非 token 的字体族')
+  assert.doesNotMatch(source, nonTokenFont, '不该出现非 token 的字体族')
 })
 
 test('CSS：颜色只用宿主 token，没有自带色板', () => {
@@ -424,7 +445,7 @@ test('错误行：就地、role=alert、每个来源各一处，写档三个错�
   const alerts = source.match(/role: "alert"/g) ?? []
   assert.equal(alerts.length, 1, '错误行应当只有一处实现（复用同一个 helper）')
   const sections = [...source.matchAll(/errorLine\("([a-z]+)"\)/g)].map((m) => m[1])
-  assert.deepEqual(sections.sort(), ['approval', 'check', 'page', 'preset', 'scope'])
+  assert.deepEqual(sections.sort(), ['approval', 'check', 'identity', 'page', 'preset', 'scope'])
   assert.ok(source.includes('没成：'), '错误行缺统一前缀')
   for (const code of ['EPROFILE', 'EBADSHAPE', 'ERECORD', 'ETOOLARGE', 'EBADOP', 'EIO']) {
     assert.ok(source.includes(`code === "${code}"`), `缺 ${code} 的建议文案`)
@@ -461,7 +482,7 @@ test('字节口径：与服务端 normalizeText 同一套，再数 UTF-8', () =>
 })
 
 test('内容边界：注入成立时给的是「能写什么」，不是把四个条件再念一遍', () => {
-  assert.ok(source.includes('写人设、写内容边界、写行为规矩都行'), '缺「能写什么」这句说明')
+  assert.ok(source.includes('写行为规矩、写内容要求、写补充说明都行'), '缺「能写什么」这句说明')
   assert.ok(!source.includes('四个条件都成立'), '不该再把注入的四个条件念一遍（上面已经说过了）')
   // 没注入时仍要给「卡在哪」的诊断，只换掉成立时那一句
   assert.ok(source.includes('没有生效，卡在：'), '缺「卡在哪」的诊断句')
@@ -491,6 +512,18 @@ test('状态：服务端 active / degraded 必须被用上，降级原因要有�
   assert.ok(source.includes('state.degradedReason === "missing"'), 'missing 与 corrupt 必须分开说')
 })
 
+test('状态：损坏原因按 degradedFields 说，不许一律说成「审批回落」（审计 B2）', () => {
+  // 坏的是「品牌人设」时，说成「审批回落到先问我」是替另一件事背锅——
+  // 用户照着它去查审批，永远查不到。
+  assert.ok(source.includes('state.degradedFields'), '必须读服务端给的 degradedFields')
+  assert.ok(source.includes('field === "identity"'), 'identity 坏值要说成「品牌人设回落到保留」')
+  assert.ok(source.includes('field === "approval"'), 'approval 坏值才说审批')
+  // 认不出的字段名要照原样抖出来，不能静默吞掉
+  assert.ok(source.includes('认不出，按默认值处理'), '未知字段名必须照原样说出来')
+  // 整行不再硬编码「审批回落到先问我」
+  assert.ok(!/状态文件损坏，这一页按默认值运行；审批回落到/.test(source), '不许把损坏原因写死成审批')
+})
+
 // ───────────────────────────────────────────── 回归闸
 
 test('状态显示看已保存文本，不看未保存草稿（否则清空草稿时自相矛盾）', () => {
@@ -503,7 +536,7 @@ test('状态显示看已保存文本，不看未保存草稿（否则清空草�
   assert.ok(!/normalizeText\(draft\)/.test(line), '右上角不该直接读草稿')
 })
 
-test('渲染：用真实快照首帧渲染出四组 + 头部，且不带已删除的两节', async () => {
+test('渲染：用真实快照首帧渲染出五组 + 头部，且不带已删除的两节', async () => {
   const module = loadBundle()
   let component
   module.apply({
@@ -530,10 +563,10 @@ test('渲染：用真实快照首帧渲染出四组 + 头部，且不带已删�
   }
   walk(tree)
 
-  for (const id of ['enh-block-scope', 'enh-block-approval', 'enh-block-preset', 'enh-block-check']) {
+  for (const id of ['enh-block-identity', 'enh-block-scope', 'enh-block-approval', 'enh-block-preset', 'enh-block-check']) {
     assert.ok(ids.has(id), `渲染树里缺 ${id}`)
   }
-  assert.equal(ids.size, 4, '渲染树里只该有四组')
+  assert.equal(ids.size, 5, '渲染树里只该有五组')
   // 组件节点（Switch/Button）的 className 在组件内部，假 React 不会展开它们；
   // 这里只验宿主可渲染的真实 DOM 节点上的类名。
   for (const cls of ['enh', 'enh-head', 'enh-title', 'enh-pill', 'enh-group', 'enh-row-head', 'enh-note']) {
@@ -636,5 +669,50 @@ test('CSS 分支真被执行：有 document 时 effect 被注册，style 标签�
 function cssRules() {
   const start = source.indexOf('var CSS = [')
   const end = source.indexOf('].join("\\n")')
-  return [...source.slice(start, end).matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  const rules = [...source.slice(start, end).matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  // 空集合会让「字号」「间距」两条刻度断言在零条规则上静默全绿——
+  // 那是「门禁在跑但什么都没量」的典型空转。量之前先确认真量到了东西。
+  if (rules.length === 0) throw new Error('cssRules() 抽到 0 条规则：CSS 数组的标记可能被改了，刻度断言会静默失效')
+  return rules
 }
+
+// ───────────────────────────────────────────── 品牌人设
+
+test('品牌人设：三态词与现状词都在，且不含「人设」二字（避开宿主 persona 与内容边界）', () => {
+  for (const word of ['保留', '去掉', '自定义']) {
+    assert.ok(source.includes(`word: "${word}"`), `缺三态词：${word}`)
+  }
+  for (const status of ['原样', '已去掉', '已替换']) {
+    assert.ok(source.includes(`"${status}"`), `缺现状词：${status}`)
+  }
+  // 组名与控件标签都不能用「人设」：宿主把 persona 叫「人设」，内容边界也能写人设文本，
+  // 这一组只管开头那句声明，混用一个词会让三件事读成一件。
+  const block = source.slice(source.indexOf('"enh-block-identity"'), source.indexOf('"enh-block-scope"'))
+  assert.ok(!block.includes('人设开关'), '别用「人设开关」这类合称')
+  assert.ok(block.includes('"品牌人设"'), '组名应是「品牌人设」')
+})
+
+test('品牌人设：只有「自定义」才画输入框（没有的控件不画）', () => {
+  // 输入框的渲染必须在 identityMode !== "custom" 的分支里
+  const at = source.indexOf('identityMode !== "custom" ? null :')
+  assert.ok(at > 0, '输入框应由 identityMode 分支控制')
+  const input = source.indexOf('label: "第一句写什么"')
+  assert.ok(input > at, '输入框必须在那条分支之后')
+})
+
+test('品牌人设：预览行与「改一次冷一次」的后果说明都在', () => {
+  assert.ok(source.includes('模型看到的第一句'), '缺预览行标签')
+  assert.ok(source.includes('identityEffective.preview'), '预览必须消费服务端派生的 preview')
+  assert.ok(source.includes('改一次，下一条请求要重算一次系统提示'), '缺缓存代价说明')
+  assert.ok(source.includes('下一条消息生效，不用重启'), '缺生效时机说明')
+})
+
+test('品牌人设：降级时说对原因，不冒称已生效', () => {
+  assert.ok(source.includes('identityEffective.degraded === true'), '必须读降级标志')
+  assert.ok(source.includes('此刻发出去的仍是宿主原句'), '降级时要说明实际行为')
+})
+
+test('品牌人设：切三态不能静默丢弃未保存的自定义文字', () => {
+  // adopt 里只有服务端身份文本真的变了才覆盖草稿
+  assert.match(source, /previousIdentity === null \|\| previousIdentity !== next\.identityText/, '草稿覆盖必须以服务端文本变化为条件')
+})

@@ -57,11 +57,11 @@ README 里那句适用版本是这份声明的派生文本，`node scripts/check
 
 ## 宿主触点
 
-每一条能力都挂在宿主的一个接缝上。例行核验，核的就是这些接缝有没有动。下面这张表按破坏面分组（完整清单由代码反推而来，按表内独立触点项计共 35 条；分组只求「宿主变了坏什么」一眼可读）：
+每一条能力都挂在宿主的一个接缝上。例行核验，核的就是这些接缝有没有动。下面这张表按破坏面分组（完整清单由代码反推而来，按表内独立触点项计共 36 条；分组只求「宿主变了坏什么」一眼可读）：
 
 | 组 | 触点（代码侧入口） | 宿主变了坏什么 |
 |---|---|---|
-| cordis 插件 API | 入口形状（`name`/`apply`/`inject`）、`systemPrompt.section()` + `getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX')`、`ctx.effect`、运行期 `ctx.inject(['webServer'])`、`web.register({kind:'exact'})` 路由、`ctx.on('approval/request')` waterfall、`settings.section` 槽位（`ctx.slots.inject` + `register`） | 注入消失 / 审批接管失效 / 设置页分节挂不上 |
+| cordis 插件 API | 入口形状（`name`/`apply`/`inject`）、`systemPrompt.section()` + `getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX')`、`ctx.effect`、运行期 `ctx.inject(['webServer'])`、`web.register({kind:'exact'})` 路由、`ctx.on('approval/request')` waterfall、`settings.section` 槽位（`ctx.slots.inject` + `register`）、`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽（品牌人设） | 注入消失 / 审批接管失效 / 设置页分节挂不上 |
 | 浏览器半装载 | `window.__ModuleLoader__.load({id, factory})`、factory 参数 `require('react')`、`dsh.client` 发现规则（`exports["./client"]` + 裸包名行才挂浏览器半） | 设置页整个消失（服务端功能仍在） |
 | 宿主视觉 token | 23 个 `--dsw-*`/`--ds-*` 变量、`body[data-ds-dark-theme]` 属性钩子、排版刻度 | 页面不可读 / 深色模式错乱 |
 | profile 配置与解析 | `profileContext` 形状（`patchPath`）、`DSH_PROFILE_DIR` + `cordis.patch.yml` 文件名、`profiles/<name>/` 布局、patch 顶层数组 + `config` 整块替换 + `- id: permission` 行、`presets`/`defaultPreset` 契约、档位菜单显示契约（表外档名纯文字行）、宿主侧档位中文名文案、审批策略 `approval/policy` 取 `never` 时前置拒绝 | 写档 409 或写坏用户配置 / 播种错开关档（默认档位的审批策略是 `never` 时，种「自动同意」会被宿主前置拒绝，须种「先问我」） |
@@ -78,7 +78,7 @@ README 里那句适用版本是这份声明的派生文本，`node scripts/check
 
 ### 1. 重数触点
 
-从代码 grep 宿主引用重推这张表，不抄旧表。口径要说清：表里的数是「独立触点项」。一个并列项算一条（「23 个 `--dsw-*`/`--ds-*` 变量」在表里是一条，代码里是 23 个名字）；`→` 连成的链，每一环各算一条——「版本探测链」那一行按 6 环算，不是 1 条。按「、」分段是 30 条，这条链多出 5 条，合计正好 35 条。grep 到的引用点比条目多，先归并成条目再计，别把引用点数直接填进表里。
+从代码 grep 宿主引用重推这张表，不抄旧表。口径要说清：表里的数是「独立触点项」。一个并列项算一条（「23 个 `--dsw-*`/`--ds-*` 变量」在表里是一条，代码里是 23 个名字）；`→` 连成的链，每一环各算一条——「版本探测链」那一行按 6 环算，不是 1 条。按「、」分段是 31 条，这条链多出 5 条，合计正好 36 条。grep 到的引用点比条目多，先归并成条目再计，别把引用点数直接填进表里。
 
 ### 2. 逐包 tree-diff
 
@@ -188,6 +188,19 @@ rc.5 上还做了一轮**干净环境终验**（2026-10-30，远端机重置后�
 - **仍未验的一项**：真会话。本机 `DEEPSEEK_API_KEY` 余额 0，`dsh --profile headless "…"` 直接 `QUOTA: Insufficient Balance`（exit 1）；「Enhanced 档下是否真会产生 `approval/request`」要一次有余额的会话才能定，这里**只记录、不下结论**。
 
 两段记录的差异来自**会话可用性**，不是产品行为变了：10-30 那次机器上有可用会话，才看得到「注入命中真实会话系统提示」；10-31 这次重置后无可用会话，`inject` 项因此为红。别把两段混着读成「行为回退了」。
+
+### 2026-11-02（1.2.0 品牌人设；36 条触点那一轮）
+
+触点表加了一条（`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽），独立触点项由 35 条重数为 36 条。这一轮核的就是这条新触点，做法与结论：
+
+- **宿主侧逐条核对（本机 `0.2.1-rc.5` 的 `app.asar` 只读）**：`@deepseek-ai/dsh-system-prompt` 里 `HARNESS_IDENTITY` 座位与 `"You are an AI agent powered by DeepSeek Harness."` 原文、`@deepseek-ai/dsh-harness-dev-context` 里 `harness:source` / `app:web-surface` 两个名字同时用于 section 与 context、`@deepseek-ai/dsh-agent` 的 `agent/created` 载荷为 `{ agent, source, signal }` 且 `agent.ctx` 是可注入的 agent 作用域上下文、`@deepseek-ai/dsh-file-reference-local` 就是 `agent.ctx.inject(['systemPrompt'], …)` 的现成先例——全部与契约 §5 的假设一致。
+- **真机端到端（远端机全量重置后）**：静默重装 `0.2.1-rc.5` → `dsh plugin --profile headless add` 与 `--profile desktop add`（均 exit 0）→ `--dump-config` 组合出三个入口；`headless` 首启种下 `state.json` **v4 五键**；设置页后端 `/enhance/api` 在桌面端 GUI 上返回 `version=4 / identityLimit=2048`，`check` 四项全绿（含 `inject`——它读会话日志证明文字真的进了提示词）；桌面端 GUI 的「增强」一节实际渲染出五组（用户截图确认）。
+- **装配层验收（契约 §3 第 1、3 条）在真机会话日志上成立**——这是 10-31 那次欠下的那项，这次补上了。做法：把 `identity` 设成 `custom`、写 `identity.txt`、`hideHarness=true`，跑一次 `dsh --profile headless headless "…"`，再解压会话日志看 `system/message` 的文本：
+  - `custom` 态：system 节点第一句是 `You are Aria, a private assistant.`，宿主原句 `You are an AI agent powered by DeepSeek Harness.` **在整份会话里 0 命中**；
+  - 切回 `keep` 态：第一句**逐字回到**宿主原句，自定义文本 0 命中。
+  两条都只改声明层——内容边界那句在两种状态下都在。
+- **仍然没验的**：`hideHarness` 在**桌面/web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，所以那两段在 `headless` 上本来就注册不到（基线里也是 0 命中），无从对比。这一项留给一次桌面端真会话。
+- **顺带纠正一处旧记录**：`dsh --version` **不会**重建 `.dsh`（10-31 那次记反了）。真正重建的是一次 profile 引导：`dsh headless "…"` 即便因 `QUOTA` 退出码 1，`~/.dsh` 也已生成。本次实测确认。
 
 ## 两个与「写入 Enhanced 档」按钮直接相关的宿主事实
 

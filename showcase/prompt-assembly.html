@@ -1188,7 +1188,7 @@
     <div class="act-head">
       <span class="act-num">Act II</span>
       <h2 class="act-title">我们的接法：在最后一档，贴一页纸<span class="tag">enhance-scope</span></h2>
-      <p class="act-lede">不改宿主、不替换系统提示、不接管渲染。只多注册一段；那段文本从一个文件里读。</p>
+      <p class="act-lede">不改宿主、不追加式接管渲染。这一页讲的是「只多注册一段」那条路；声明层的替换（品牌人设）走的是另一条接缝，见文末注。</p>
     </div>
 
     <div class="body">
@@ -1422,7 +1422,7 @@
     <h2>边界与代价</h2>
     <ul>
       <li><b>不是变量系统。</b>默认 <code>interpolate: false</code>，<code>{{…}}</code> 保持字面。要做变量，那是宿主插件 API 的事，不是这个插件的承诺。</li>
-      <li><b>不替换整份系统提示。</b>没有 <code>complete: true</code>。它只做加法，所以也不能靠它改掉工具说明或人格。</li>
+      <li><b>不替换整份系统提示。</b>没有 <code>complete: true</code>。内容边界只做加法，所以不能靠它改掉工具说明或人格；要改开头那句声明，是「品牌人设」那一组的事，机制不同（按 agent 遮蔽同名段），不在这条链上。</li>
       <li><b>上限 8 KB，读写两侧都拦。</b>直接编辑文件写超限不会注入，设置页检查判红；设置页写入超限返回 413。</li>
       <li><b>patch 只做行级追加，不解析整份 YAML。</b>结构坏要靠人看；<code>shared/preset.mjs</code> 能抓「形态认不出」，抓不了「行在但语义不对」。</li>
       <li><b>生效有一条消息的时延。</b>没有文件监听：改完不会立刻有任何事发生，下一次装配才读。</li>

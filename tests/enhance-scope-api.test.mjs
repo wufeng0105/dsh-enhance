@@ -20,15 +20,25 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { apply, readAsarManifestVersion, resolveProfilePatch } from '../enhance-scope/index.js'
+import { apply, identityPreview, readAsarManifestVersion, resolveProfilePatch, shadowPlan } from '../enhance-scope/index.js'
 
 /** 一个够 `apply()` 用的假 cordis 上下文；`profile` 为 undefined 时模拟「没有 profile 上下文」。 */
-function fakeCtx({ profile, home } = {}) {
+function fakeCtx({ profile, home, agents } = {}) {
   const registered = []
   const sections = []
+  const contexts = []
+  const listeners = new Map()
   const ctx = {
     get(name) {
-      return name === 'profileContext' ? profile : undefined
+      if (name === 'profileContext') return profile
+      if (name === 'agents') return agents
+      return undefined
+    },
+    on(event, handler) {
+      const list = listeners.get(event) ?? []
+      list.push(handler)
+      listeners.set(event, list)
+      return () => {}
     },
     effect(fn) {
       const cleanup = fn()
@@ -45,16 +55,38 @@ function fakeCtx({ profile, home } = {}) {
           },
         })
       }
+      if (names.includes('systemPrompt')) {
+        // 品牌人设走这条路：agent 作用域里拿到的 systemPrompt 有 section 与 context 两个方法
+        callback({
+          systemPrompt: {
+            getSectionOrder: () => 100,
+            getContextOrder: () => 200,
+            section(spec) {
+              sections.push(spec)
+              return () => {}
+            },
+            context(spec) {
+              contexts.push(spec)
+              return () => {}
+            },
+          },
+        })
+      }
     },
     systemPrompt: {
       getSectionOrder: () => 100,
+      getContextOrder: () => 200,
       section(spec) {
         sections.push(spec)
         return () => {}
       },
+      context(spec) {
+        contexts.push(spec)
+        return () => {}
+      },
     },
   }
-  return { ctx, registered, sections }
+  return { ctx, registered, sections, contexts, listeners }
 }
 
 /** 假响应：把 writeHead/end 的结果收起来。 */
@@ -87,7 +119,7 @@ function fakeReq(headers, body) {
 }
 
 /** 起一个 home + profile patch，返回调用一个 op 的函数。 */
-async function harness({ profileContext = true, patch, home: presetHome, envProfileDir } = {}) {
+async function harness({ profileContext = true, patch, home: presetHome, envProfileDir, agents } = {}) {
   const home = presetHome ?? mkdtempSync(join(tmpdir(), 'enhance-api-'))
   const profileDir = join(home, 'profiles', 'desktop')
   mkdirSync(profileDir, { recursive: true })
@@ -102,7 +134,7 @@ async function harness({ profileContext = true, patch, home: presetHome, envProf
   else process.env.DSH_PROFILE_DIR = profileDir
 
   const profile = profileContext === true ? { name: 'desktop', dir: profileDir, patchPath } : undefined
-  const { ctx, registered } = fakeCtx({ profile })
+  const { ctx, registered, listeners, contexts } = fakeCtx({ profile, agents })
   apply(ctx)
   assert.equal(registered.length, 1, '路由没挂上')
   const handler = registered[0].handler
@@ -122,7 +154,7 @@ async function harness({ profileContext = true, patch, home: presetHome, envProf
     rmSync(home, { recursive: true, force: true })
   }
 
-  return { home, profileDir, patchPath, call, close }
+  return { home, profileDir, patchPath, call, close, listeners, contexts }
 }
 
 test('resolveProfilePatch：优先 profileContext.patchPath', () => {
@@ -403,6 +435,231 @@ test('写档会在 <home>/enhance/preset-write.json 留归属记录', async () =
     assert.equal(record.patchPath, probe.patchPath)
     assert.equal(record.profile, 'desktop')
     assert.equal(record.action, 'added')
+  } finally {
+    await probe.close()
+  }
+})
+
+// ───────────────────────────────────────────── 品牌人设：遮蔽计划与预览
+
+test('shadowPlan：keep 且不隐藏 = 什么都不注册（这才叫「保留」）', () => {
+  assert.deepEqual(shadowPlan({ mode: 'keep', hideHarness: false }), [])
+})
+
+test('shadowPlan：remove / custom 只遮身份段，且两者注册方式必须完全一样', () => {
+  // 两者都用 `live`（动态读文本）是**功能性要求**，不是风格问题：
+  // 若 remove 用常量空串、custom 用动态函数，两者座名相同 → 重装指纹相同 →
+  // 「去掉 → 自定义」不会重装，座上留着旧空串。见下面那条回归测试。
+  const remove = shadowPlan({ mode: 'remove', hideHarness: false })
+  const custom = shadowPlan({ mode: 'custom', hideHarness: false })
+  assert.deepEqual(remove, [{ kind: 'section', seat: 'identity', text: 'live' }])
+  assert.deepEqual(custom, [{ kind: 'section', seat: 'identity', text: 'live' }])
+  assert.deepEqual(remove, custom, '两种模式必须产出同一份注册计划')
+})
+
+test('shadowPlan：隐藏开关把两段说明的 section 与 context 一起遮——成对，不能只遮一半', () => {
+  const plan = shadowPlan({ mode: 'keep', hideHarness: true })
+  assert.deepEqual(plan.map((item) => `${item.kind}:${item.seat}`), [
+    'section:source', 'context:sourceContext', 'section:web', 'context:webContext',
+  ])
+  // 只遮 section 的话，refreshContext() 会在准入前按名字把 context 重新求值出来
+  assert.equal(plan.filter((item) => item.kind === 'context').length, 2)
+})
+
+test('shadowPlan：三态与隐藏开关互相独立，组合起来不重不漏', () => {
+  const combo = shadowPlan({ mode: 'custom', hideHarness: true })
+  assert.deepEqual(combo.map((item) => `${item.kind}:${item.seat}`), [
+    'section:identity', 'section:source', 'context:sourceContext', 'section:web', 'context:webContext',
+  ])
+})
+
+test('identityPreview：keep 给宿主原句，remove 不伪造，custom 取首行', () => {
+  assert.match(identityPreview({ mode: 'keep', text: '' }), /^You are an AI agent/)
+  assert.match(identityPreview({ mode: 'remove', text: '' }), /已去掉/)
+  assert.equal(identityPreview({ mode: 'custom', text: 'You are Aria.\nsecond line' }), 'You are Aria.')
+})
+
+test('品牌人设：agent/created 装遮蔽项、agent/disposed 拆掉，且落在 agent 自己的作用域上', async () => {
+  // 钉的是「按 agent 遮蔽」这条路线真的接上了，以及「keep 不注册」这条分界。
+  const agentSections = []
+  const agentContexts = []
+  const makeAgent = () => ({
+    ctx: {
+      inject(names, callback) {
+        if (!names.includes('systemPrompt')) return { dispose: () => {} }
+        callback({
+          systemPrompt: {
+            getSectionOrder: () => -1000,
+            getContextOrder: () => 200,
+            section(spec) {
+              agentSections.push(spec)
+              return () => { const i = agentSections.indexOf(spec); if (i >= 0) agentSections.splice(i, 1) }
+            },
+            context(spec) {
+              agentContexts.push(spec)
+              return () => { const i = agentContexts.indexOf(spec); if (i >= 0) agentContexts.splice(i, 1) }
+            },
+          },
+        })
+        return { dispose: () => {} }
+      },
+    },
+  })
+
+  const probe = await harness({ patch: '[]\n', agents: { list: () => [] } })
+  try {
+    const created = probe.listeners.get('agent/created')?.[0]
+    const disposed = probe.listeners.get('agent/disposed')?.[0]
+    assert.equal(typeof created, 'function', 'apply 必须监听 agent/created')
+    assert.equal(typeof disposed, 'function', 'apply 必须监听 agent/disposed')
+
+    const agent = makeAgent()
+    await created({ agent })
+    assert.deepEqual(agentSections, [], '默认 keep：一项都不该注册（注册空串等于去掉，不是保留）')
+
+    // 切成 remove → 走真实 op，排一次微任务让同步落地
+    await probe.call({ op: 'set', identity: 'remove' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.equal(agentSections.length, 1, 'remove：应注册一条身份遮蔽')
+    assert.equal(agentSections[0].name, 'harness:identity', '必须遮宿主的身份段名')
+    assert.equal(agentSections[0].interpolate, false, '用户文本要保持字面，否则一个 { { 就炸')
+    assert.equal(agentSections[0].text(), '', 'remove 的内容是空串，渲染时被丢弃')
+
+    // 再开隐藏 → 身份 + 两段说明的 section/context 都在
+    await probe.call({ op: 'set', hideHarness: true })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const names = agentSections.map((spec) => spec.name).sort()
+    assert.deepEqual(names, ['app:web-surface', 'harness:identity', 'harness:source'])
+    assert.deepEqual(agentContexts.map((spec) => spec.name).sort(), ['app:web-surface', 'harness:source'])
+
+    // 退回 keep + 关隐藏 → 拆干净
+    await probe.call({ op: 'set', identity: 'keep', hideHarness: false })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.deepEqual(agentSections, [], '退回保留后不该留任何遮蔽项')
+    assert.deepEqual(agentContexts, [])
+
+    disposed({ agent })
+    assert.deepEqual(agentSections, [])
+  } finally {
+    await probe.close()
+  }
+})
+
+test('writeState 回归：只切总开关，品牌人设不被重置（审计 M5）', async () => {
+  // writeState 是整块重建。set 的 next 必须把五键都带上，否则用户点一次「总开关」
+  // 就把 identity/hideHarness 悄悄清回默认——这是最容易漏、也最难在界面上看出来的事故。
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const first = await probe.call({ op: 'set', identity: 'custom', hideHarness: true })
+    assert.equal(first.status, 200)
+
+    const second = await probe.call({ op: 'set', enabled: false })
+    assert.equal(second.status, 200)
+    assert.equal(second.json.enabled, false)
+    assert.equal(second.json.identity, 'custom', '切总开关后身份必须还在')
+    assert.equal(second.json.hideHarness, true, '切总开关后隐藏开关必须还在')
+
+    // 内容边界那条路也一样
+    const third = await probe.call({ op: 'set', contentScope: false })
+    assert.equal(third.json.contentScope, false)
+    assert.equal(third.json.identity, 'custom')
+    assert.equal(third.json.hideHarness, true)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('品牌人设：非法 identity / 非布尔 hideHarness / 超限文本都被拒，且不落盘', async () => {
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const badMode = await probe.call({ op: 'set', identity: 'white-label' })
+    assert.equal(badMode.status, 400)
+    assert.equal(badMode.json.code, 'EBADOP')
+
+    const badBool = await probe.call({ op: 'set', hideHarness: 'yes' })
+    assert.equal(badBool.status, 400)
+    assert.equal(badBool.json.code, 'EBADOP')
+
+    const tooLong = await probe.call({ op: 'set', identityText: 'x'.repeat(2049) })
+    assert.equal(tooLong.status, 413)
+    assert.equal(tooLong.json.code, 'ETOOLARGE')
+
+    // 超限与非法都不该改状态
+    const snapshot = await probe.call({ op: 'state' })
+    assert.equal(snapshot.json.identity, 'keep')
+    assert.equal(snapshot.json.identityText, '')
+  } finally {
+    await probe.close()
+  }
+})
+
+test('state 快照：身份字段齐全，preview 按服务端派生', async () => {
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const keep = await probe.call({ op: 'state' })
+    assert.equal(keep.json.identity, 'keep')
+    assert.equal(keep.json.identityLimit, 2048)
+    assert.equal(keep.json.identityEffective.mode, 'keep')
+    assert.match(keep.json.identityEffective.preview, /^You are an AI agent/)
+
+    await probe.call({ op: 'set', identity: 'custom', identityText: 'You are Aria.' })
+    const custom = await probe.call({ op: 'state' })
+    assert.equal(custom.json.identityEffective.mode, 'custom')
+    assert.equal(custom.json.identityEffective.preview, 'You are Aria.')
+    assert.equal(custom.json.identitySha256.length, 12)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('品牌人设回归：活着的 agent 上「去掉 → 自定义」必须真的换上自定义文本', async () => {
+  // 这条钉的是审计 B1：重装指纹原先只看「有哪些座」，不看座上的 text 是哪一种实现。
+  // remove 注册的是常量空串、custom 注册的是动态读函数，两者座名相同 → 指纹相同 → 不重装，
+  // 结果设置页显示「已替换」而模型实际收到空串（等于删除）。新 agent 正常，所以症状是
+  // 「有的会话对、有的不对」——这类 bug 只有把三步串起来才照得出来。
+  const sections = []
+  const agent = {
+    ctx: {
+      inject(names, callback) {
+        if (!names.includes('systemPrompt')) return { dispose: () => {} }
+        callback({
+          systemPrompt: {
+            getSectionOrder: () => -1000,
+            getContextOrder: () => 200,
+            section(spec) {
+              sections.push(spec)
+              return () => { const i = sections.indexOf(spec); if (i >= 0) sections.splice(i, 1) }
+            },
+            context() { return () => {} },
+          },
+        })
+        return { dispose: () => {} }
+      },
+    },
+  }
+
+  const probe = await harness({ patch: '[]\n', agents: { list: () => [] } })
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+  try {
+    const created = probe.listeners.get('agent/created')[0]
+    await created({ agent })
+    assert.equal(sections.length, 0, 'keep：不注册')
+
+    await probe.call({ op: 'set', identity: 'remove' })
+    await settle()
+    assert.equal(sections.length, 1, 'remove：注册一条')
+    assert.equal(sections[0].text(), '', 'remove：内容为空串')
+
+    await probe.call({ op: 'set', identity: 'custom', identityText: 'You are Aria, a private assistant.' })
+    await settle()
+    assert.equal(sections.length, 1, 'custom：仍然只该有一条（同一个座）')
+    assert.equal(sections[0].text(), 'You are Aria, a private assistant.',
+      '去掉 → 自定义之后，座上必须真的换成自定义文本；留着旧空串就是「显示已替换、实际被删掉」')
+
+    // 只改文本（identity 不变）也要能跟上
+    await probe.call({ op: 'set', identityText: 'You are Nova.' })
+    await settle()
+    assert.equal(sections[0].text(), 'You are Nova.', '只改文本时，动态读函数本身就该跟上')
   } finally {
     await probe.close()
   }

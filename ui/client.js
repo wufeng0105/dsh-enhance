@@ -1,11 +1,11 @@
-// dsh-enhance-ui — 设置页：四组设置，按宿主设置页的刻度排版（16/24 标题、14/22 行标题、
+// dsh-enhance-ui — 设置页：五组设置，按宿主设置页的刻度排版（16/24 标题、14/22 行标题、
 // 0.5px 发丝线、12px 节间距、720 宽度上限），先给控件再给后果，没有的按钮不画。
 //
 // 装载协议与官方 bundle 相同：window.__ModuleLoader__.load({ id, factory })。
 // 数据只走 /enhance/api 的四个 op：state / check / set / preset。
 //
 // 页面纪律：
-//   1. 一屏只有四件事：内容边界、越界审批、Enhanced 权限档、检查。别的都删了——
+//   1. 一屏只有五件事：品牌人设、内容边界、越界审批、Enhanced 权限档、检查。
 //      装/卸/升级归插件市场，本页不重复一遍。
 //   2. 一个控件只说一次后果：每组是「标题 + 右上现状 + 正文 + 一行后果」。
 //   3. 不用内部指代：「那句话」「尾段」这类词离开上下文就没意义。
@@ -16,7 +16,7 @@
 //   本页能改「档位**存在与否**」——点一下就往当前 profile 的 patch 里写 Enhanced 档；
 //   但改不了「这一轮用哪个档」——那永远归宿主的档位菜单。
 //
-// 主线在这一页的落法：只追加一段文本、只多声明一个档位，别的一个字不动。
+// 主线在这一页的落法：只在开头换一句声明、只在末尾追一段文本、只多声明一个档位，别的一个字不动。
 window.__ModuleLoader__.load({
 	id: "dsh-enhance-ui",
 	factory: (require) => {
@@ -78,6 +78,29 @@ window.__ModuleLoader__.load({
 			preset: "Enhanced 档",
 		};
 
+		// 品牌人设三态说的是「系统提示第一句怎么办」。词与主菜单、与内容边界都错开：
+		// 这里没有「人设」二字——那是宿主 persona 的名字，也是内容边界能写的东西，
+		// 这一组只管开头那句声明，不能把两件事混成一个词。
+		var IDENTITY = {
+			keep: {
+				word: "保留",
+				tone: "mute",
+				note: "宿主怎么写就怎么发，本插件一个字不动。",
+			},
+			remove: {
+				word: "去掉",
+				tone: "ok",
+				note: "那句声明不再出现，下一段自然接上。",
+			},
+			custom: {
+				word: "自定义",
+				tone: "ok",
+				note: "用下面那段文字替掉原句；写什么就是什么。",
+			},
+		};
+
+		var IDENTITY_ORDER = ["keep", "remove", "custom"];
+
 		/** 三态真正起作用的档位：宿主只在「沙箱挡住 → 申请放宽」时发审批请求。名称用宿主中文菜单的叫法。 */
 		var APPROVAL_SCOPE_HINT = "该设置只对「仅可查看」和「工作区内修改」两个档位生效。当档位为「完全权限」或「Enhanced」时，宿主不会产生需要审批的请求，因此这三项不会起作用。";
 
@@ -124,6 +147,7 @@ window.__ModuleLoader__.load({
 		/** 错误行里用来指明「哪一组」；与各组的标题一致，便于对照。 */
 		var SECTION_LABELS = {
 			page: "页面：",
+			identity: "「品牌人设」：",
 			scope: "「内容边界」：",
 			approval: "「越界审批」：",
 			preset: "「Enhanced 权限档」：",
@@ -183,8 +207,40 @@ window.__ModuleLoader__.load({
 			return { kind: "absent", word: "未写入", tone: "mute" };
 		}
 
-		/** 四组按 API 的 name 排；pass / na 一律用服务端值，本页不伪造 ✓；na = 当前装法不适用。 */
-		function checkRows(checks) {
+		/**
+		 * 品牌人设的现状词。判定顺序从上到下：
+		 * 「总开关关着」和「降级」都排在模式词前面——那两种情况下，
+		 * 「已替换」这个结论根本不成立（实际发出去的还是宿主原句）。
+		 */
+		function identityStatusOf(state) {
+			if (state === null) return { word: "—", tone: "mute" };
+			if (state.enabled === false) return { word: "不生效", tone: "mute" };
+			var effective = state.identityEffective || {};
+			if (effective.degraded === true) return { word: "降级运行", tone: "warn" };
+			if (effective.mode === "custom") return { word: "已替换", tone: "ok" };
+			if (effective.mode === "remove") return { word: "已去掉", tone: "ok" };
+			return { word: "原样", tone: "mute" };
+		}
+
+		/**
+		 * 状态文件损坏时说清「坏的是哪个字段、各自回落成什么」。
+		 *
+		 * 服务端给的是 `degradedFields`（`shared/state.mjs` 里那几个键），这里逐个翻成人话。
+		 * 认不出的字段名照原样抖出来——宁可难看，也不要漏说。
+		 */
+		function degradedTextOf(state) {
+			var fields = Array.isArray(state.degradedFields) ? state.degradedFields : [];
+			if (fields.length === 0) return "状态文件损坏，这一页按默认值运行。";
+			var said = fields.map(function (field) {
+				if (field === "approval") return "越界审批回落到「先问我」";
+				if (field === "identity") return "品牌人设回落到「保留」";
+				if (field === "hideHarness") return "宿主说明照常显示";
+				return "「" + field + "」认不出，按默认值处理";
+			});
+			return "状态文件损坏，这一页按默认值运行；" + said.join("；") + "。";
+		}
+
+		/** 四组按 API 的 name 排；pass / na 一律用服务端值，本页不伪造 ✓；na = 当前装法不适用。 */		function checkRows(checks) {
 			if (!checks || !checks.checks) return [];
 			return checks.checks.map(function (item) {
 				return {
@@ -253,6 +309,10 @@ window.__ModuleLoader__.load({
 			".enh-textarea:disabled{color:var(--dsw-alias-label-tertiary)}",
 			".enh-textmeta{display:flex;justify-content:space-between;gap:12px;font:12px/18px var(--ds-font-family-code);color:var(--dsw-alias-label-tertiary)}",
 			".enh-over{color:var(--dsw-alias-state-error-primary)}",
+			// 预览行：只读地把「模型将看到的第一句」摆出来。等宽，因为它是一段要被逐字发出的文本。
+			".enh-preview{display:flex;flex-direction:column;gap:4px;padding:8px 12px;border:.5px solid var(--enh-rule);border-radius:var(--dsw-radius-sm)}",
+			".enh-preview-label{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}",
+			".enh-preview-text{font:12px/18px var(--ds-font-family-code);color:var(--dsw-alias-label-primary);overflow-wrap:anywhere}",
 			".enh-checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}",
 			".enh-check-row{display:grid;grid-template-columns:16px minmax(0,1fr) 46%;gap:8px;padding:8px 0;border-top:.5px solid var(--enh-rule);font-size:12px;line-height:18px;align-items:start}",
 			".enh-mark{font:12px/18px var(--ds-font-family-code);text-align:center}",
@@ -352,6 +412,10 @@ window.__ModuleLoader__.load({
 			var draft = draftBox[0];
 			var setDraft = draftBox[1];
 
+			var identityDraftBox = React.useState("");
+			var identityDraft = identityDraftBox[0];
+			var setIdentityDraft = identityDraftBox[1];
+
 			var busyBox = React.useState(false);
 			var busy = busyBox[0];
 			var setBusy = busyBox[1];
@@ -380,8 +444,12 @@ window.__ModuleLoader__.load({
 			 */
 			function adopt(next) {
 				var previous = state === null ? null : state.text;
+				var previousIdentity = state === null ? null : state.identityText;
 				setState(next);
 				if (previous === null || previous !== next.text) setDraft(next.text || "");
+				// 同一纪律：只有服务端的身份文本真的变了才覆盖草稿，
+				// 否则切一下三态就把用户还没保存的自定义文字静默丢掉。
+				if (previousIdentity === null || previousIdentity !== next.identityText) setIdentityDraft(next.identityText || "");
 			}
 
 			/**
@@ -483,7 +551,7 @@ window.__ModuleLoader__.load({
 			);
 
 			var intro = h("p", { className: "enh-intro" },
-				"这一页管四件事：写一段文字接到系统提示末尾、越界时怎么答、要不要多一个档位、以及它有没有真的生效。");
+				"这一页管五件事：换掉系统提示开头那句声明、在末尾接一段文字、越界时怎么答、要不要多一个档位、以及它有没有真的生效。");
 			// 版本行：本包版本 + 本机 DSH 版本 + 已验范围。
 			// 「超出已验范围」只变黄、不拦人——拦人是宿主 engines.dsh 门禁的职责（装时拒、载时禁），这一页只负责把事实说清。
 			function compatLine(compat) {
@@ -501,15 +569,120 @@ window.__ModuleLoader__.load({
 
 			var versionLine = compatLine(state === null ? null : state.compat);
 
-			// 状态文件坏了不再有「元信息」块，用一行说清降级原因（这是唯一会丢的信息）
+			// 状态文件坏了不再有「元信息」块，用一行说清降级原因（这是唯一会丢的信息）。
+			//
+			// 原因要按 `degradedFields` 说，不能一律说成审批：坏的是「品牌人设」时，
+			// 那句「审批回落到先问我」是在替另一件事背锅——用户照着它去查审批，永远查不到。
 			var degradedLine = state !== null && state.degraded
 				? h("p", { className: "enh-hint" },
 					state.degradedReason === "missing"
 						? "状态文件不存在，这一页按默认值运行。"
-						: "状态文件损坏，这一页按默认值运行；审批回落到「先问我」。")
+						: degradedTextOf(state))
 				: null;
 
-			// ---- 01 内容边界 ----
+			// ---- 01 品牌人设 ----
+			// 排在内容边界之前：它管系统提示的**第一句**，内容边界管末尾。
+			var identityWord = identityStatusOf(state);
+			var identityMode = state === null ? "keep" : (state.identity || "keep");
+			var identityEffective = state === null ? null : (state.identityEffective || {});
+			var identityLimit = state === null ? 2048 : (state.identityLimit || 2048);
+			var identityDraftSize = draftBytes(identityDraft);
+			var identityOver = state !== null && identityDraftSize > identityLimit;
+			var identitySaved = state === null ? "" : (state.identityText || "");
+
+			var identityDetail = [];
+			if (state !== null && state.enabled === false) {
+				identityDetail.push(h("p", { className: "enh-hint", key: "off" }, "总开关关着，这一组不做任何事，宿主原句照常发。"));
+			} else if (state !== null && identityEffective.degraded === true) {
+				identityDetail.push(h("p", { className: "enh-hint", key: "deg" }, "没有按设置生效：" + (identityEffective.reason || "未知原因") + "；此刻发出去的仍是宿主原句。"));
+			}
+
+			var identityActions = [];
+			if (identityEffective !== null && identityEffective.preview !== undefined) {
+				identityActions.push(h("div", { className: "enh-preview", key: "preview" },
+					h("span", { className: "enh-preview-label" }, "模型看到的第一句"),
+					h("code", { className: "enh-preview-text" }, identityEffective.preview),
+				));
+			}
+
+			var blockIdentity = group("enh-block-identity", "品牌人设",
+				"系统提示的第一句，模型用它回答「你是谁」。",
+				state === null ? "—" : identityWord.word,
+				state === null ? "mute" : identityWord.tone,
+				h("div", { className: "enh-stack" },
+					h(Segmented, {
+						label: "第一句怎么办",
+						onKeyDown: function (event) {
+							if (locked) return;
+							// 与「越界审批」同一套 APG radio group 行为：方向键在组内移动并选中，两端回绕
+							var at = IDENTITY_ORDER.indexOf(identityMode);
+							if (at < 0) at = 0;
+							var forward = event.key === "ArrowRight" || event.key === "ArrowDown";
+							var backward = event.key === "ArrowLeft" || event.key === "ArrowUp";
+							if (forward) at = (at + 1) % IDENTITY_ORDER.length;
+							else if (backward) at = (at + IDENTITY_ORDER.length - 1) % IDENTITY_ORDER.length;
+							else if (event.key === " " || event.key === "Enter") {
+								if (event.key === " ") event.preventDefault();
+								return;
+							} else return;
+							event.preventDefault();
+							run("identity", call({ op: "set", identity: IDENTITY_ORDER[at] }));
+						},
+					}, IDENTITY_ORDER.map(function (value) {
+						return h(Option, {
+							key: value,
+							checked: identityMode === value,
+							disabled: locked,
+							onClick: function () { run("identity", call({ op: "set", identity: value })); },
+						}, IDENTITY[value].word);
+					})),
+					h("div", { className: "enh-stack" },
+						h(Switch, {
+							checked: state !== null && state.hideHarness === true,
+							disabled: locked,
+							onClick: function () { run("identity", call({ op: "set", hideHarness: !(state !== null && state.hideHarness) })); },
+						}, state !== null && state.hideHarness === true ? "同时隐藏宿主说明" : "显示宿主说明"),
+						h("p", { className: "enh-hint" }, "宿主说明指系统提示里那两段讲安装位置与图形界面的文字；隐藏后模型不再收到它们。"),
+					),
+					// 只有「自定义」才画输入框：没有的控件不画
+					identityMode !== "custom" ? null : h("div", { className: "enh-stack" },
+						h(TextArea, {
+							label: "第一句写什么",
+							value: identityDraft,
+							disabled: locked,
+							onChange: function (event) { setIdentityDraft(event.target.value); },
+						}),
+						h("div", { className: "enh-textmeta" },
+							h("span", { className: identityOver ? "enh-over" : "" }, fmtBytes(identityDraftSize) + " / 上限 " + fmtBytes(identityLimit)),
+							h("span", null, "sha " + (state === null || state.degraded ? "—" : state.identitySha256 || "—")),
+						),
+						h("div", { className: "enh-actions" },
+							h(Button, {
+								kind: "primary",
+								disabled: locked || identityOver || identityDraft === identitySaved,
+								onClick: function () { run("identity", call({ op: "set", identityText: identityDraft })); },
+							}, "保存"),
+							h(Button, {
+								disabled: locked || identityDraft === identitySaved,
+								onClick: function () { setIdentityDraft(identitySaved); },
+							}, "还原"),
+							identityOver ? h("span", { className: "enh-hint" }, "超上限，删一点再存") : null,
+						),
+					),
+					identityActions.length === 0 ? null : h("div", null, identityActions),
+					errorLine("identity"),
+				),
+				[state === null
+					? null
+					: !on
+						? "总开关关着，宿主原句照常发。"
+						: identityEffective.degraded === true
+							? "没有生效，卡在：" + (identityEffective.reason || "未知原因") + "。"
+							: IDENTITY[identityMode].note,
+				"改的是模型看到的第一句；下一条消息生效，不用重启。改一次，下一条请求要重算一次系统提示，之后恢复正常。",
+				]);
+
+			// ---- 02 内容边界 ----
 			var scopeNow = state === null ? "—" : !on ? "不生效" : !state.contentScope ? "不接" : savedEmpty ? "文字为空" : "带 · " + fmtBytes(bytes);
 			var scopeNowTone = state === null ? "mute" : (!on || !state.contentScope || savedEmpty ? "mute" : "ok");
 			var blockScope = group("enh-block-scope", "内容边界",
@@ -546,11 +719,11 @@ window.__ModuleLoader__.load({
 					: state.enabled === false
 						? "总开关关着，这段文字不接进去。"
 						: state.injecting
-							? "写人设、写内容边界、写行为规矩都行；它只是追加在末尾，不改 DSH 自己的系统提示。"
+							? "写行为规矩、写内容要求、写补充说明都行；它只是追加在末尾，不改 DSH 自己的系统提示。"
 							: "没有生效，卡在：" + (state.reason || "未知原因") + "。",
 				]);
 
-			// ---- 02 越界审批 ----
+			// ---- 03 越界审批 ----
 			var blockApproval = group("enh-block-approval", "越界审批",
 				"DSH 要做的事，超出当前档位允许的范围时。",
 				state === null ? "—" : (on ? ap.word : "不接管"),
@@ -601,7 +774,7 @@ window.__ModuleLoader__.load({
 				APPROVAL_SCOPE_HINT,
 				]);
 
-			// ---- 03 Enhanced 权限档 ----
+			// ---- 04 Enhanced 权限档 ----
 			// 已写入时不再多写一句确认：右上角的状态标签已经是结论，
 			// 多写一行落盘位置只是把同一件事说第二遍。
 			var presetDetail = [];
@@ -664,7 +837,7 @@ window.__ModuleLoader__.load({
 					errorLine("preset"),
 				), null);
 
-			// ---- 04 检查 ----
+			// ---- 05 检查 ----
 			var blockCheck = group("enh-block-check", "检查",
 				"扫最近的会话日志（一次 10 份，任一命中即过）读回系统提示，看这段文字在不在末尾。只读，不改任何东西。",
 				checks === null ? "还没查过" : (allPass ? "全部通过" : "有失败项"),
@@ -702,6 +875,7 @@ window.__ModuleLoader__.load({
 				versionLine,
 				degradedLine,
 				errorLine("page"),
+				blockIdentity,
 				blockScope,
 				blockApproval,
 				blockPreset,

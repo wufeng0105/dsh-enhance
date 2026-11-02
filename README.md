@@ -3,7 +3,7 @@
 [![CI](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml/badge.svg)](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-在 DeepSeek Harness 的系统提示末尾追加一段你自己写的文本——人设、内容边界、破甲词都行。存盘即生效，下一条消息就带上。不用重启，不改宿主。
+换掉 DeepSeek Harness 系统提示开头那句品牌声明，或在末尾追加一段你自己写的文本。存盘即生效，下一条消息就带上。不用重启，不改宿主文件。
 
 简体中文 | [English](./README.en.md)
 
@@ -11,8 +11,9 @@
 
 DeepSeek Harness 每次回答前，都会先读一段很长的系统提示：它是谁、能调哪些工具、该用什么语气。这段内容由宿主自己拼，没留给你改的位置。
 
-`dsh-enhance` 是一个 cordis 插件 bundle：它注册多一段提示词，接在宿主的 persona suffix 后面。文字你写，宿主自己的提示词一个字节不动。
+`dsh-enhance` 是一个 cordis 插件 bundle：它往宿主的提示装配里加一段、并在**声明层**换掉开头那一句。除那一句之外，宿主自己的提示词一个字节不动。
 
+- **品牌人设**——系统提示的第一句（`You are an AI agent powered by DeepSeek Harness.`）可保留、可去掉、可换成你自己的；还能一并隐藏另外两段提到宿主名字的说明。改的是模型看到的结果，不碰宿主文件。
 - **内容边界**——一个文本文件，最多 8 KB，接在每条系统提示的末尾。
 - **越界审批**——动作超出当前档位允许的范围时，自动放行、问你要么直接回绝，你选。
 - **Enhanced 权限档**（可选）——往你的 profile 里多加一个「沙箱全开、越界仍问你」的档位。
@@ -61,7 +62,9 @@ notepad "$env:USERPROFILE\.dsh\enhance\content-scope.txt"
 
 ### 设置页
 
-重启后，DSH 的设置页里会多出「增强」一节，四组：内容边界、越界审批、Enhanced 权限档、检查。它写的是同样那两个文件，所以页面里的文本框和你手改的文件始终一致。
+重启后，DSH 的设置页里会多出「增强」一节，五组：品牌人设、内容边界、越界审批、Enhanced 权限档、检查。它写的是同样那几个文件，所以页面里的文本框和你手改的文件始终一致。
+
+品牌人设改完**不用重启**：下一条消息就生效。想退回原样，把它选回「保留」即可。
 
 ### 卸载
 

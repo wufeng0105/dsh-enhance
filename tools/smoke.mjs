@@ -55,7 +55,7 @@ process.env.DSH_HOME = home
 const scope = await import(pathToFileURL(join(repo, 'enhance-scope', 'index.js')).href)
 const autoApprove = await import(pathToFileURL(join(repo, 'auto-approve', 'index.js')).href)
 
-const captured = { sections: [], routes: [], approvalHandler: undefined }
+const captured = { sections: [], routes: [], approvalHandler: undefined, agentCreated: undefined }
 const profileContext = { name: 'smoke', dir: profileDir, patchPath }
 function makeCtx() {
   return {
@@ -84,6 +84,7 @@ function makeCtx() {
     },
     on(event, handler) {
       if (event === 'approval/request') captured.approvalHandler = handler
+      if (event === 'agent/created') captured.agentCreated = handler
       return () => {}
     },
   }
@@ -141,6 +142,67 @@ check('3.3 初始状态：patch 里没有 enhanced 档', stateBefore.json.preset
 const checkResult = await api({ op: 'check' })
 const names = (checkResult.json?.checks ?? []).map((item) => item.name)
 check('3.4 检查项是四项且最后一项是 preset', JSON.stringify(names) === JSON.stringify(['plugins', 'text', 'inject', 'preset']), JSON.stringify(names))
+
+// ---- 3.5 品牌人设：agent/created 把遮蔽项装进 agent 作用域 ----
+// 这一段验的是「按 agent 遮蔽」这条路线在真宿主组合里接通了：默认 keep 不注册任何东西；
+// 切到 remove 后注册一条同名 `harness:identity`，且 interpolate 必须是 false。
+function makeAgent() {
+  const sections = []
+  const contexts = []
+  return {
+    sections,
+    contexts,
+    ctx: {
+      inject(names, callback) {
+        if (!names.includes('systemPrompt')) return { dispose() {} }
+        callback({
+          systemPrompt: {
+            getSectionOrder: () => -1000,
+            getContextOrder: () => 200,
+            section(spec) { sections.push(spec); return () => {} },
+            context(spec) { contexts.push(spec); return () => {} },
+          },
+        })
+        return { dispose() {} }
+      },
+    },
+  }
+}
+check('3.5.0 插件监听了 agent/created', typeof captured.agentCreated === 'function')
+const keepAgent = makeAgent()
+await captured.agentCreated({ agent: keepAgent })
+check('3.5.1 默认 keep：不注册任何遮蔽项', keepAgent.sections.length === 0, JSON.stringify(keepAgent.sections.map((s) => s.name)))
+
+await api({ op: 'set', identity: 'remove' })
+await new Promise((resolve) => setTimeout(resolve, 0))
+const removeAgent = makeAgent()
+await captured.agentCreated({ agent: removeAgent })
+const identityShadow = removeAgent.sections.find((spec) => spec.name === 'harness:identity')
+check('3.5.2 remove：注册了 harness:identity', identityShadow !== undefined)
+check('3.5.3 遮蔽段保持字面（interpolate=false）', identityShadow?.interpolate === false)
+check('3.5.4 remove 的内容是空串（渲染时丢弃）', identityShadow?.text() === '')
+
+await api({ op: 'set', hideHarness: true })
+await new Promise((resolve) => setTimeout(resolve, 0))
+const hideAgent = makeAgent()
+await captured.agentCreated({ agent: hideAgent })
+const shadowNames = hideAgent.sections.map((spec) => spec.name).sort().join(',')
+check('3.5.5 隐藏开关把两段说明的 section 一起遮', shadowNames === 'app:web-surface,harness:identity,harness:source', shadowNames)
+const ctxNames = hideAgent.contexts.map((spec) => spec.name).sort().join(',')
+check('3.5.6 两条 context 成对遮蔽（不遮会被 refreshContext 重建）', ctxNames === 'app:web-surface,harness:source', ctxNames)
+
+// 3.5.7 在**同一个活着的 agent** 上「去掉 → 自定义」：这是审计 B1 的现场。
+// 只换模式时座名不变，如果重装指纹只记座、不看座上文本是哪一种实现，旧注册会留下，
+// 于是设置页显示「已替换」而模型收到空串。新 agent 是好的，所以只有同 agent 连做两步才照得出来。
+await api({ op: 'set', identity: 'custom', identityText: 'You are Aria, a private assistant.' })
+await new Promise((resolve) => setTimeout(resolve, 0))
+const onSameAgent = removeAgent.sections.find((spec) => spec.name === 'harness:identity')
+check('3.5.7 同一个 agent 上「去掉 → 自定义」真的换上了自定义文本',
+  onSameAgent?.text() === 'You are Aria, a private assistant.',
+  JSON.stringify(onSameAgent?.text()))
+
+await api({ op: 'set', identity: 'keep', hideHarness: false })
+await new Promise((resolve) => setTimeout(resolve, 0))
 
 // ---- 4. 写档 → 重启（dump-config）→ 移除 ----
 const originalPatch = readFileSync(patchPath, 'utf8')

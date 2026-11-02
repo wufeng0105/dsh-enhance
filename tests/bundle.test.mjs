@@ -98,6 +98,12 @@ test('ensureEnhanceData：缺文件才种，已有不覆盖', () => {
     const state = JSON.parse(readFileSync(join(home, 'enhance', 'state.json'), 'utf8'))
     assert.equal(state.approval, 'allow')
     assert.equal(state.enabled, true)
+    // v4 五键必须一次带全：首装那一刻身份就不该处于「未知」状态
+    assert.equal(state.version, 4)
+    assert.equal(state.identity, 'keep')
+    assert.equal(state.hideHarness, false)
+    // identity.txt 不播种：默认 keep，没有自定义文本要写
+    assert.equal(existsSync(join(home, 'enhance', 'identity.txt')), false)
   } finally {
     rmSync(home, { recursive: true, force: true })
   }

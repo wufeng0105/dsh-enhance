@@ -3,15 +3,16 @@
 [![CI](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml/badge.svg)](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Append your own text to the end of DeepSeek Harness's system prompt. Saved to disk, effective on the next message.
+Replace the brand line that opens DeepSeek Harness's system prompt. Saved to disk, effective on the next message.
 
 English | [简体中文](./README.md)
 ## What it does
 
 DeepSeek Harness assembles a long system prompt before every reply: who it is, which tools it may call, which tone to use. That text is the host's own, and it leaves you no seam to write into.
 
-`dsh-enhance` is a cordis plugin bundle that registers one extra prompt section and appends it after the host's persona suffix. You write the words; the host's own prompt stays byte-for-byte untouched.
+`dsh-enhance` is a cordis plugin bundle that adds one prompt section and replaces the opening brand line at the **declaration layer**. Apart from that one line, the host's own prompt stays byte-for-byte untouched.
 
+- **Brand persona** — the first line of the system prompt (`You are an AI agent powered by DeepSeek Harness.`) can be kept, removed, or replaced with your own; two further passages that mention the host by name can be hidden along with it. It changes what the model sees, never the host's files.
 - **Content boundary** — one text file, up to 8 KB, injected at the end of every system prompt.
 - **Out-of-scope approval** — when an action exceeds the current permission preset, answer it automatically, ask the user, or refuse.
 - **Enhanced preset** *(optional)* — add a "sandbox fully open, still asks" permission preset to your profile.
@@ -76,7 +77,9 @@ A damaged `state.json` never grants silent permission: it falls back to `ask`.
 
 ### Settings page
 
-Restarting the host adds an **Enhance** section to DSH's settings page with four groups: content boundary, out-of-scope approval, Enhanced preset, and check. It writes to the same two files, so the text area and the file stay in sync.
+Restarting the host adds an **Enhance** section to DSH's settings page with five groups: brand persona, content boundary, out-of-scope approval, Enhanced preset, and check. It writes to the same files, so the text area and the file stay in sync.
+
+Brand persona needs no restart: the next message picks it up. Choose **keep** to return to the host's original line.
 
 ### Uninstall
 

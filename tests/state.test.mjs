@@ -17,8 +17,9 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  derive, normalizeText, paths, readState, readText, textBytes, writeState, writeText,
-  TEXT_LIMIT, STATE_VERSION,
+  derive, deriveIdentity, fileStat, normalizeText, paths, readIdentity, readState, readText,
+  textBytes, writeIdentity, writeState, writeText,
+  IDENTITY_LIMIT, TEXT_LIMIT, STATE_VERSION,
 } from '../shared/state.mjs'
 
 /** 每个用例一个空 home，互不影响。 */
@@ -34,14 +35,16 @@ function seed(home, raw) {
   return p
 }
 
-test('state.json 缺失：默认 开/ask，并标明 missing', () => {
+test('state.json 缺失：默认 开/ask/keep，并标明 missing', () => {
   const state = readState(paths(freshHome()))
   assert.equal(state.contentScope, true)
   assert.equal(state.approval, 'ask')
+  assert.equal(state.identity, 'keep')
+  assert.equal(state.hideHarness, false)
   assert.equal(state.degraded, true)
   assert.equal(state.degradedReason, 'missing')
   assert.equal(state.version, STATE_VERSION)
-  assert.equal(STATE_VERSION, 3)
+  assert.equal(STATE_VERSION, 4)
 })
 
 test('state.json 损坏：不抛，同样按默认值走', () => {
@@ -53,13 +56,24 @@ test('state.json 损坏：不抛，同样按默认值走', () => {
   assert.equal(state.approval, 'ask')
 })
 
-test('只认三个字段：同形状字段照读，多出来的字段自然被忽略', () => {
+test('只认五个字段：同形状字段照读，多出来的字段自然被忽略', () => {
   const home = freshHome()
-  const state = readState(seed(home, JSON.stringify({ version: 3, enabled: true, contentScope: true, approval: 'allow', legacyExtra: true })))
+  const state = readState(seed(home, JSON.stringify({ version: 3, enabled: true, contentScope: true, approval: 'allow', identity: 'custom', hideHarness: true, legacyExtra: true })))
   assert.equal(state.version, STATE_VERSION)
   assert.equal(state.approval, 'allow')
+  assert.equal(state.identity, 'custom')
+  assert.equal(state.hideHarness, true)
   assert.equal(state.degraded, false)
-  assert.deepEqual(Object.keys(state).sort(), ['approval', 'contentScope', 'degraded', 'degradedReason', 'enabled', 'updatedAt', 'version'])
+  assert.deepEqual(Object.keys(state).sort(), ['approval', 'contentScope', 'degraded', 'degradedFields', 'degradedReason', 'enabled', 'hideHarness', 'identity', 'updatedAt', 'version'])
+})
+
+test('v3 旧文件（无 identity/hideHarness）：按 keep + 不隐藏读，且不标坏', () => {
+  // 旧版本 state.json 里没有这两个字段是正常的，不是损坏——升级后不该报降级。
+  const state = readState(seed(freshHome(), JSON.stringify({ version: 3, enabled: true, contentScope: true, approval: 'ask' })))
+  assert.equal(state.identity, 'keep')
+  assert.equal(state.hideHarness, false)
+  assert.equal(state.degraded, false)
+  assert.deepEqual(state.degradedFields, [])
 })
 
 test('空对象 / 非法 approval：按 ask 并标坏，不倒向放行', () => {
@@ -72,6 +86,24 @@ test('空对象 / 非法 approval：按 ask 并标坏，不倒向放行', () => 
   assert.equal(bad.approval, 'ask')
   assert.equal(bad.degraded, true)
   assert.equal(bad.degradedReason, 'corrupt')
+  assert.deepEqual(bad.degradedFields, ['approval'])
+})
+
+test('非法 identity：按 keep 并标坏，degradedFields 指到具体字段', () => {
+  // 降级方向是不改身份；页面要能说对原因，所以坏的是哪个字段必须记下来。
+  // 注意：缺 approval 本身也算坏（v3 起就有这个键），所以这里显式给一个合法 approval。
+  const bad = readState(seed(freshHome(), JSON.stringify({ version: 4, approval: 'ask', identity: 'white-label' })))
+  assert.equal(bad.identity, 'keep')
+  assert.equal(bad.degraded, true)
+  assert.equal(bad.degradedReason, 'corrupt')
+  assert.deepEqual(bad.degradedFields, ['identity'])
+
+  const both = readState(seed(freshHome(), JSON.stringify({ version: 4, approval: 'nope', identity: 'nope' })))
+  assert.deepEqual(both.degradedFields.sort(), ['approval', 'identity'])
+
+  const badHide = readState(seed(freshHome(), JSON.stringify({ version: 4, approval: 'ask', hideHarness: 'yes' })))
+  assert.equal(badHide.hideHarness, false)
+  assert.deepEqual(badHide.degradedFields, ['hideHarness'])
 })
 
 test('字符串布尔：读路径按字面认 "false"', () => {
@@ -95,6 +127,24 @@ test('writeState：建目录、原子落盘、写当前格式', () => {
   assert.equal(reread.degraded, false)
   assert.match(reread.updatedAt ?? '', /^\d{4}-\d{2}-\d{2}T/)
   assert.deepEqual(readdirSyncSafe(p.dir).filter((name) => name.includes('.tmp-')), [])
+})
+
+test('writeState 整块重建：漏带新字段就把身份重置回默认——调用点必须读回来再写回去', () => {
+  // 这条锁的是「点一次总开关把品牌人设清空」这类事故：writeState 不合并旧值，
+  // 调用方必须先 readState() 再把 identity/hideHarness 原样带回。
+  const p = paths(freshHome())
+  writeState(p, { contentScope: true, approval: 'ask', identity: 'custom', hideHarness: true })
+  assert.equal(readState(p).identity, 'custom')
+
+  // 反例：只带三键（1.1.2 的旧写法）→ 身份被重置
+  writeState(p, { enabled: false, contentScope: true, approval: 'ask' })
+  assert.equal(readState(p).identity, 'keep', '漏带即重置——这正是必须在所有调用点补齐的原因')
+  assert.equal(readState(p).hideHarness, false)
+
+  // 正例：先读后写，五键带全
+  const before = readState(p)
+  writeState(p, { ...before, enabled: true })
+  assert.equal(readState(p).identity, 'keep')
 })
 
 test('writeText：写得进、去控制字符、sha 与字节数同口径', () => {
@@ -156,7 +206,7 @@ test('总开关写盘：只认 true/false，写回后读得到', () => {
   writeState(p, { enabled: false, contentScope: true, approval: 'allow' })
   const state = readState(p)
   assert.equal(state.enabled, false)
-  assert.equal(state.version, 3)
+  assert.equal(state.version, 4)
   assert.equal('fence' in state, false)
 })
 
@@ -168,4 +218,70 @@ test('derive：超过 8 KB 上限就不注入（与设置页 check 同一口径�
   const over = derive(on, { text: 'x'.repeat(TEXT_LIMIT + 1), ok: true })
   assert.equal(over.injecting, false, '超过上限必须停手')
   assert.match(over.reason, /上限/)
+})
+
+// ───────────────────────────────────────────── 品牌人设
+
+test('identity.txt：读写同口径，独立上限 2 KB', () => {
+  const p = paths(freshHome())
+  assert.equal(IDENTITY_LIMIT, 2048)
+  assert.equal(readIdentity(p).ok, false, '文件不存在时 ok=false')
+
+  writeIdentity(p, '\uFEFF  You are Aria.\u0007  \n')
+  assert.equal(readIdentity(p).text, 'You are Aria.')
+  assert.equal(fileStat(p.identity).bytes, 'You are Aria.'.length)
+
+  // 恰好在限内能写；超一个字节就抛，且原文件不变
+  writeIdentity(p, 'x'.repeat(IDENTITY_LIMIT))
+  assert.throws(() => writeIdentity(p, 'x'.repeat(IDENTITY_LIMIT + 1)), (error) => error.code === 'ETOOLARGE')
+  assert.equal(readIdentity(p).text.length, IDENTITY_LIMIT)
+})
+
+test('deriveIdentity：keep / remove 直通，custom 取文本', () => {
+  assert.deepEqual(deriveIdentity({ identity: 'keep', hideHarness: false }), { mode: 'keep', text: '', hideHarness: false, degraded: false, reason: undefined })
+  assert.deepEqual(deriveIdentity({ identity: 'keep', hideHarness: true }).hideHarness, true)
+  assert.equal(deriveIdentity({ identity: 'remove', hideHarness: false }).mode, 'remove')
+
+  const custom = deriveIdentity({ identity: 'custom', hideHarness: false }, { text: 'You are Aria.', ok: true })
+  assert.equal(custom.mode, 'custom')
+  assert.equal(custom.text, 'You are Aria.')
+  assert.equal(custom.degraded, false)
+})
+
+test('deriveIdentity：custom 的失败路径各有归宿，且都给出理由', () => {
+  // 读不到 / 超限 → 退化为 keep（不改身份）
+  const missing = deriveIdentity({ identity: 'custom', hideHarness: false }, { text: '', ok: false })
+  assert.equal(missing.mode, 'keep')
+  assert.equal(missing.degraded, true)
+  assert.match(missing.reason, /读不到 identity.txt/)
+
+  const over = deriveIdentity({ identity: 'custom', hideHarness: false }, { text: 'x'.repeat(IDENTITY_LIMIT + 1), ok: true })
+  assert.equal(over.mode, 'keep')
+  assert.equal(over.degraded, true)
+  assert.match(over.reason, /超过上限/)
+
+  // 空文本 → 按「去掉」处理（空文本等于不声明），并标明
+  const empty = deriveIdentity({ identity: 'custom', hideHarness: false }, { text: '', ok: true })
+  assert.equal(empty.mode, 'remove')
+  assert.equal(empty.degraded, true)
+  assert.match(empty.reason, /为空/)
+})
+
+test('deriveIdentity：总开关关着就什么都不做', () => {
+  const off = deriveIdentity({ enabled: false, identity: 'custom', hideHarness: true }, { text: 'You are Aria.', ok: true })
+  assert.equal(off.mode, 'keep')
+  assert.equal(off.hideHarness, false)
+  assert.equal(off.reason, '总开关关闭')
+})
+
+test('deriveIdentity：非法 identity 值按 keep 处理', () => {
+  const out = deriveIdentity({ identity: 'white-label', hideHarness: false }, { text: 'x', ok: true })
+  assert.equal(out.mode, 'keep')
+})
+
+test('deriveIdentity：hideHarness 与三态互相独立', () => {
+  for (const identity of ['keep', 'remove', 'custom']) {
+    const out = deriveIdentity({ identity, hideHarness: true }, { text: 'x', ok: true })
+    assert.equal(out.hideHarness, true, `${identity} 下 hideHarness 应保持为真`)
+  }
 })

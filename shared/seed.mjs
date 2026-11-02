@@ -63,9 +63,12 @@ export function seedApprovalForHome(home) {
  * 补齐 `<home>/enhance/`：
  *   - 目录不存在就建；
  *   - `content-scope.txt` 不存在时，从 `defaultTextPath`（包内默认文本）复制一份；
- *   - `state.json` 不存在时，按 `seedApprovalForHome()` 种下三个开关。
+ *   - `state.json` 不存在时，按 `seedApprovalForHome()` 种下五个开关。
  *
  * 已存在的文件一个字节都不动。返回实际种了哪些，以及（如果有）失败原因。
+ *
+ * `identity.txt` 不在这里播种：品牌人设默认 `keep`，没有自定义文本要写。
+ * 用户第一次在设置页选「自定义」时才创建它。
  *
  * @param {string} home
  * @param {string} [defaultTextPath]
@@ -86,7 +89,14 @@ export function ensureEnhanceData(home, defaultTextPath) {
   try {
     const state = readState(p)
     if (state.degradedReason === 'missing') {
-      writeState(p, { enabled: true, contentScope: true, approval: seedApprovalForHome(home) })
+      // writeState 是整块重建：种子必须把 v4 五键带全，否则首装的那一刻身份就丢了默认值
+      writeState(p, {
+        enabled: true,
+        contentScope: true,
+        approval: seedApprovalForHome(home),
+        identity: 'keep',
+        hideHarness: false,
+      })
       result.stateSeeded = true
     }
   } catch (error) {

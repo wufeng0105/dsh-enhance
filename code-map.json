@@ -10,13 +10,13 @@
       "id": "core.state",
       "layer": "core",
       "path": "shared/state.mjs",
-      "owns": "state.json 与 content-scope.txt 的读写、派生"
+      "owns": "state.json 与 content-scope.txt / identity.txt 的读写、派生（含品牌人设三态）"
     },
     {
       "id": "plugin.scope",
       "layer": "plugin",
       "path": "enhance-scope/index.js",
-      "owns": "内容边界注入 + /enhance/api 路由（state / set / check / preset）+ 本机版本探测（只读 app.asar 清单）"
+      "owns": "内容边界注入 + 品牌人设（按 agent 遮蔽宿主同名段与 context）+ /enhance/api 路由（state / set / check / preset）+ 本机版本探测（只读 app.asar 清单）"
     },
     {
       "id": "plugin.approve",
@@ -40,7 +40,7 @@
       "id": "plugin.ui-client",
       "layer": "plugin",
       "path": "ui/client.js",
-      "owns": "设置页：浏览器半，四组设置（内容边界 / 越界审批 / Enhanced 权限档 / 检查）+ 就地错误行，注册 settings.section 并调 /enhance/api"
+      "owns": "设置页：浏览器半，五组设置（品牌人设 / 内容边界 / 越界审批 / Enhanced 权限档 / 检查）+ 就地错误行，注册 settings.section 并调 /enhance/api"
     },
     {
       "id": "tool.docs-check",
@@ -52,7 +52,7 @@
       "id": "tool.smoke",
       "layer": "cli",
       "path": "tools/smoke.mjs",
-      "owns": "端到端冒烟：隔离 home 真装 bundle、组合树、三态、写档/摘档后宿主重新组合"
+      "owns": "端到端冒烟：隔离 home 真装 bundle、组合树、三态、品牌人设遮蔽项、写档/摘档后宿主重新组合"
     },
     {
       "id": "core.text-lines",
@@ -181,6 +181,12 @@
       "from": "plugin.scope",
       "to": "core.compat",
       "kind": "import"
+    },
+    {
+      "from": "plugin.scope",
+      "to": "host.agentScope",
+      "kind": "seam",
+      "via": "ctx.on('agent/created') → agent.ctx.inject(['systemPrompt']) → 按名遮蔽 harness:identity / harness:source / app:web-surface"
     }
   ],
   "events": [
@@ -188,17 +194,31 @@
       "name": "approval/request",
       "mode": "waterfall",
       "owner": "plugin.approve"
+    },
+    {
+      "name": "agent/created",
+      "mode": "serial",
+      "owner": "plugin.scope"
+    },
+    {
+      "name": "agent/disposed",
+      "mode": "emit",
+      "owner": "plugin.scope"
     }
   ],
   "state": {
     "fields": [
       "version",
+      "enabled",
       "contentScope",
       "approval",
+      "identity",
+      "hideHarness",
       "updatedAt"
     ],
     "derived": [
-      "injecting"
+      "injecting",
+      "identityEffective"
     ],
     "pluginScoped": [
       "active"
