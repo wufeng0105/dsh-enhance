@@ -115,9 +115,22 @@ You are an AI agent powered by DeepSeek Harness.
 | 控件 | 复用 | 作用 |
 |---|---|---|
 | 三档分段按钮 | `Segmented` + `Option` | `identity` 三态 |
-| 开关 | `Switch` | `hideHarness` |
+| 开关「隐藏宿主说明」 | `Switch` | `hideHarness`。标签固定为动作名，**不许随状态翻转**：开关绑的是「隐藏」，若关着时写「显示宿主说明」，用户会读成「宿主说明不显示了」，与事实相反 |
 | 输入框 + 保存 / 还原 | `TextArea` + `Button` | 自定义文本，仅 `custom` 时出现 |
 | 预览行 | 只读文本 | 模型将看到的第一句 |
+
+**`hideHarness` 隐藏的不是「一句品牌名」，而是两整段带操作约定的文字。** 这一点必须在下游说清楚，否则用户会以为是纯品牌改动：
+
+| 被隐藏的名字 | 座位 | 丢的是什么 |
+|---|---|---|
+| `harness:source` | section（order 10000） | 「实现 checkout 与当前工作目录是两个值、可能不同；**不要从 checkout 路径推断工作目录**；用 `pwd`；这个 checkout 只用来查看或扩展 DSH 本身」 |
+| `harness:source` | context（order 200） | 安装目录的绝对路径（`Current DeepSeek Harness implementation checkout: "…"`） |
+| `app:web-surface` | section（order 10100） | 「这个页面 / 这个 GUI 指的就是它」的指代消解，加上**「别为了让改动生效另起服务器」**与「客户端插件改动何时才生效（HMR 要看 `pnpm run dev:web` 在不在跑）」 |
+| `app:web-surface` | context（order 210） | Web GUI 的 URL |
+
+所以对**改 DSH / 写插件**的人，打开这个开关是实打实的行为退化；对终端用户才近乎无成本。设置页那句提示语就是照这个写的。
+
+**还有一条容易误解的**：隐藏 ≠ 隔离。路径与 URL 模型照样读得到（`pwd`、文件系统、网络），隐藏只是「不告诉它」，不是安全边界——省的是噪声与暴露面。
 
 预览行由服务端派生：`remove` 态显示「已去掉，下一段接上」，不伪造一句话；`custom` 显示自定义文本；`keep` 显示宿主原文。
 

@@ -641,8 +641,11 @@ window.__ModuleLoader__.load({
 							checked: state !== null && state.hideHarness === true,
 							disabled: locked,
 							onClick: function () { run("identity", call({ op: "set", hideHarness: !(state !== null && state.hideHarness) })); },
-						}, state !== null && state.hideHarness === true ? "同时隐藏宿主说明" : "显示宿主说明"),
-						h("p", { className: "enh-hint" }, "宿主说明指系统提示里那两段讲安装位置与图形界面的文字；隐藏后模型不再收到它们。"),
+						}, "隐藏宿主说明"),
+						// 标签固定为「隐藏」，开=隐藏、关=照常显示。原先按状态在「显示/同时隐藏」之间
+						// 换文案，开关本体表示「隐藏」而标签按「显示」措辞，读起来正好相反：
+						// 关着的时候写「显示宿主说明」，用户会读成「宿主说明不显示了」。
+						h("p", { className: "enh-hint" }, "隐藏的是两段：一段讲实现目录与工作目录不是一回事、并给出安装位置；一段讲这个 Web 界面、改动何时生效、以及不要另起服务器。终端用户用不到这几条；自己在改 DSH 或写插件时，它们正是防错规则。"),
 					),
 					// 只有「自定义」才画输入框：没有的控件不画
 					identityMode !== "custom" ? null : h("div", { className: "enh-stack" },
