@@ -14,7 +14,19 @@ You are an AI agent powered by DeepSeek Harness.
 
 「品牌人设」让这一句在本插件作用域内可控：保留、去掉、或换成你自己的。它同时可以隐藏另外两段提到宿主名字的内容：`harness:source` 的 checkout 说明、`app:web-surface` 的 Web GUI 说明——这两段各有一个 section 和一条 runtime context，一共四处。
 
-**它不是完整白标。** 宿主配置里有官方开关 `includeHarnessIdentity: false`，其说明是「仅当兼容性部署**自己接管完整系统提示词**时」才设。那条路要求接管整份提示，连同十几段工具引导与运行规则。本功能走的是有界的那条：只替换声明层，其余段落一个字节不动。
+**它不是完整白标，而且「去品牌」的可达范围是有边的。** 下面是模型与用户实际能看到品牌的地方，以及本功能管不管——这句话原来只写「不是完整白标」，太含糊：
+
+| 位置 | 载体 | 本功能 |
+|---|---|---|
+| system 节点 · 自称句 | `harness:identity` section | **管**（三态） |
+| system 节点 · 实现目录说明 | `harness:source` section | **管**（开关） |
+| system 节点 · 界面说明 | `app:web-surface` section | **管**（开关） |
+| user 快照 · 两条 runtime context | 安装路径 / GUI URL | **管**（开关，成对） |
+| `DSH` 缩写 | `dsh-sandbox-policy` 的 runtime context（`Current DSH file policy: …`） | **不管** |
+| 界面侧栏品牌、`productTitle` | 宿主客户端槽位与硬编码 | **不管**（本轮范围外，见 §4） |
+| 工具 schema 里的 `DSH` | `dsh-tool-cordis` 等 | **不管** |
+
+宿主配置里的官方开关 `includeHarnessIdentity: false` 是另一条路：它要求兼容性部署**自己接管完整系统提示词**，连同十几段工具引导与运行规则。本功能走的是有界的那条：只替换声明层，其余段落一个字节不动。
 
 **它也不保证「模型再也不会说自己是 DSH」。** 训练先验里就有这个名字，去掉声明能大幅压低，不能归零。产品文案不要承诺「彻底去品牌」。
 
@@ -22,9 +34,31 @@ You are an AI agent powered by DeepSeek Harness.
 
 一个具体故障：产品换了皮，模型仍张口就说自己是 DSH。
 
-这句话被用在三类场合：直接回答「你是谁」、解释自身能力时带出产品名、用户提到 DSH 时确认自己属于它。对终端用户是品牌泄漏；对上游网关，它有时还是内容指纹。
+这句话被用在三类场合：直接回答「你是谁」、解释自身能力时带出产品名、用户提到 DSH 时确认自己属于它。对终端用户是品牌泄漏。
 
 修法不能是改宿主文件：那会让每次升级失效，也打破本仓「除声明层外，宿主提示词一个字节不动」的承诺。
+
+### 2.1 「去品牌」和「过网关」是两件事，别并成一件
+
+早先的讨论把它们混成过一句「去掉品牌就顺带解决了指纹」。**这是错的**，写清楚，免得下游按错的前提做承诺。
+
+上游网关的内容过滤有一份实测规则表（来源是相邻项目 `_xdpool-local-layer/dsh-xdpool` 的 `src/upstream.ts`，配 `tests/system-fingerprint.test.ts` 与三次 400/11128 的时间线）：
+
+| 规则 | 验证过的最小修法 | 与品牌的关系 |
+|---|---|---|
+| `powered by DeepSeek Harness` | → `running on DeepSeek Harness` | **保留品牌名** |
+| `DeepSeek Harness Web GUI` | → `DeepSeek Harness web interface` | **保留品牌名** |
+| `Relative paths resolve from the workspace root` | → `Relative paths are resolved against the workspace root` | **与品牌无关** |
+
+三条读出来的结论：
+
+1. 网关要的是**那串字换掉**，不是品牌消失——前两条的最小修法都留着 `DeepSeek Harness`。
+2. 第三条由 `@deepseek-ai/dsh-file-reference` 供给、由 `dsh-file-reference-local` 注册进 section `context:file-reference`（order 900，仅当 `read` 工具在）。**它与品牌毫无关系，所以无论怎么去品牌，都过不了网关。**
+3. 网关只扫 `system` 与 `assistant` 两个角色的消息；runtime context 是 user 角色的快照，**不在扫描范围内**。所以「两条 context 必须成对处理」是为了**去品牌**，不是为了过指纹。
+
+**本功能解决「模型自称」，不解决「过网关」。** 过网关是那条独立规则的事，本仓不是责任方，也不替它做承诺。
+
+（网关判定来自上面那份实测记录，本仓无法复现——这里写的是「依据在哪」，不是「本仓已验证」。）
 
 ## 3. 做到什么算成
 
@@ -42,7 +76,7 @@ You are an AI agent powered by DeepSeek Harness.
 |---|---|
 | 改 persona 那句 `You are a coding agent powered by …` | 它由宿主按真实模型名插值（换模型就变），改它等于让模型自述错误型号 |
 | 改工具描述里的品牌 | 工具 schema 在 `request/header.tools`，不在 sections 里；动它会同时改 header 与缓存形状 |
-| 改宿主界面上的产品名、图标 | 那是打包层资源，本插件不碰 |
+| 改宿主界面上的产品名、图标 | **本轮范围外**。宿主把侧栏品牌做成了 single slot，官方填充包的 README 明写「使用其他品牌的部署应提供替代品牌包」——宿主**期待**它被替换，所以这不是「打包层资源」（本仓已有浏览器半，技术上够得着）。写成范围外，不是写成做不到 |
 | 改写已有会话的历史提示词 | 改写只对新装配生效；日志里的历史是事实 |
 | 加第 5 个检查项（v1） | 检查页仍四项。品牌人设的验法只有验收 #1/#2，这条要写明，免得读者以为检查覆盖它 |
 
@@ -67,7 +101,7 @@ You are an AI agent powered by DeepSeek Harness.
 
 所以本功能走这条：监听 `agent/created`，在 `agent.ctx` 上注册**同名**段遮蔽全局段。`ctx.systemPrompt.section()` 的 scope 取自调用方上下文，因此在 agent 作用域内注册即落在该 agent 的层上。
 
-要注册的四个名字（按名定位，不按文本匹配——`harness-dev-context` 会给旧会话返回历史措辞，按文本找会漏）：
+要注册的是 **5 个注册项，落在 3 个名字上**（按名定位，不按文本匹配——`harness-dev-context` 会给旧会话返回历史措辞，按文本找会漏）。① 是一个名字一项；②④ 各自 section 与 context 同名，所以各两项：
 
 | 名字 | 类型 | 遮蔽后 |
 |---|---|---|
@@ -161,15 +195,22 @@ DSH 自己的口径是：
 | 只对装了本插件的进程生效 | 另一进程（不同 home / profile）不受影响 |
 | 日志显示遮蔽后结果 | 会话日志记装配结果，不记宿主原版；与「只追加」时口径一致 |
 | 不动 `request/header` | config 与 tools 不变，不额外触发 header 记录 |
-| 设置页看不出「某部署关掉了全局身份段」 | 见下方「读不到的宿主事实」 |
+| 设置页看不出「某部署关掉了全局身份段」 | 见下方「读得到的宿主事实」 |
 
-### 读不到的宿主事实
+### 读得到的宿主事实，以及一个要明写的决策
 
-有一件事本插件**做不到**，写清楚免得后来者以为漏了：设置页无法判断「这个部署有没有全局 `harness:identity`」。
+这里原先写着「宿主没有提供读取已注册分段的 API」，并据此推出「所以我们只能自己写整段替换文案」。**前半句不准确，后半句因此不成立**——等于用一件不存在的事实，替自己省掉了一个选项。
 
-- 宿主没有提供「读已注册分段」的 API——`systemPrompt` 只有 `section` / `context` / `getSectionOrder` / `getContextOrder` / `assemble` 这些写入与装配入口，没有枚举。
-- 想绕就得调 `assemble()`，那会连带跑一遍装配瀑布（`working-directory` 的 `ensure` 等），代价与副作用都不该由一次设置页查询来付。
-- 也可以去解析 profile 各层的 YAML 找 `includeHarnessIdentity`，但配置来自「发行模板 + profile cordis.yml + patch 叠加」多层，本仓没有 YAML 解析器，手搓一层的判断会在别的层上失灵。
+- `SystemPrompt` 的**原型方法**确实只有写入与装配入口：`section` / `context` / `getSectionOrder` / `getContextOrder` / `suppressRuntimeContext` / `tools` / `variable` / `refreshContext` / `assemble`，**没有枚举方法**。
+- 但服务实例上有**公有字段 `layers`**（`@deepseek-ai/dsh-system-prompt/lib/index.js` 的类字段，非 `#` 私有），而 `ScopedLayers` / `NamedEntries` 由 `@deepseek-ai/dsh-scope` 导出。实测能枚举出全局已注册的段及其 `order` / `text` / `interpolate`：
+
+  ```text
+  harness:identity | order: -1000 | text: "You are an AI agent powered by DeepSeek Harness."
+  ```
+
+- `layers` **不是文档化 API**（宿主 README 只声明「没有给终端用户编辑提示词的 API」）。所以用不用它是一个**要明写下来的决策**，而不是一句「没有入口」就能排除的事。三条路线的对比见 `.zhll/04-路线对比.md`（本地账本，不入库）。
+
+仍然读不到的是**宿主配置**：想知道某个部署有没有关掉 `includeHarnessIdentity`，只能去解析 profile 各层的 YAML，而配置来自「发行模板 + profile cordis.yml + patch 叠加」多层，本仓没有 YAML 解析器，手搓一层的判断会在别的层上失灵。
 
 所以页面在 `keep` 态一律预览宿主的默认原句。真遇到关掉该开关的部署，预览句与实际不符——这是**已知且已声明**的边界，不是待办的 bug。
 
@@ -221,10 +262,12 @@ DSH 自己的口径是：
 
 ## 11. 落地状态（2026-11-02）
 
-- **已核验**：`node scripts/check.mjs` 7/7（145 项测试 / 9 个文件）；`--self-test` 17/17；
-  `tools/smoke.ps1` 37/37（真装 bundle + 真组合树 + 七条品牌人设断言）；
+- **已核验**：`node scripts/check.mjs` 7/7（149 项测试 / 9 个文件）；`--self-test` 17/17；
+  `tools/smoke.ps1` 38/38（真装 bundle + 真组合树 + 八条品牌人设断言）；
   **真宿主首启**落盘的 `state.json` 确为 v4 五键（`gates/wp4-live-seed.log`）。
-- **尚未核验**：第 3 节验收 1 与 3 的**装配层**结论（最新一条 `system/message` 的第一句）。
-  本机隔离 `DSH_HOME` 没有模型凭据，`dsh headless` 在会话建立前就停下，拿不到会话日志。
-  在有凭据的环境里，装上本包、切成「自定义」发一条消息，再读那条 `system/message` 即可补上——
-  这是本功能唯一还欠的一次核验。
+- **装配层验收（第 3 节第 1、3 条）已在真机会话日志上验成**，这一条此前一直欠着：远端机全量重置后
+  装 `0.2.1-rc.5` + 本包，`custom` 态下 `system/message` 的第一句是自定义文本、宿主原句在整份会话里
+  **0 命中**；切回 `keep` 后第一句**逐字回到**宿主原句，内容边界在两种状态下都在。做法与结论见
+  `docs/compatibility.md` 的 2026-11-02 记录。
+- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject`
+  含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。
