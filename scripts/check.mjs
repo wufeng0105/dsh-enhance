@@ -328,22 +328,15 @@ function gateDocs(base = root, options = {}) {
  * 适用版本」，这里管其余部分。
  */
 function gateReadmeGate(base = root) {
-  let result
   try {
-    result = gateReadme(base)
+    // 只判「结构检查有没有过」。**不再拿检查项总数去比对 known-counts**：
+    // 那个数随 README 的章节数变化（增删一节就 ±1），而它没有任何文档声明位、
+    // 也抓不到任何缺陷——保留它等于要求「改 README 章节必须同步一个 JSON」，
+    // 纯粹是维护摩擦（实测：删掉 ToC 一节，132→129，门禁红在数字上而不是内容上）。
+    return gateReadme(base)
   } catch (error) {
     // 门禁偶发抛错也得是「红」而不是整条 check 崩掉：README.en.md 被删时 gateReadme 会抛。
     return { pass: false, detail: `readme 门抛错：${String(error?.message ?? error)}` }
-  }
-  // 结构检查项数也是已发布计数：与单一来源对不上就红（README 加了检查项要同步 known-counts.json）
-  const expected = knownCount('readmeChecks')
-  const countProblem = expected !== undefined && result.total !== expected
-    ? `README 结构检查项 ${result.total} != 单一来源 scripts/known-counts.json 的 ${expected}`
-    : undefined
-  if (result.pass && countProblem === undefined) return { pass: true, detail: result.detail }
-  return {
-    pass: false,
-    detail: [result.pass ? undefined : result.detail, countProblem].filter(Boolean).join(' | '),
   }
 }
 

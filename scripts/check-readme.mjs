@@ -110,15 +110,24 @@ export function gateReadme(base = repo) {
       check(file, existsSync(resolve(base, target)), `图片存在：${target}`)
     }
 
-    // 8. ToC 覆盖全部二级标题（正文 > 100 行时必须）；ToC 自身不列入
-    if (lines.length > 100) {
-      check(file, /^(## Contents|## 目录)$/m.test(raw), '正文 >100 行，有 ToC')
-      const anchors = [...raw.matchAll(/^- \[([^\]]+)\]\(#([^)]+)\)/gm)].map((m) => m[2])
-      const expected = rawHeadings.filter((h) => h !== 'Contents' && h !== '目录')
-        .map((h) => h.toLowerCase().replace(/[^a-z0-9一-鿿 -]/g, '').trim().replace(/ /g, '-'))
-      const missing = expected.filter((e) => !anchors.includes(e))
-      check(file, missing.length === 0, `ToC 覆盖全部二级标题${missing.length ? `（缺 ${missing.join(', ')}）` : ''}`)
-    }
+    // 8. ToC 是可选排版：**不强制存在**，但一旦有，就必须覆盖全部二级标题。
+    //    这条始终只产生 1 个检查项（没有 ToC 时记一条「可选、未提供」），
+    //    结构检查项数因此不随「有没有 ToC」变化，known-counts 才钉得住。
+    //    放开强制性的理由：ToC 是排版偏好、不是正确性，强制它挡过一次真实的维护提交
+    //    （维护者想删目录，门禁红到只能先改门禁）；而「有就必须全覆盖」保留了防退化
+    //    价值——写了目录却漏节，仍然判红。
+    const hasToc = /^(## Contents|## 目录)$/m.test(raw)
+    const anchors = [...raw.matchAll(/^- \[([^\]]+)\]\(#([^)]+)\)/gm)].map((m) => m[2])
+    const expected = rawHeadings.filter((h) => h !== 'Contents' && h !== '目录')
+      .map((h) => h.toLowerCase().replace(/[^a-z0-9一-鿿 -]/g, '').trim().replace(/ /g, '-'))
+    const missing = expected.filter((e) => !anchors.includes(e))
+    check(
+      file,
+      !hasToc || missing.length === 0,
+      hasToc
+        ? `ToC 覆盖全部二级标题${missing.length ? `（缺 ${missing.join(', ')}）` : ''}`
+        : '无 ToC（可选，不强制；有则须覆盖全部二级标题）',
+    )
 
     // 9. 无空章节（下一节标题之前必须有正文）
     const headingIndexes = lines.map((l, i) => ({ l, i })).filter((x) => /^## /.test(x.l))

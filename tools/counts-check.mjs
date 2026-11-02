@@ -18,7 +18,9 @@
  * 口径边界，写清楚不装：
  *   - `smokeAssertions` / `hostContacts` 是**人工维护值**——冒烟要 pwsh + dsh CLI、触点计数口径
  *     是散文公式，fast 层算不出来。它们只校验「来源值 == 各文档声明值」，不假装能机算。
- *   - `readmeChecks` 当前没有文档声明位，只有 readme 门的运行期比对（门禁读数 == 来源值）。
+ *   - `readmeChecks` 已从单一来源**移除**：README 结构检查的项数随章节数变化（增删一节就 ±1），
+ *     既没有文档声明位、也抓不到缺陷，钉住它只会逼人「改 README 章节就同步一个 JSON」。
+ *     readme 门现在只判「结构检查有没有过」，不再比对总数。
  *
  * 用法：node tools/counts-check.mjs [--root <项目根>] [--gates <本次运行的门的数量>]
  * 退出码：0 全一致；1 有漂移/缺声明/用法错。
@@ -57,8 +59,8 @@ const SCAN = [
   { count: 'selfTestCases', regex: /--self-test[^\n\d]{0,12}(\d+)\s*\/\s*(\d+)/g },
   { count: 'gates', regex: /([一二三四五六七八九十\d]+)\s*道(?:闸|门|门禁)/g },
   { count: 'gates', regex: /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+gates?\b/gi },
-  { count: 'readmeChecks', regex: /(\d+)\s*项(?:结构)?检查/g },
-  { count: 'readmeChecks', regex: /(\d+)\s*README checks?/gi },
+  // readmeChecks 不再参与比对（见文件头口径边界），所以它那两个扫描式也一并去掉：
+  // 留着只会让「文档里写了 N 项结构检查」指向一个不存在的来源值。
   { count: 'smokeAssertions', regex: /(\d+)\s*条断言/g },
   { count: 'smokeAssertions', regex: /(\d+)\s*assertions?\b/gi },
   { count: 'smokeAssertions', regex: /smoke[^\n]{0,30}?(\d+)\s*\/\s*(\d+)/gi },
@@ -73,17 +75,20 @@ const SCAN = [
 ]
 
 /**
- * 必需声明位：每一项计数（除 `readmeChecks`）至少在这里点一次名。
+ * 必需声明位：**对外承诺与口径权威**必须点名一个计数，其余文档只做「出现即校验」。
  * 删掉那一行 → 红（不是「扫不到就放过」）。`what` 只用于报错时指路。
+ *
+ * 为什么只留这些：契约文档（`docs/brand-persona.md`）里的测试数 / 冒烟数 / 触点
+ * 「现为 NN 条」原先也是必需位，结果是**每加一个测试都得去改契约的措辞**，否则门禁
+ * 红——那是把「计数必须说对」错做成了「计数必须提到」。现在这三处改为：写了就按现值
+ * 校验，没写不算错；对外承诺（README 的门数与组数、CONTRIBUTING 的负例数）与口径
+ * 权威（compatibility 的触点数、terminology 的组名）仍然强制，因为它们是对读者的承诺。
  */
 const REQUIRED = [
   { doc: 'README.md', count: 'gates', what: '七道门禁', regex: /([一二三四五六七八九十\d]+)\s*道门禁/g },
   { doc: 'README.en.md', count: 'gates', what: 'seven gates', regex: /\b(seven|six|eight|\d+)\s+gates?\b/gi },
   { doc: 'CONTRIBUTING.md', count: 'gates', what: '七道闸', regex: /([一二三四五六七八九十\d]+)\s*道闸/g },
   { doc: 'CONTRIBUTING.md', count: 'selfTestCases', what: 'NN 个负例', regex: /(\d+)\s*个负例/g },
-  { doc: 'docs/brand-persona.md', count: 'tests', what: 'NN 项测试', regex: /(\d+)\s*项测试/g },
-  { doc: 'docs/brand-persona.md', count: 'smokeAssertions', what: 'smoke.ps1 NN/NN', regex: /smoke\.ps1`?\s*(\d+)\s*\/\s*\d+/g },
-  { doc: 'docs/brand-persona.md', count: 'hostContacts', what: '现为 NN 条', regex: /现为\s*(\d+)\s*条/g },
   { doc: 'docs/compatibility.md', count: 'hostContacts', what: '共 NN 条', regex: /共\s*(\d+)\s*条/g },
   { doc: 'docs/terminology.md', count: 'settingsGroups', what: 'N 个组名', regex: /([一二三四五六七八九十\d]+)\s*个组名/g },
   { doc: 'README.md', count: 'settingsGroups', what: 'N 组：', regex: /([一二三四五六七八九十\d]+)\s*组[：:]/g },

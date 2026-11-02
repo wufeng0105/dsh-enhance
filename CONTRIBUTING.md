@@ -60,3 +60,20 @@ CI 在 `windows-latest` 上跑 `--layer fast`（`.github/workflows/ci.yml`）。
 - 一个逻辑改动一个提交，信息写清「改了什么、为什么」
 - PR 里贴 `check.mjs` 与 `--self-test` 的输出
 - 不要提交 `.zhll/`、`.tmp/`、`.codegraph/`（已在 `.gitignore` 里）
+
+## 推之前：会挡住你的只有这几类
+
+远端有新提交时 `git push` 会被拒（非快进），先 `git pull --rebase origin main`，整合完**重跑一遍门禁**再推——rebase 改了基线，门禁读的数可能跟着变。
+
+以下四类改动会让门禁变红，都是**有意的**，按表同步即可：
+
+| 你改了什么 | 要同步的地方 |
+|---|---|
+| 加 / 删测试、改 `--self-test` 负例、新增门禁 | `scripts/known-counts.json` 的对应计数（`tests` / `selfTestCases` / `gates`） |
+| 改冒烟断言数 | `scripts/known-counts.json` 的 `smokeAssertions`（人工维护值） |
+| 新增常驻源码文件（不含 `scripts/`、`tests/`） | `code-map.json` 登记；新增 `ctx.on(...)` 事件还要登记 `events` |
+| 改 `cordis.patch.yml` 的入口 | 入口 `name` 必须指向真实存在的文件（`bundle` 门） |
+
+两类**不会**再挡你（已按维护成本放开）：README 有没有目录（ToC 现在是可选的，**有则须覆盖全部二级标题**）；README 增删章节导致的检查项数变化（结构检查项数不再钉在 `known-counts.json` 上）。
+
+本机 DSH 升级到 `engines.dsh` 区间之外时，`version` 门会红——那是提醒你按例行核验扩区间，不是误报；CI 不装 DSH，所以只有本机会看到。
