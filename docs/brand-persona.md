@@ -272,46 +272,16 @@ DSH 自己的口径是：
 
 - **装没装上**：状态快照里的 `identityInstall`（机读）与设置页品牌人设组那一行说明（人读）会如实说「已生效 / 已接上 / 未生效」，例如「未生效：本版宿主没有可注入的 agent 上下文（agent.ctx.inject 不可用）」；「还没有 agent 可判」是三态的 `null`，不压成「失败」。
 - **遮蔽是否真的生效**：由「检查」里 `inject` 那一项的第二路证伪——`custom` 要在会话日志里命自定义文本、`remove` 要用反向探针确认最新一份装配记录里已经没有宿主原句；`keep` 不判。
-- **仍要人工记的**：真机验收的限制不变——`hideHarness` 在桌面 / web profile 上的效果仍未核（见「落地状态」），`compatibility.md` 该记的轮次照记。
+- **仍要人工记的**：真机验收的限制不变——`hideHarness` 在桌面 / web profile 上的效果仍未核（见文末「仍未核验」），`compatibility.md` 该记的轮次照记。
 
-## 10. 落地清单
+## 10. 落地状态与剩余边界
 
-一次性清单，做完逐项勾。
+这个功能已经落地。**状态不在这份契约里复述**——它随每次发版变化，写在这里就一定会变成假话：
 
-**代码**
+- 逐版本改了什么、验证读数是多少 → [`CHANGELOG.md`](../CHANGELOG.md)
+- 宿主接缝、历轮核验的结论与「想复跑要什么条件」 → [`docs/compatibility.md`](compatibility.md)
 
-- `shared/state.mjs`：`STATE_VERSION` 3→4；新增 `identity` / `hideHarness` 与 `IDENTITY_LIMIT`；文本读写复用现有 `readText` / `writeText` 口径（加路径与上限参数），不另起第二套实现
-- `shared/seed.mjs`：首装写盘带全 v4 键
-- `enhance-scope/index.js`：`ctx.on('agent/created')` + `agent/disposed`；按名遮蔽 5 项（3 个名字）；`set` op 白名单加 `identity` / `hideHarness` / `identityText`；`state` 快照加三字段与预览句；`writeState` 所有调用点带全键
-- `ui/client.js`：新增「品牌人设」组（三档 + 开关 + 输入框 + 预览），`errorLine` 加 `identity` 段，页面自身「四组」文案与注释同步改
-- `code-map.json`：`events` 加 `agent/created`、`agent/disposed`（owner `plugin.scope`）；新增「agent 作用域遮蔽」接缝边；`state.fields` 补齐（含今天已缺的 `enabled`）；`plugin.ui-client` 的 `owns` 文案
+契约只需要记住两条**不会随发版消失**的边界：
 
-**文档**
-
-- `docs/terminology.md`：组名「品牌人设」；机读标识符 `identity` / `hideHarness` / `identityText`；三分「人设」——品牌人设（`harness:identity` 开场白）／部署人设（`deployment:persona-prefix`）／内容边界文本；内容边界提示里的「写人设」改为「写行为规矩、写内容要求、写补充说明」
-- `docs/compatibility.md`：按「维护：DSH 升级后核这一条」改两处 + 下一轮核验记录
-- `README.md` / `README.en.md`：功能一句、设置页说明、退回方法；「四组」改「五组」；承诺句统一为「除声明层外，宿主提示词一个字节不动」
-- `CONTRIBUTING.md`：同上承诺句
-- `showcase/prompt-assembly.html`：「它只做加法」那两处补上品牌人设这一例外
-- `package.json`：`files` 加 `docs/brand-persona.md`（契约要随包发布）
-
-**门禁与测试**
-
-- `tests/state.test.mjs`：`STATE_VERSION` 断言、精确 key 列表、只切 `enabled` 不动 `identity` 的回归
-- `tests/ui-client.test.mjs`：四组顺序与切片（改五组）、`errorLine` 段列表加 `identity`、`ids.size` 改 5、「写人设」锁定串改「写行为规矩、写内容要求、写补充说明」、新增组的文案锁
-- `tests/enhance-scope-api.test.mjs`：`fakeCtx` 补 `on('agent/created')` 捕获；新 op 白名单与校验；`interpolate: false` 断言；只切 `enabled` 后 `identity` / `hideHarness` 不变的回归（`writeState` 整块重建的坑）
-- 新增纯函数测试：三态 × 隐藏 的组合、按名遮蔽、空文本、`{{` 不炸、超限退化
-- `tools/smoke.mjs`：加七条端到端断言（捕获 `agent/created`，喂假 agent ctx，断言 `keep` 不注册、`remove` 注册同名段且 `interpolate:false`、隐藏时 section 与 context 成对遮蔽）
-- `node scripts/check.mjs` 与 `--self-test` 都要 exit 0
-
-## 11. 落地状态（2026-11-02）
-
-- **已核验**：`node scripts/check.mjs` 7/7（**161** 项测试 / 9 个文件；含「装没装上」与「遮蔽有没有真生效」这两路可发现性的用例）；`--self-test` 17/17；
-  `tools/smoke.ps1` 44/44（真装 bundle + 真组合树 + 八条品牌人设断言 + 设置页四项的取值断言）；
-  **真宿主首启**落盘的 `state.json` 确为 v4 五键（`gates/wp4-live-seed.log`）。
-- **装配层验收（「做到什么算成」第 1、3 条）已在真机会话日志上验成**，这一条此前一直欠着：远端机全量重置后
-  装 `0.2.1-rc.5` + 本包，`custom` 态下 `system/message` 的第一句是自定义文本、宿主原句在整份会话里
-  **0 命中**；切回 `keep` 后第一句**逐字回到**宿主原句，内容边界在两种状态下都在。做法与结论见
-  `docs/compatibility.md` 的 2026-11-02 记录。
-- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject`
-  含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。
+- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。补它的条件见 `compatibility.md` 的历轮汇总。
+- **装配层验收**：做法与结论记在 `compatibility.md`；真会话那一半要**一次有余额的会话**才能复跑。

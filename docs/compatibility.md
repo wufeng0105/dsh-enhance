@@ -218,122 +218,54 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 
 ## 核验记录
 
-每改一次声明区间前后各核一轮，都记在这儿——**都留着、不覆盖**，因为两轮暴露的问题不一样。每轮的结构相同：结论表 → 逐文件读法 → 那一轮确认的边界与未验项 → **逐条复跑条件表**（每条记录都写清本机可不可复跑、不可复跑时缺什么）。
+每改一次声明区间前后各核一轮。**细节不在这里复述**：每一轮当时的完整叙述都在 git 历史里（`git log -p docs/compatibility.md`），本表只留三样——核了什么、结论是什么、想复跑要什么条件。这样记录不随版本数无限膨胀，而结论与复跑条件一条不少。
 
-### 2026-10-30（范围 rc.1–rc.5）
+### 2026-10-30 – 2026-11-02（历轮汇总）
 
-| 包 | rc.1 tree SHA | rc.2 | rc.3 | rc.4 | rc.5 | 结论 |
-|---|---|---|---|---|---|---|
-| `packages/core/system-prompt/src` | `004ba79f1155e70d6106d57d18bde92408da3c97` | 同左 | 同左 | 同左 | 同左 | 全同 |
-| `packages/host/webserver/src` | `2a70b7add8775b3fe47724e34706317485298e6d` | 同左 | 同左 | 同左 | 同左 | 全同 |
-| `packages/interaction/user-approval/src` | `2c3c6bcdcd5b1e7a57e09459dd71be2e8adf05fa` | 同左 | 同左 | 同左 | 同左 | 全同 |
-| `packages/interaction/permission-presets/src` | `9c84caa30dbc0ab32d530217c10be26479c58f19` | 同左 | 同左 | 同左 | 同左 | 全同 |
-| `packages/client/ui-settings/src` | `6bcf51fa271b5763ac4adf713a6a32087ab6bb73` | 同左 | 同左 | 同左 | 同左 | 全同 |
-| `packages/client/ui-settings-general/src` | `e0ad312f5ae2b026c986ef908fda668016d6dd64` | 同左 | `22c42682ba5fb15014c86caaabfeb4bb4c86bb58` | 同左 | 同左 | rc.1≡rc.2；rc.3 起变，rc.3≡rc.4≡rc.5 |
-| `packages/client/ui-permission-presets/src` | `71cf0cb4204e166c8dec3434681a9a52a0221966` | 同左 | 同左 | 同左 | 同左 | 全同 |
-| `packages/boot/app-boot/src` | `14016c958ce4f6006933056a4863c5bebb348daf` | 同左 | 同左 | 同左 | 同左 | 全同 |
-| `packages/boot/plugin-manager/src` | `90ef58695a4ebc4a076c4688b36529124fdfcf11` | 同左 | 同左 | 同左 | 同左 | 全同（rc.1–rc.5 五个 tag 同一个 tree SHA） |
+**源码级区间（2026-10-30）**：9 个包的 5 个 tag 逐个比 tree SHA。取法即「例行核验」第 2 步那条脚本；「同左」= 与 rc.1 同一个 SHA（不是「没测」）。
 
-表里的「同左」= 与前一列同一个 SHA（不是「没测」）。取这张表的命令就是「例行核验」第 2 步那条 5 tag 脚本，输出逐行对得上：`ALL-SAME` 的行对应本表的「全同」，`ui-settings-general/src` 那行打印 5 个 SHA，只有第 3、4、5 个相同。2026-11-02 逐 tag 重取复对，9 行全部一致；其中 `plugin-manager/src` 那一行原先只写「（blob 级对照）」、没有值也没有命令，本轮补上 tree SHA `90ef58695a4e…`（完整值见上表）与上面的命令。
-
-逐文件比对 `ui-settings-general/src`：只有 `client/index.ts` 变了，diff 是新增 `productAnalytics.track('code_work_view_toggle', …)` 埋点与一行 `import type {}`，**`settings.section` 的槽位机制未动**。复跑就是「例行核验」第 3 步那两条命令：该目录在 rc.1 与 rc.3 各 22 个文件，21 个 blob 全同、只有 `index.ts` 不同（`src/` 层面是 25 个文件里 24 同、同样只有它变——`src/client` 之外还有 3 个文件，全同）。
-
-rc.5 上还做了一轮**干净环境终验**（2026-10-30，远端机重置后）：静默重装 `0.2.1-rc.5` → 按现行装法 `dsh plugin add` 装最终包（`engines.dsh` 区间在装载 preflight 下直接通过，exit 0）→ `--dump-config` 三个入口齐全、profile patch 保持 `[]` → 隔离 home 冒烟 30 条断言全过 → GUI 侧 `/enhance/api` 注入命中真实会话系统提示、写档/重启/组合/摘除闭环 → 真启动一次只报余额不足（`QUOTA`），没有插件相关报错。**复跑条件**：装包、`--dump-config`、冒烟三步本机可复跑（「例行核验」第 4 步）；「GUI 注入命中真实会话」这一环**不可复跑**——要一台能起桌面 GUI 的机器和一次**有余额的会话**才能复跑，两样今天都没有（余额 0，见 10-31 那轮 `QUOTA`）。
-
-同一轮里确认的版本行已知边界：asar 清单读取在 CLI 进程（headless / 探针）稳定返回 `0.2.1-rc.5`，但在 GUI 的插件进程里，整条探测链都退化为「读不到本机版本」——页面照实显示、不判红，注入、审批、写档不受影响；这就是「读不到就照实写」的实测样例。**复跑条件**：这一段**不可复跑**——需要一台能起桌面 GUI 的机器，并把本包装进 `desktop` profile 才能复跑（本机 `desktop` profile 里装的是 `dsh-enhance-1.1.2.tgz`、`state.json` 仍是 v3，等于没装这一轮的代码）；CLI 那一半只用 `--version` 与 `--dump-config` 就能复跑。
-
-**本轮逐条复跑条件**：
-
-| 记录条目 | 复跑条件 | 缺什么 |
+| 包 | tree SHA | 结论 |
 |---|---|---|
-| rc.1–rc.5 的 9 行 tree SHA 表 | **本机可复跑**：「例行核验」第 2 步的 5 tag 脚本，约两分钟 | 无 |
-| `plugin-manager/src` 那一行 | **本机可复跑**：同一条命令，值见上表 | 无（原先没写 SHA 值，属「结论在、证据缺」） |
-| 「只有 `client/index.ts` 变了」 | **本机可复跑**：「例行核验」第 3 步的列 sha + base64 解码 | 无 |
-| rc.5 干净环境终验（装包 / `--dump-config` / 冒烟 / GUI 注入命中真实会话） | 前三步**本机可复跑**；「GUI 注入命中真实会话」**不可复跑** | 需要一台能起桌面 GUI 的机器 + 一次**有余额的会话**，才能复跑那一环 |
-| GUI 插件进程里探测链退化为「读不到本机版本」 | **不可复跑** | 需要一台能起桌面 GUI 的机器，且把本包装进 `desktop` profile（本机装的是 1.1.2、`state.json` 仍 v3），才能复跑 |
+| `packages/core/system-prompt/src` | `004ba79f1155e70d6106d57d18bde92408da3c97` | rc.1–rc.5 全同 |
+| `packages/host/webserver/src` | `2a70b7add8775b3fe47724e34706317485298e6d` | 全同 |
+| `packages/interaction/user-approval/src` | `2c3c6bcdcd5b1e7a57e09459dd71be2e8adf05fa` | 全同 |
+| `packages/interaction/permission-presets/src` | `9c84caa30dbc0ab32d530217c10be26479c58f19` | 全同 |
+| `packages/client/ui-settings/src` | `6bcf51fa271b5763ac4adf713a6a32087ab6bb73` | 全同 |
+| `packages/client/ui-settings-general/src` | rc.1/rc.2 `e0ad312f5ae2b026c986ef908fda668016d6dd64`；rc.3–rc.5 `22c42682ba5fb15014c86caaabfeb4bb4c86bb58` | 唯一变更：`client/index.ts`（新增埋点 + 一行 `import type {}`），`settings.section` 槽位未动；该目录 22 文件里 21 个 blob 全同 |
+| `packages/client/ui-permission-presets/src` | `71cf0cb4204e166c8dec3434681a9a52a0221966` | 全同 |
+| `packages/boot/app-boot/src` | `14016c958ce4f6006933056a4863c5bebb348daf` | 全同 |
+| `packages/boot/plugin-manager/src` | `90ef58695a4ebc4a076c4688b36529124fdfcf11` | 全同 |
 
-### 2026-10-31（重置重装后，rc.5）
+**历轮汇总**
 
-把远端测试机**全量重置**（杀进程 → 删 `.dsh` / `%APPDATA%\@deepseek-ai` / 安装根 / 卸载项 → 静默装 `0.2.1-rc.5`，43 s），随后实测。**复跑条件**：**不可复跑**——需要一台可整机重置的测试机与连接方式（那台机是 Windows Server 2022 / pwsh 7.6.9 / node v24.22.1，从开发机经 SSH 别名连入；别名与私钥不在仓内，原始输出在本地账本、不随包发布），本机是日常机、不能当重置对象，详见本轮末尾的复跑条件表：
+| 轮次 | 核了什么 | 结论 | 复跑条件 |
+|---|---|---|---|
+| 10-30 · 源码级区间 | 上面那张表 | 8 个包全同、1 个包在 rc.2→rc.3 变且只动埋点 → 「全系源码级核验」成立 | **本机可复跑**（例行核验第 2、3 步） |
+| 10-30 · rc.5 干净环境终验 | 远端重置后真装 → `--dump-config` 三入口、patch 仍 `[]` → 隔离 home 冒烟 → GUI 侧 `/enhance/api` 命中真实会话 | 装包、组合、冒烟通过；GUI 注入命中（当时有可用会话） | 前三步**可复跑**；GUI 那一环**不可复跑**（要桌面 GUI + 一次有余额的会话） |
+| 10-31 · 远端全量重置后重装 | 杀进程 → 删 `.dsh`／安装根／卸载项 → 静默重装 rc.5 → 复对 SHA → 装包 → 冒烟 | SHA 9/9 一致；装包 exit 0；冒烟当时全过；空 patch 三种写法必败；组合树 `presets` 三档全表、不含 `defaultPreset` | 重置本身**不可复跑**（需可整机重置的测试机）；空 patch 探针**可复跑**（下面那段命令） |
+| 11-02 · 36 条触点那一轮（1.2.0） | 宿主侧 asar 逐条核对新触点；远端真机端到端（双 profile 装包、设置页五组） | 契约假设全部成立；装配层验收在真机会话日志上成立（`custom` 第一句为自定义文本、宿主原句 0 命中；切回 `keep` 逐字回原句） | asar 核对**可复跑**（基准见下）；远端那轮**不可复跑**（桌面 GUI + 有余额的会话） |
+| 11-02 · 1.2.1 收口轮 | 干净基线远端真装 1.2.1（**1.2.0 那轮的包装不含本轮新增的 `identityInstall` 与 `inject` 两路探针**） | 装包 exit 0；三入口齐；patch 仍 `[]`；远端 68 文件 sha256 前后无差异；冒烟当轮 38 条（现值见 `CHANGELOG`） | 装包**不可复跑**（需那台测试机）；冒烟**可复跑** |
+| 每一轮的真会话 | 真会话里的装配结果、桌面 `hideHarness` | **仍未验**：`QUOTA: Insufficient Balance`（余额 0），只记录、不下结论 | **不可复跑**，缺**一次有余额的会话**（+ `custom`/`keep` 两份日志对照） |
 
-- **tree SHA 表逐条复对**：按五个 tag 重取（脚本见「例行核验」第 2 步），上面那张 9 行的表全部一致；`ui-settings-general/src/client/` 内除 `index.ts` 外**其余 21 个文件 blob 全同**，与「只有 `client/index.ts` 变了」吻合。
-- **洁净环境装本包**：`dsh plugin --profile headless add <仓库>` → exit 0，profile 的 `dsh.profile.bundles` 追加本包，`--dump-config` 组合出 `enhance-scope` / `auto-approve` / `enhance-ui` 三个入口。说明 `engines.dsh` 预检与 bundle patch 在全新 rc.5 上都通过。
-- **一次性 home 冒烟 30 条断言全过**：三态映射（`allow→allowed-once`、`ask→unavailable` 且交还下游、`deny→rejected`）、写档写完整四档、**不写 `defaultPreset`**、摘档逐字节回到写前、`<home>/enhance/` 自动补齐。
-- **patch 摘成空文件确实会失败**（三种写法都试了：0 字节 / 仅换行 / 仅注释）：宿主 `exit=1`，报 `dsh: overlay <profile>/cordis.patch.yml must be a top-level YAML array of loader patch entries`（`dsh-app-boot/lib/index.js:4000`）。所以往 patch 里写东西必须写成顶层数组，别留空文件。2026-11-02 本机用下面这段一次性 home 命令重跑，三种写法同样都是 `exit 1`、错误串逐字一致；写回 `[]` 则 `--dump-config` 回到 `exit 0`（360 行配置输出）。
-- **组合树里 `- id: permission` 的 `config.presets` 是三档全表、不含 `defaultPreset`**：默认档由组合的 sandbox 与 approval 推导，不是写出来的（组合默认 `workspace-write` + `ask`）。
-- **仍未验的一项**：真会话。本机 `DEEPSEEK_API_KEY` 余额 0，`dsh --profile headless "…"` 直接 `QUOTA: Insufficient Balance`（exit 1）；「Enhanced 档下是否真会产生 `approval/request`」要一次有余额的会话才能定，这里**只记录、不下结论**。
+**三条容易忘的边界**
 
-空 patch 的复跑命令（本机 2026-11-02 实测；用一次性 `DSH_HOME`，不碰日常 profile）：
+- **本机 asar 不是原封发行件**：与同目录 `app.asar.bak-2026-10-31T09-42-57-481Z` 等长而内容差一个条目（`dsh-sandbox-windows-acl` 的 `types-*.js` 一行等长替换，改动者不是本插件）。它与核过的四个包无关，结论不变；要干净基准先重装。
+- **GUI 侧版本读取退化**：CLI 进程读得到本机版本，GUI 插件进程读不到，页面照实写「读不到本机版本」、不判红。
+- **设置页四项**：名字与顺序、四项取值都有断言（冒烟 `3.4.1`–`3.4.6`）；但**没有 GUI / 浏览器证据**——只装了 `headless`，组合树里没有 web 服务宿主。
+
+空 patch 的复跑命令（一次性 `DSH_HOME`，不碰日常 profile）：
 
 ```powershell
 $cli = Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
 $env:DSH_HOME = Join-Path $env:TEMP 'dsh-empty-patch-probe'
-& $cli plugin --profile t list                      # 先初始化 profile；跳过这步会报「profile 不存在」
+& $cli plugin --profile t list                        # 先初始化 profile
 $patch = Join-Path $env:DSH_HOME 'profiles\t\cordis.patch.yml'
-Set-Content -LiteralPath $patch -Value '' -NoNewline # 0 字节；再试 "`n" 与 "# comment`n"
-& $cli --profile t --dump-config                    # 期望 exit 1：overlay … must be a top-level YAML array
+Set-Content -LiteralPath $patch -Value '' -NoNewline   # 再试 "`n" 与 "# comment`n"
+& $cli --profile t --dump-config                      # 期望 exit 1：overlay … must be a top-level YAML array
 Set-Content -LiteralPath $patch -Value "[]`n" -NoNewline
-& $cli --profile t --dump-config                    # 对照：exit 0
+& $cli --profile t --dump-config                      # 对照：exit 0
 Remove-Item -LiteralPath $env:DSH_HOME -Recurse -Force
 ```
-
-**本轮逐条复跑条件**：
-
-| 记录条目 | 复跑条件 | 缺什么 |
-|---|---|---|
-| 把远端测试机全量重置（见本节开头） | **不可复跑** | 需要一台**可整机重置**的 Windows 测试机与连接方式（规格见本节开头；连接别名不在仓内），本机是日常机，不能当重置对象 |
-| tree SHA 表逐条复对 + `client/` 21 文件 blob 全同 | **本机可复跑**：「例行核验」第 2、3 步 | 无 |
-| 洁净环境 `dsh plugin --profile headless add <仓库>`（exit 0） | **本机可复跑**：`tools/smoke.ps1` 第 1 步走同一条装载路径 | 无 |
-| 一次性 home 冒烟（当时 30 条断言，现 **38** 条） | **本机可复跑**：`pwsh -NoProfile -File tools/smoke.ps1` | 无 |
-| 空 patch 三种写法必失败 | **本机可复跑**：上面那段命令；2026-11-02 本机实测三种都 `exit 1`，写回 `[]` 则 `exit 0` | 无 |
-| 组合树 `config.presets` 三档全表、不含 `defaultPreset` | **本机可复跑**：`dsh --profile <p> --dump-config`（冒烟 4.5/4.6 覆盖） | 无 |
-| 真会话仍未验（`QUOTA`，只记录不下结论） | **不可复跑** | 需要一次**有余额的会话**才能复跑；`QUOTA` 是凭据余额状态，不是插件行为 |
-
-两段记录的差异来自**会话可用性**，不是产品行为变了：10-30 那次机器上有可用会话，才看得到「注入命中真实会话系统提示」；10-31 这次重置后无可用会话，`inject` 项因此为红。别把两段混着读成「行为回退了」。补一句口径：`inject` 仍是**一项**（键与标题都不动），但它现在同时探**内容边界**与**品牌人设**两路——这两路探针是 **1.2.1 才进工作树**的，10-31 那轮还没有它们（那轮的 `inject` 只探内容边界）。有装配日志却两路都不命中才是真红；没有日志时按「还没有证据」如实说，不冒充失败。
-
-### 2026-11-02（1.2.0 品牌人设；36 条触点那一轮）
-
-触点表加了一条（`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽），独立触点项由 35 条重数为 36 条。这一轮核的就是这条新触点，做法与结论：
-
-- **宿主侧逐条核对（本机 `0.2.1-rc.5` 的 `app.asar` 只读）**：`@deepseek-ai/dsh-system-prompt` 里 `HARNESS_IDENTITY` 座位与 `"You are an AI agent powered by DeepSeek Harness."` 原文、`@deepseek-ai/dsh-harness-dev-context` 里 `harness:source` / `app:web-surface` 两个名字同时用于 section 与 context、`@deepseek-ai/dsh-agent` 的 `agent/created` 载荷为 `{ agent, source, signal }` 且 `agent.ctx` 是可注入的 agent 作用域上下文、`@deepseek-ai/dsh-file-reference-local` 就是 `agent.ctx.inject(['systemPrompt'], …)` 的现成先例——全部与契约「为什么是「按 agent 遮蔽同名段」」的假设一致。**复跑条件**：本机可复跑（只读解 asar 头，读法见「例行核验」第 3 步末尾；「21 个文件含 `engines.dsh`」按同一读法复算）。但**基准不是原封发行件**：本机 `app.asar` 与同目录 `app.asar.bak-2026-10-31T09-42-57-481Z` 等长（182766714 B）而内容差一个条目——`dsh-sandbox-windows-acl` 的 `types-*.js` 一行等长替换（改动者不是本插件）。它与这一轮核对的四个包无关，所以结论不变；要拿干净基准，先用安装器重装一次再核。
-- **真机端到端（远端机全量重置后）**：静默重装 `0.2.1-rc.5` → `dsh plugin --profile headless add` 与 `--profile desktop add`（均 exit 0）→ `--dump-config` 组合出三个入口；`headless` 首启种下 `state.json` **v4 五键**；设置页后端 `/enhance/api` 的 `state` 快照在桌面端 GUI 上返回 `version=4 / identityLimit=2048`；`check` 四项全绿——按**这一轮的探针口径**读：那一轮的 `inject` 只探**内容边界**一路，还没有品牌人设那一路（**1.2.1 起 `inject` 另加品牌人设一路**，该轮口径与实测见下面「2026-11-02（1.2.1 收口轮）」）；桌面端 GUI 的「增强」一节实际渲染出五组（用户截图确认）。**复跑条件**：**不可复跑**——需要那台可整机重置的远端测试机、桌面 GUI 与一次**有余额的会话**，三样缺一样都复不了；本机 `desktop` profile 装的是 1.1.2，连「装的是本轮代码」这个前提都不成立。
-- **装配层验收（契约「做到什么算成」的第 1、3 条）在真机会话日志上成立**——这是 10-31 那次欠下的那项，这次补上了。做法是**手工**的：把 `identity` 设成 `custom`、写 `identity.txt`、`hideHarness=true`，跑一次 `dsh --profile headless headless "…"`，再解压会话日志看 `system/message` 的文本：
-  - `custom` 态：system 节点第一句是 `You are Aria, a private assistant.`，宿主原句 `You are an AI agent powered by DeepSeek Harness.` **在整份会话里 0 命中**；
-  - 切回 `keep` 态：第一句**逐字回到**宿主原句，自定义文本 0 命中。
-  两条都只改声明层——内容边界那句在两种状态下都在。这条路径**不依赖任何 1.2.1 才进工作树的能力**（它是改设置 + 跑一次 headless + 解压日志，那几件新探针一件都没用上），所以它是这一轮的记录，不下移到别轮。**复跑条件**：**不可复跑**——要改完 `identity` 后**新起一次真会话**，而那需要一次**有余额的会话**（本机余额 0，`dsh --profile headless headless "…"` 直接 `QUOTA` exit 1）；还要 `custom` 与 `keep` 两次会话日志作对照，才能复跑。**这条限制的是「今天能不能重跑一遍」，不是「那一轮验没验过」**——当时读的那两份会话日志的读数就记在上面这两行。
-- **仍然没验的**：`hideHarness` 在**桌面/web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，所以那两段在 `headless` 上本来就注册不到（基线里也是 0 命中），无从对比。这一项留给一次桌面端真会话。**复跑条件**：**不可复跑**——需要一次**桌面端真会话**才复得了；本机没有桌面会话可跑。
-- **顺带纠正一处旧记录**：`dsh --version` **不会**重建 `.dsh`（10-31 那次记反了）。真正重建的是一次 profile 引导：`dsh headless "…"` 即便因 `QUOTA` 退出码 1，`~/.dsh` 也已生成。本次实测确认（2026-11-02 本机复核：临时 `DSH_HOME` 下 `dsh --version` 后目录仍不存在；`dsh plugin --profile t list` 之后 `profiles/t/` 就出现了）。**复跑条件**：**本机可复跑**，命令即这两步。
-
-**本轮逐条复跑条件**：
-
-| 记录条目 | 复跑条件 | 缺什么 |
-|---|---|---|
-| 宿主侧 asar 逐条核对（`0.2.1-rc.5` 只读） | **本机可复跑**：只读解 asar 头 + 上面那四个包的条目对照 | 步骤上不缺；但**基准不是原封发行件**（本机差一个 `dsh-sandbox-windows-acl` 条目），要干净基准得先重装 |
-| 真机端到端（远端重置 + 双 profile 装包 + 设置页五组 + `check` 四项全绿） | **不可复跑** | 需要一台可整机重置的远端测试机（规格与连接方式见 10-31 那轮开头）、桌面 GUI、一次**有余额的会话**；本机 `desktop` profile 装的是 1.1.2 |
-| 装配层验收：`custom` 态第一句是自定义文本、宿主原句 0 命中 / 切回 `keep` 逐字回原句 | **不可复跑** | 需要改完 `identity` 后**新起真会话** + `custom`/`keep` 两份会话日志作对照，而真会话要**有一次有余额的会话** |
-| `hideHarness` 在桌面 / web profile 上的效果 | **不可复跑** | 需要一次**桌面端真会话**；本机没有桌面会话可跑 |
-| 「`dsh --version` 不重建 `.dsh`」这处纠正 | **本机可复跑**：临时 `DSH_HOME` 下 `dsh --version` 后目录不存在，再跑一次带 `--profile` 的命令就出现 | 无 |
-
-### 2026-11-02（1.2.1 收口轮；干净基线远端机真装 1.2.1）
-
-这一节记的是 **1.2.1** 的能力归属与它在真机上的读数。上面 1.2.0 那一轮装进去的包**不含**下面这些能力，所以它们不写在那轮里。
-
-**先勘时段归属。** `identityInstall`（`state` 快照的上报字段，由 `describeIdentityInstall` 派生）、`inject` 的「内容边界 + 品牌人设」两路（由 `identityShadowProof` 判定）、反向探针 `sessionOmits` 都是 **1.2.1 才进工作树**的（本轮改动之前，这四个名字在上一版代码里各 0 命中）。原先挂在 1.2.0 那轮的两处说法（`state` 快照带 `identityInstall`、`inject` 两路与 `sessionOmits`）因此从那轮叙述里移出，改按下面的实测重写。**这次移出只覆盖上面这两个字段，不覆盖那一轮的装配层验收**：那轮的装配层验收走的是**手工路径**（设 `identity=custom`、写 `identity.txt`、跑 headless、解压会话日志看 `system/message`），不碰上面任何一件新探针，所以它**不属时段错位**——它已按原记录恢复在上一节；那轮的「`check` 四项全绿」在当时的口径（`inject` 只探内容边界）下也成立，同样保留。
-
-- **能力进树（1.2.1）**：`state` 快照新增 `identityInstall`——`ok` 是三值：`true` 装上、`false` 明确装不上、`null` 还没有 agent 可判，不把「还没有证据」报成失败；`inject` 从只探内容边界扩成「**内容边界 + 品牌人设**」两路（`custom` 要命中 `identity.txt` 的文本、`remove` 不得再出现宿主原句、`keep` 这一路不判）；缺失性走反向探针 `sessionOmits`，只看**最新一份**含 `"system-prompt"` 装配记录的日志（按 mtime 倒序取第一份，不让切换设置前的旧日志把检查永久判红）。
-- **干净基线远端机真装 1.2.1（本轮实测）**：远端测试机已全量重置为干净 `0.2.1-rc.5`（重置过程见 10-31 那轮开头）。本轮真装 **1.2.1**：`dsh plugin --profile smoke add <仓库>` → **exit 0**（输出 `+ dsh-enhance 1.2.1`）；一次性 home 冒烟 **`pass=38 fail=0 total=38`**（进程内驱动真实插件入口，含 `3.5.7` 在同一个活 agent 上「去掉 → 自定义」真的换上自定义文本）；持久装进 `headless` profile 后 `--dump-config` 三个入口齐——`enhance-scope` / `auto-approve` / `enhance-ui` 各命中一次；`profiles/headless/cordis.patch.yml` 仍是 `[]`（本包不替用户改 patch）；核验前后两次算的远端仓库 **68 文件** sha256 清单无差异、**820967 B** 不变（本包没动被核对的源码）。
-- **设置页四项：取值断言后来补上了，真机证据仍缺**：本轮（WP15）当轮，冒烟 `3.4` 只断到 `op=check` 返回的 `checks` **名字与顺序**恰为 `["plugins","text","inject","preset"]`，四项各自的 `pass`/`na` 取值没有断言。**这一批之后补上了**：`3.4.1`–`3.4.4` 分别断言四项取值（`inject` 在没有会话日志时**如实为 `false`** 并点明「没有会话日志」，不是静默绿、也不当成遮蔽失效），`3.4.5`/`3.4.6` 用**合成**会话日志覆盖 `inject` 的两路绿路；冒烟因此从 38 增至 **44**，并在同一台远端复跑 `pass=44 fail=0 total=44`。上面 `38` 那个读数保持原样——那是当轮的实测。**合成日志不替代真机会话证据**，也没有浏览器 / DOM 证据：这只装了 `headless` profile，组合树里没有 web 服务宿主，设置页的 HTTP 端点在这台机上起不来。
-- **真机会话仍是阻塞**：`dsh --profile headless headless "hi"` 跑一次即 **`QUOTA: Insufficient Balance`**（exit 1），**未重试、未动凭据**。所以**本轮想再跑一次真会话、补一份 1.2.1 装配结果的读数**这件事没有做成：这一轮**没有新增**任何真机会话读数，只记录、不下结论——这不改变 1.2.0 那轮已成立的那对读数（见上一节），也不拿它当「当时没验成」的凭据。**复跑条件**：**不可复跑**——需要**一次有余额的会话**才能复跑（`QUOTA` 是凭据余额状态，不是插件行为），且要 `custom` 与 `keep` 两次会话日志作对照。
-
-**本轮逐条复跑条件**：
-
-| 记录条目 | 复跑条件 | 缺什么 |
-|---|---|---|
-| 远端重置为干净 `0.2.1-rc.5` 后真装 1.2.1（`plugin --profile smoke add` exit 0） | **不可复跑** | 需要一台可整机重置的测试机与连接方式（规格见 10-31 那轮开头），本机是日常机、不能当重置对象 |
-| 冒烟 `pass=38 fail=0 total=38`（含 `3.5.7` 的活 agent 换文） | **本机可复跑**：`pwsh -NoProfile -File tools/smoke.ps1`（**现值 44 条**，见上；38 是当轮读数） | 无 |
-| `--dump-config` 三入口齐 + `cordis.patch.yml` 仍 `[]` | **本机可复跑**：冒烟 `0.3`/`0.4` 与 `3.3` 覆盖 | 无 |
-| 远端仓库 68 文件 sha256 清单前后无差异 | **不可复跑** | 需要那台测试机（清单是对远端仓库逐文件算 `Get-FileHash`） |
-| 真会话 `QUOTA`（只记录、不下结论） | **不可复跑** | 需要**一次有余额的会话** |
 
 ## 两个与「写入 Enhanced 档」按钮直接相关的宿主事实
 
