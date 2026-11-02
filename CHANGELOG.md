@@ -6,7 +6,7 @@
 
 ### 新增
 
-- 门禁补齐三处「零门禁」（独立审计 §3.3 的漏挡），**仍是七道门、不加第八道**，新判据都并进现有门里：`tools/host-check.mjs`（宿主原文基准核对——`harness:identity` 仍是 section 座位、开场那句逐字命中宿主原文、`harness:source` / `app:web-surface` 各自 section + context 成对）并进 **version** 门；`tools/counts-check.mjs`（文档计数一致性）并进 **docs** 门；`tools/field-check.mjs`（生产目录里未登记的 `layers` 入口）挂进 **graph** 门。极性一律「坏输入判红、扫不到也判红」，只有「本机没有 asar」才如实跳过；
+- 门禁补齐独立审计指出的三处「零门禁」，**仍是七道门、不加第八道**，新判据都并进现有门里：`tools/host-check.mjs`（宿主原文基准核对——`harness:identity` 仍是 section 座位、开场那句逐字命中宿主原文、`harness:source` / `app:web-surface` 各自 section + context 成对）并进 **version** 门；`tools/counts-check.mjs`（文档计数一致性）并进 **docs** 门；`tools/field-check.mjs`（生产目录里未登记的 `layers` 入口）挂进 **graph** 门。极性一律「坏输入判红、扫不到也判红」，只有「本机没有 asar」才如实跳过；
 - `scripts/known-counts.json`：七个已发布计数（测试 / 负例 / 门数 / README 检查项 / 冒烟断言 / 设置组数 / 宿主触点）的单一来源；其中冒烟断言与触点数显式标 `manual`——算不出来就承认，不假装能机算；
 - `tools/asar-read.mjs`：只读解 `app.asar` 头的读取器，供上面那道宿主核对用（不解包、不写盘）。
 
@@ -20,7 +20,7 @@
 
 ### 修复
 
-- **品牌人设静默失效现在能发现了**：装不上、或装上了没顶掉时，页面不再照旧显示「已替换」。三处一起改——`state` 快照新增 `identityInstall`（`ok` 是三值：装上 / 明确装不上 / 还没有 agent 可判，不把「还没有证据」报成失败）；`inject` 从只探内容边界扩成「**内容边界 + 品牌人设**」两路（`custom` 要命中 `identity.txt` 的文本、`remove` 不得再出现宿主原句、`keep` 这一路不判）；缺失性走反向探针 `sessionOmits`，只看**最新一份**含系统提示的装配记录，不让切换设置前的旧日志把检查永久判红；
+- **品牌人设静默失效现在能发现了**：装不上、或装上了没顶掉时，页面不再照旧显示「已替换」。三处一起改——`state` 快照新增 `identityInstall`（`ok` 是三值：装上 / 明确装不上 / 还没有 agent 可判，不把「还没有证据」报成失败）；`inject` 从只探内容边界扩成「**内容边界 + 品牌人设**」两路，缺失性走新加的反向探针 `sessionOmits`（两路的三态判定口径见 [`docs/brand-persona.md`](docs/brand-persona.md) 与 [`docs/compatibility.md`](docs/compatibility.md)）；
 - 设置页的降级原因不再一律说成「审批回落到先问我」：改按 `degradedFields` 逐字段说，身份坏值就说「品牌人设回落到保留」。
 
 ### 验证
