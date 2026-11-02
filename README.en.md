@@ -10,9 +10,9 @@ English | [简体中文](./README.md)
 
 DeepSeek Harness assembles a long system prompt before every reply: who it is, which tools it may call, which tone to use. That text is the host's own, and it leaves you no seam to write into.
 
-`dsh-enhance` is a cordis plugin bundle that adds one prompt section and replaces the opening brand line at the **declaration layer**. Apart from that one line, the host's own prompt stays byte-for-byte untouched.
+`dsh-enhance` is a cordis plugin bundle that adds one prompt section and replaces the opening brand line at the **declaration layer** (it can also hide two further passages the host writes about itself). **With the default settings**, apart from those spots in the declaration layer, the host's own prompt stays byte-for-byte untouched.
 
-- **Brand persona** — the first line of the system prompt (`You are an AI agent powered by DeepSeek Harness.`) can be kept, removed, or replaced with your own; two further passages that mention the host by name can be hidden along with it. It changes what the model sees, never the host's files.
+- **Brand persona** — the first line of the system prompt (`You are an AI agent powered by DeepSeek Harness.`) can be kept, removed, or replaced with your own; two further passages that mention the host by name can be hidden along with it. It changes what the model sees, never the host's files. Its boundaries and costs are in [this contract](./docs/brand-persona.md) (Chinese).
 - **Content boundary** — one text file, up to 8 KB, injected at the end of every system prompt.
 - **Out-of-scope approval** — when an action exceeds the current permission preset, answer it automatically, ask the user, or refuse.
 - **Enhanced preset** *(optional)* — add a "sandbox fully open, still asks" permission preset to your profile.
@@ -57,23 +57,26 @@ Node.js ≥ 22 (the host already ships one) and a DeepSeek Harness within the ve
 
 ## Usage
 
-Write the text you want appended. Either edit the file the plugin created, or use the settings page:
+Each of the two texts has its own file. Either edit them, or use the settings page:
 
 ```powershell
-# <DSH_HOME>/enhance/content-scope.txt holds the text itself.
-# <DSH_HOME>/enhance/state.json holds three switches.
+# Content boundary: the text appended to the end of the system prompt (up to 8 KB)
 notepad "$env:USERPROFILE\.dsh\enhance\content-scope.txt"
+# Brand persona: read only when identity is custom; created on first save (up to 2 KB)
+notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 ```
 
-The three switches decide whether and how it applies:
+`state.json` holds five switches:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | on | Master switch. Off stops everything. |
-| `contentScope` | on | Off detaches the text from the prompt. |
+| `contentScope` | on | Off detaches the trailing text from the prompt. |
 | `approval` | depends | `allow` / `ask` / `deny` — how to answer an out-of-scope approval request. |
+| `identity` | `keep` | `keep` / `remove` / `custom` — the opening line: keep it, drop it, or replace it. |
+| `hideHarness` | off | On also hides the two passages the host writes about itself. |
 
-A damaged `state.json` never grants silent permission: it falls back to `ask`.
+A damaged `state.json` never grants silent permission: approval falls back to `ask`, brand persona to `keep`.
 
 ### Settings page
 
@@ -103,7 +106,7 @@ Your text reaches the prompt through a callback the host invokes on every assemb
 
 ![How one message reaches the system prompt](./docs/figures/02-prompt-injection.svg)
 
-For the full walkthrough — how the host's registry is sorted at request time, where this package slips one extra section in, and how the session log proves it landed — there is a long-form page: [How the system prompt is assembled](./showcase/prompt-assembly.html) (Chinese).
+For the full walkthrough — how the host's registry is sorted at request time, where this package slips one extra section in, and how the session log proves it landed — there is a long-form page: [How the system prompt is assembled](./showcase/prompt-assembly.html) (Chinese) — written against 1.1.1 / DSH 0.2.1-rc.3, and it states its own verification basis at the end. The chain it describes has not changed; the capabilities added later are not on that chain.
 
 ### One save, end to end
 

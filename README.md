@@ -11,9 +11,9 @@
 
 DeepSeek Harness 每次回答前，都会先读一段很长的系统提示：它是谁、能调哪些工具、该用什么语气。这段内容由宿主自己拼，没留给你改的位置。
 
-`dsh-enhance` 是一个 cordis 插件 bundle：它往宿主的提示装配里加一段、并在**声明层**换掉开头那一句。除那一句之外，宿主自己的提示词一个字节不动。
+`dsh-enhance` 是一个 cordis 插件 bundle：它往宿主的提示装配里加一段，并在**声明层**换掉开头那一句（也可以再隐去两段讲宿主自己的说明）。**默认设置下**，除声明层那几处之外，宿主自己的提示词一个字节不动。
 
-- **品牌人设**——系统提示的第一句（`You are an AI agent powered by DeepSeek Harness.`）可保留、可去掉、可换成你自己的；还能一并隐藏另外两段提到宿主名字的说明。改的是模型看到的结果，不碰宿主文件。
+- **品牌人设**——系统提示的第一句（`You are an AI agent powered by DeepSeek Harness.`）可保留、可去掉、可换成你自己的；还能一并隐藏另外两段提到宿主名字的说明。改的是模型看到的结果，不碰宿主文件。边界与代价见[这份契约](./docs/brand-persona.md)。
 - **内容边界**——一个文本文件，最多 8 KB，接在每条系统提示的末尾。
 - **越界审批**——动作超出当前档位允许的范围时，自动放行、问你要么直接回绝，你选。
 - **Enhanced 权限档**（可选）——往你的 profile 里多加一个「沙箱全开、越界仍问你」的档位。
@@ -42,23 +42,26 @@ Node.js ≥ 22（宿主自带一个），以及落在上面那个已验区间里
 
 ## 用法
 
-写下你想追加的那段文字。改插件建好的文件，或者直接用设置页：
+两段文字各有各的文件，改文件或直接用设置页都行：
 
 ```powershell
-# <DSH_HOME>/enhance/content-scope.txt 放文字本身。
-# <DSH_HOME>/enhance/state.json 放三个开关。
+# 内容边界：接在系统提示末尾的那段文字（≤ 8 KB）
 notepad "$env:USERPROFILE\.dsh\enhance\content-scope.txt"
+# 品牌人设：只有 identity 选 custom 时才读，第一次保存时创建（≤ 2 KB）
+notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 ```
 
-三个开关决定它起不起作用、怎么起作用：
+`state.json` 放五个开关：
 
 | 字段 | 默认 | 管什么 |
 | --- | --- | --- |
 | `enabled` | 开 | 总开关。关掉 = 全部停下。 |
-| `contentScope` | 开 | 关掉 = 不接那段文本。 |
+| `contentScope` | 开 | 关掉 = 不接末尾那段文字。 |
 | `approval` | 看情况 | `allow` / `ask` / `deny`——越界时自动同意、先问我、自动回绝。 |
+| `identity` | `keep` | `keep` / `remove` / `custom`——开头那句：保留、去掉、换成你的。 |
+| `hideHarness` | 关 | 打开 = 再隐去两段讲宿主自己的说明。 |
 
-`state.json` 坏了不会静默放行：回落到「先问我」。
+`state.json` 坏了不会静默放行：审批回落到「先问我」，品牌人设回落到「保留」。
 
 ### 设置页
 
@@ -88,7 +91,7 @@ dsh plugin --profile desktop remove dsh-enhance
 
 ![一条消息怎么进到系统提示末尾](./docs/figures/02-prompt-injection.svg)
 
-想看这套装配的完整推演——原版注册表怎么现场排序、我们怎么在最后一档贴一页纸、怎么用会话日志证明它真的进去了——另有一页长文：[系统提示是怎么拼起来的](./showcase/prompt-assembly.html)。
+想看这套装配的完整推演——原版注册表怎么现场排序、我们怎么在最后一档贴一页纸、怎么用会话日志证明它真的进去了——另有一页长文：[系统提示是怎么拼起来的](./showcase/prompt-assembly.html)——那页写于 1.1.1 / DSH 0.2.1-rc.3，页末标了它自己的核对依据；它讲的那条链没变，之后新增的能力不在这条链上。
 
 ### 一次保存的全程
 

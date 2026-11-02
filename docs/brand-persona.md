@@ -28,7 +28,7 @@ You are an AI agent powered by DeepSeek Harness.
 | system 节点 · 界面说明 | `app:web-surface` section | **管**（开关） |
 | user 快照 · 两条 runtime context | 安装路径 / GUI URL | **管**（开关，成对） |
 | `DSH` 缩写 | `dsh-sandbox-policy` 的 runtime context（`Current DSH file policy: …`） | **不管** |
-| 界面侧栏品牌、`productTitle` | 宿主客户端槽位与硬编码 | **不管**（本轮范围外，见 §4） |
+| 界面侧栏品牌、`productTitle` | 宿主客户端槽位与硬编码 | **不管**（本轮范围外，见「不做什么」） |
 | 工具 schema 里的 `DSH` | `dsh-tool-cordis` 等 | **不管** |
 
 **这张表就是「白标能到哪一步」的答案**：本插件只覆盖 harness 的自指。**只去掉 ① 不等于白标**——下一句仍是 `You are a coding agent powered by the deepseek-flash model.`（真机会话日志实测），那一句归部署方配 `personaPrefix`。
@@ -75,7 +75,7 @@ You are an AI agent powered by DeepSeek Harness.
 | 2 | 附带开关：同时隐藏宿主说明 | `identity` 为 `remove` 或 `custom`（且自定义文本本身不含该名）时，**system 节点**里 `DeepSeek Harness` 出现 0 次；两条 runtime context 也一并消失（它们不在 system 节点里，单独验） |
 | 3 | 随时退回原样 | 选回「保留」后，**最新一条** `system/message` 的文本哈希与未装本插件时一致。历史节点不会被回改，不与历史比 |
 
-自定义文本另有一条验收：文本里含 `{{x}}` 或落单的 `{{` 时，装配不抛错（见第 6 节的 `interpolate: false`）。
+自定义文本另有一条验收：文本里含 `{{x}}` 或落单的 `{{` 时，装配不抛错（见「它长什么样」的 `interpolate: false`）。
 
 ## 4. 不做什么
 
@@ -160,7 +160,7 @@ You are an AI agent powered by DeepSeek Harness.
 | 输入框 + 保存 / 还原 | `TextArea` + `Button` | 自定义文本，仅 `custom` 时出现 |
 | 预览行 | 只读文本 | 模型将看到的第一句 |
 
-**按 §1 的目标，这个开关是「可选加固」，不是达成目标的必要条件**——「模型不自称」由三态那一个控件就达成了；开关的作用是进一步减少品牌暴露。所以它保持**一个开关、两档**：两类角色正好各自对应一档（改 DSH / 写插件的人关掉、两段都留；白标终端用户打开、两段都去）。**不拆成两个**——② 与 ④ 在这里性质相同（都是减少品牌暴露），拆开只会逼用户做一个他无从判断的选择。将来若「只隐藏安装路径、保留界面说明」变成独立需求，那属于**环境值脱敏**，是另一个功能。
+**按「它是什么，以及不是什么」的目标，这个开关是「可选加固」，不是达成目标的必要条件**——「模型不自称」由三态那一个控件就达成了；开关的作用是进一步减少品牌暴露。所以它保持**一个开关、两档**：两类角色正好各自对应一档（改 DSH / 写插件的人关掉、两段都留；白标终端用户打开、两段都去）。**不拆成两个**——② 与 ④ 在这里性质相同（都是减少品牌暴露），拆开只会逼用户做一个他无从判断的选择。将来若「只隐藏安装路径、保留界面说明」变成独立需求，那属于**环境值脱敏**，是另一个功能。
 
 **`hideHarness` 隐藏的不是「一句品牌名」，而是两整段带操作约定的文字。** 这一点必须在下游说清楚，否则用户会以为是纯品牌改动：
 
@@ -200,7 +200,7 @@ DSH 自己的口径是：
 | 边界 | 表现 |
 |---|---|
 | 某 preset 声明 `complete: true` | 装配会用那一段覆盖整份提示词，本遮蔽失效。宿主既定行为，不兼容 |
-| 无 agent 作用域的装配 | 看到宿主原版开场白（见第 5 节） |
+| 无 agent 作用域的装配 | 看到宿主原版开场白（见「为什么是「按 agent 遮蔽同名段」」） |
 | 只对装了本插件的进程生效 | 另一进程（不同 home / profile）不受影响 |
 | 日志显示遮蔽后结果 | 会话日志记装配结果，不记宿主原版；与「只追加」时口径一致 |
 | 不动 `request/header` | config 与 tools 不变，不额外触发 header 记录 |
@@ -254,7 +254,7 @@ DSH 自己的口径是：
 **文档**
 
 - `docs/terminology.md`：组名「品牌人设」；机读标识符 `identity` / `hideHarness` / `identityText`；三分「人设」——品牌人设（`harness:identity` 开场白）／部署人设（`deployment:persona-prefix`）／内容边界文本；内容边界提示里的「写人设」改为「写行为规矩、写内容要求、写补充说明」
-- `docs/compatibility.md`：按第 9 节改两处 + 下一轮核验记录
+- `docs/compatibility.md`：按「维护：DSH 升级后核这一条」改两处 + 下一轮核验记录
 - `README.md` / `README.en.md`：功能一句、设置页说明、退回方法；「四组」改「五组」；承诺句统一为「除声明层外，宿主提示词一个字节不动」
 - `CONTRIBUTING.md`：同上承诺句
 - `showcase/prompt-assembly.html`：「它只做加法」那两处补上品牌人设这一例外
@@ -271,10 +271,10 @@ DSH 自己的口径是：
 
 ## 11. 落地状态（2026-11-02）
 
-- **已核验**：`node scripts/check.mjs` 7/7（149 项测试 / 9 个文件）；`--self-test` 17/17；
+- **已核验**：`node scripts/check.mjs` 7/7（152 项测试 / 9 个文件）；`--self-test` 17/17；
   `tools/smoke.ps1` 38/38（真装 bundle + 真组合树 + 八条品牌人设断言）；
   **真宿主首启**落盘的 `state.json` 确为 v4 五键（`gates/wp4-live-seed.log`）。
-- **装配层验收（第 3 节第 1、3 条）已在真机会话日志上验成**，这一条此前一直欠着：远端机全量重置后
+- **装配层验收（「做到什么算成」第 1、3 条）已在真机会话日志上验成**，这一条此前一直欠着：远端机全量重置后
   装 `0.2.1-rc.5` + 本包，`custom` 态下 `system/message` 的第一句是自定义文本、宿主原句在整份会话里
   **0 命中**；切回 `keep` 后第一句**逐字回到**宿主原句，内容边界在两种状态下都在。做法与结论见
   `docs/compatibility.md` 的 2026-11-02 记录。

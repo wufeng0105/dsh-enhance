@@ -193,9 +193,9 @@ rc.5 上还做了一轮**干净环境终验**（2026-10-30，远端机重置后�
 
 触点表加了一条（`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽），独立触点项由 35 条重数为 36 条。这一轮核的就是这条新触点，做法与结论：
 
-- **宿主侧逐条核对（本机 `0.2.1-rc.5` 的 `app.asar` 只读）**：`@deepseek-ai/dsh-system-prompt` 里 `HARNESS_IDENTITY` 座位与 `"You are an AI agent powered by DeepSeek Harness."` 原文、`@deepseek-ai/dsh-harness-dev-context` 里 `harness:source` / `app:web-surface` 两个名字同时用于 section 与 context、`@deepseek-ai/dsh-agent` 的 `agent/created` 载荷为 `{ agent, source, signal }` 且 `agent.ctx` 是可注入的 agent 作用域上下文、`@deepseek-ai/dsh-file-reference-local` 就是 `agent.ctx.inject(['systemPrompt'], …)` 的现成先例——全部与契约 §5 的假设一致。
+- **宿主侧逐条核对（本机 `0.2.1-rc.5` 的 `app.asar` 只读）**：`@deepseek-ai/dsh-system-prompt` 里 `HARNESS_IDENTITY` 座位与 `"You are an AI agent powered by DeepSeek Harness."` 原文、`@deepseek-ai/dsh-harness-dev-context` 里 `harness:source` / `app:web-surface` 两个名字同时用于 section 与 context、`@deepseek-ai/dsh-agent` 的 `agent/created` 载荷为 `{ agent, source, signal }` 且 `agent.ctx` 是可注入的 agent 作用域上下文、`@deepseek-ai/dsh-file-reference-local` 就是 `agent.ctx.inject(['systemPrompt'], …)` 的现成先例——全部与契约「为什么是「按 agent 遮蔽同名段」」的假设一致。
 - **真机端到端（远端机全量重置后）**：静默重装 `0.2.1-rc.5` → `dsh plugin --profile headless add` 与 `--profile desktop add`（均 exit 0）→ `--dump-config` 组合出三个入口；`headless` 首启种下 `state.json` **v4 五键**；设置页后端 `/enhance/api` 在桌面端 GUI 上返回 `version=4 / identityLimit=2048`，`check` 四项全绿（含 `inject`——它读会话日志证明文字真的进了提示词）；桌面端 GUI 的「增强」一节实际渲染出五组（用户截图确认）。
-- **装配层验收（契约 §3 第 1、3 条）在真机会话日志上成立**——这是 10-31 那次欠下的那项，这次补上了。做法：把 `identity` 设成 `custom`、写 `identity.txt`、`hideHarness=true`，跑一次 `dsh --profile headless headless "…"`，再解压会话日志看 `system/message` 的文本：
+- **装配层验收（契约「做到什么算成」的第 1、3 条）在真机会话日志上成立**——这是 10-31 那次欠下的那项，这次补上了。做法：把 `identity` 设成 `custom`、写 `identity.txt`、`hideHarness=true`，跑一次 `dsh --profile headless headless "…"`，再解压会话日志看 `system/message` 的文本：
   - `custom` 态：system 节点第一句是 `You are Aria, a private assistant.`，宿主原句 `You are an AI agent powered by DeepSeek Harness.` **在整份会话里 0 命中**；
   - 切回 `keep` 态：第一句**逐字回到**宿主原句，自定义文本 0 命中。
   两条都只改声明层——内容边界那句在两种状态下都在。

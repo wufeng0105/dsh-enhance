@@ -1070,7 +1070,7 @@
             <span class="ord">0</span>
             <div class="slip-body">
               <span class="slip-name">deployment:persona-prefix</span>
-              <span class="slip-text">部署方写在配置里的人格前缀；默认空，空段会被丢弃。</span>
+              <span class="slip-text">部署方写在配置里的部署人设前缀；默认空，空段会被丢弃。</span>
             </div>
           </div>
           <div class="slip reveal">
@@ -1112,7 +1112,7 @@
             <span class="ord">10200</span>
             <div class="slip-body">
               <span class="slip-name">deployment:persona-suffix</span>
-              <span class="slip-text">部署人格后缀。本机这次装配里它渲染为空，于是被丢弃。</span>
+              <span class="slip-text">部署人设的后缀。本机这次装配里它渲染为空，于是被丢弃。</span>
             </div>
           </div>
           <div class="slip-slot reveal">10,200 是座位表的最大值 —— 再往后没有档了</div>
@@ -1130,7 +1130,7 @@
         <summary>顺序表 · SECTION_ORDERS</summary>
         <ul class="band-list">
           <li><button class="band-row" type="button" data-note="固定的第一方开场白：模型是谁在做这件事。可以由部署配置关掉。"><span class="band-val">−1000</span><span class="band-name">HARNESS_IDENTITY</span></button></li>
-          <li><button class="band-row" type="button" data-note="部署方写在配置里的人格前缀，位于第一方指导之前。最近的一个「官方可配置系统提示」入口。"><span class="band-val">0</span><span class="band-name">DEPLOYMENT_PERSONA_PREFIX</span></button></li>
+          <li><button class="band-row" type="button" data-note="部署方写在配置里的部署人设前缀，位于第一方指导之前。最近的一个「官方可配置系统提示」入口。"><span class="band-val">0</span><span class="band-name">DEPLOYMENT_PERSONA_PREFIX</span></button></li>
           <li><button class="band-row" type="button" data-note="Plan 模式的政策：什么时候该先出计划、计划怎么算结束。"><span class="band-val">500</span><span class="band-name">PLAN_POLICY</span></button></li>
           <li><button class="band-row" type="button" data-note="Agent Teams 的协作规则：谁改哪些文件、任务怎么认领、Lead 什么时候才能收尾。"><span class="band-val">600</span><span class="band-name">TEAM_POLICY</span></button></li>
           <li><button class="band-row" type="button" data-note="按需加载（PTC）相关：工具怎么分页、什么时候才把 schema 拉进来。"><span class="band-val">800</span><span class="band-name">PTC_ONLY</span></button></li>
@@ -1160,7 +1160,7 @@
           <li><button class="band-row" type="button" data-note="结构化输出：什么时候按 schema 回。"><span class="band-val">9900</span><span class="band-name">STRUCTURED_OUTPUT</span></button></li>
           <li><button class="band-row" type="button" data-note="宿主源码说明：checkout 在哪、能读不能改、什么时候该去读。"><span class="band-val">10000</span><span class="band-name">HARNESS_SOURCE</span></button></li>
           <li><button class="band-row" type="button" data-note="当前表层：桌面 / Web / 远端，以及这个界面能做的事。"><span class="band-val">10100</span><span class="band-name">WEB_SURFACE</span></button></li>
-          <li><button class="band-row max" type="button" data-note="部署人格后缀，也是整张表的最大值。官方留的最后一个槽位——我们要接的那一段，就在这一档。"><span class="band-val">10200</span><span class="band-name">DEPLOYMENT_PERSONA_SUFFIX</span></button></li>
+          <li><button class="band-row max" type="button" data-note="部署人设的后缀，也是整张表的最大值。官方留的最后一个槽位——我们要接的那一段，就在这一档。"><span class="band-val">10200</span><span class="band-name">DEPLOYMENT_PERSONA_SUFFIX</span></button></li>
         </ul>
         <p class="band-note" id="band-note"><b>点一行</b>看这一档负责什么。最后一行是重点：10,200 是最大值，没有比它更靠后的档。</p>
       </details>
