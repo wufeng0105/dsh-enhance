@@ -64,7 +64,9 @@ jobs:
           npm --version
 
       # 标签与 VERSION 必须一致：防止「推了 v2.0.0 却发出去 1.9.0」。
+      # 只在标签推送时核对——手动触发跑在分支上，GITHUB_REF_NAME 是分支名，比了必错。
       - name: 核对标签与 VERSION
+        if: github.event_name == 'push'
         run: |
           tag="${GITHUB_REF_NAME#v}"
           version="$(tr -d '\r\n' < VERSION)"
@@ -80,8 +82,40 @@ jobs:
 
       # 幂等：这个版本已经在 npm 上就跳过发布，只往下建 Release。
       # 用途是补一条已经手工发过的版本，以及工作流重跑时不因为「版本已存在」整条红掉。
-      - name: 发布
-        if: github.event_name == 'push' || inputs.dry_run == false
+      #
+      # 两种发布身份，先看有没有 NPM_TOKEN：
+      #   - 有：用仓库 secret 里的 granular access token（当前是这条——
+      #     trusted publishing 还在等安全密钥，见 CONTRIBUTING 的「发布」一节）；
+      #   - 没有：走 OIDC 可信发布（`id-token: write` 已在上面授权）。
+      # 配好 trusted publishing 之后把 secret 删掉，就自动切到 OIDC，这个文件不用再改。
+      - name: 选发布身份
+        id: auth
+        env:
+          HAS_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" = "true" ]; then
+            echo "mode=token" >> "$GITHUB_OUTPUT"
+            echo "::notice::用 NPM_TOKEN 发布"
+          else
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+            echo "::notice::没有 NPM_TOKEN，走 OIDC 可信发布"
+          fi
+
+      - name: 发布（NPM_TOKEN）
+        if: (github.event_name == 'push' || inputs.dry_run == false) && steps.auth.outputs.mode == 'token'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          pkg="$(node -p "require('./package.json').name")"
+          version="$(tr -d '\r\n' < VERSION)"
+          if npm view "$pkg@$version" version >/dev/null 2>&1; then
+            echo "::notice::npm 上已有 $pkg@$version，跳过发布，继续建 Release"
+          else
+            npm publish --access public
+          fi
+
+      - name: 发布（OIDC 可信发布）
+        if: (github.event_name == 'push' || inputs.dry_run == false) && steps.auth.outputs.mode == 'oidc'
         run: |
           pkg="$(node -p "require('./package.json').name")"
           version="$(tr -d '\r\n' < VERSION)"

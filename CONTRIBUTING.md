@@ -79,9 +79,20 @@ node scripts/release.mjs patch --ship
 
 所以一次 `--ship` 就让**版本号、git tag、npm、GitHub Release** 四处齐平，不用你分别去记。没有 `NPM_TOKEN` 这类长期密钥。
 
-**一次性配置（必须在 npmjs.com 上做，代码里做不了）**：包的 Settings → Trusted Publisher → GitHub Actions，仓库填 `wufeng0105/dsh-enhance`、工作流文件名填 `release.yml`，并勾上 publish 与 manage dist-tags。没配之前这个工作流会失败——那说明可信发布者还没登记，不是代码坏了。
+**发布身份有两条腿，工作流会自动选**：
 
-为什么不用长期 token：npm 在 2026-07 的公告里写明，勾了「bypass 2FA」的 granular access token 从 2026-08 起不能做账号与包管理动作，**约 2027-01 起连直接发布也不行**，发布会收缩成「暂存 + 人工用 2FA 批准」。长期 token 是条死路。
+| 仓库里有 `NPM_TOKEN` secret | 走哪条 |
+|---|---|
+| 有 | 用这个 granular access token（勾了 bypass 2FA） |
+| 没有 | OIDC 可信发布（`id-token: write`） |
+
+所以**没配好 trusted publishing 也能发**：建一个 bypass-2FA token 存进仓库的 `NPM_TOKEN` secret 即可。等哪天配好可信发布者，把 secret 删掉，工作流就自动切到 OIDC，`release.yml` 一个字都不用改。
+
+**配可信发布者（长期方案）**：npm 上包的 Settings → Trusted Publisher → GitHub Actions，仓库填 `wufeng0105/dsh-enhance`、工作流文件名填 `release.yml`，勾上 publish 与 manage dist-tags。
+
+⚠️ **这一步当前卡着**：npm 把「改包设置」归为敏感操作，要求账号已配 **2FA**；网页端只提供**安全密钥**（WebAuthn）这一种方式，需要 Windows Hello PIN、手机通行证或 USB 安全钥匙。账号现有的 TOTP（`auth-and-writes`）足够发版，但不够改包设置。在解决之前，用上面那条 `NPM_TOKEN` 的路。
+
+为什么长期要迁到 OIDC：npm 在 2026-07 的公告里写明，勾了「bypass 2FA」的 granular access token 从 2026-08 起不能做账号与包管理动作，**约 2027-01 起连直接发布也不行**，发布会收缩成「暂存 + 人工用 2FA 批准」。长期 token 是条死路。
 
 ### 随时核对：`--check`
 

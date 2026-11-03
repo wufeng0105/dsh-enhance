@@ -13,7 +13,7 @@
  * 覆盖，npm 上那个版本就永远对不上仓库了。脚本在最后把该跑的 git 命令打出来，由人决定。
  *
  * 用法：
- *   node scripts/release.mjs patch              # 1.2.1 -> 1.2.2，只改版本并自检，不发
+ *   node scripts/release.mjs patch              # 只改版本并自检，不发
  *   node scripts/release.mjs minor --ship       # 改版本 → 门禁 → 提交 → 打标签 → 推
  *   node scripts/release.mjs minor --publish    # 自检通过后从本机直接发到 npm
  *   node scripts/release.mjs --check            # 只核对 npm / git tag / GitHub Release 是否一致
