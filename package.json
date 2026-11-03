@@ -59,7 +59,6 @@
     "LICENSE",
     "VERSION",
     "docs/brand-persona.md",
-    "CHANGELOG.md",
-    "showcase"
+    "CHANGELOG.md"
   ]
 }

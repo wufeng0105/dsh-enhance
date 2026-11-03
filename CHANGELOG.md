@@ -117,7 +117,7 @@
 - `state.json` 从 v3 升到 v4：新增 `identity`（`keep` / `remove` / `custom`）与 `hideHarness`，只加字段、不写迁移支路；旧文件缺这两个键是正常的，不标降级，只有「写了但认不出」才算坏；
 - `readState` 新增 `degradedFields`：坏的是哪个字段要能说清——原来只写「审批回落」会把身份坏值说成审批的事；
 - 文本读写收敛成唯一实现（`readTextFile` / `writeTextFile`），品牌人设不另起第二套；`readIdentity` / `writeIdentity` 是其薄包装；
-- 公开承诺句统一为「**除声明层那一句之外**，宿主提示词一个字节不动」——原来那句「一个字节不动」被本功能打破，README（中英）、`CONTRIBUTING.md` 与 `showcase/prompt-assembly.html` 已同步；
+- 公开承诺句统一为「**除声明层那一句之外**，宿主提示词一个字节不动」——原来那句「一个字节不动」被本功能打破，README（中英）与 `CONTRIBUTING.md` 已同步；
 - `docs/terminology.md` 新增「人设一名三义」：品牌人设 / 部署人设 / 尾巴文字必须分写；内容边界提示语里的「写人设」改为「写行为规矩、写内容要求、写补充说明」；
 - `docs/compatibility.md` 触点表加一条（`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽），独立触点项由 35 条重数为 36 条；
 - `package.json` 的 `files` 收录 `docs/brand-persona.md`。
