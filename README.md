@@ -97,8 +97,10 @@ notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 ### 卸载
 
 ```powershell
-dsh plugin --profile desktop remove dsh-enhance
+dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 ```
+
+如果你是从 1.2.x 之前的旧包名（无 scope 的 `dsh-enhance`）装的，profile 里那条依赖键还写着旧名字，要先按旧名卸掉、再用上面的新名装回来。
 
 然后重启。`<DSH_HOME>/enhance/` 里你写的文本和开关会保留；想一并清掉就删掉那个目录。
 

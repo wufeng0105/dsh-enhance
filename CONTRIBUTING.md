@@ -75,9 +75,13 @@ node scripts/release.mjs patch --ship
 4. `npm pack --dry-run` 打出会发出去的文件清单；
 5. 提交 `chore: release <版本>`、打标签 `v<版本>`、推分支与标签。
 
-标签推上去后 [`.github/workflows/release.yml`](.github/workflows/release.yml) 接手：核对「标签 == `VERSION`」→ 再跑一遍门禁 → **OIDC 可信发布**到 npm → 用 `CHANGELOG.md` 里 `## [<版本>]` 那一节建 **GitHub Release**。
+标签推上去后 [`.github/workflows/release.yml`](.github/workflows/release.yml) 接手：核对「标签 == `VERSION`」→ 再跑一遍门禁 → 发到 npm → 用 `CHANGELOG.md` 里 `## [<版本>]` 那一节建 **GitHub Release**。
 
-所以一次 `--ship` 就让**版本号、git tag、npm、GitHub Release** 四处齐平，不用你分别去记。没有 `NPM_TOKEN` 这类长期密钥。
+所以一次 `--ship` 就让**版本号、git tag、npm、GitHub Release** 四处齐平，不用你分别去记。
+
+**发布身份当前是 `NPM_TOKEN`**（仓库 secret 里的 granular access token）；OIDC 可信发布是目标态，配好后删掉 secret 即自动切换——见下面那张表。
+
+**手动触发（`workflow_dispatch`）永远是预演**：只跑门禁与 `npm pack --dry-run`，不发布、不建 Release。要真发布只有一条路——推 `v*` 标签。这是有意的：一次手动触发就能造出「npm 有版本、git 无 tag、GitHub 无 Release」，而 npm 侧不可回退。
 
 **发布身份有两条腿，工作流会自动选**：
 

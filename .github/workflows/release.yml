@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 只打包预演，不真的发布
+        description: 手动触发永远是预演（只打包、不发布、不建 Release）；要真发布请推 v* 标签
         type: boolean
         default: true
 
@@ -102,7 +102,7 @@ jobs:
           fi
 
       - name: 发布（NPM_TOKEN）
-        if: (github.event_name == 'push' || inputs.dry_run == false) && steps.auth.outputs.mode == 'token'
+        if: github.event_name == 'push' && steps.auth.outputs.mode == 'token'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -115,7 +115,7 @@ jobs:
           fi
 
       - name: 发布（OIDC 可信发布）
-        if: (github.event_name == 'push' || inputs.dry_run == false) && steps.auth.outputs.mode == 'oidc'
+        if: github.event_name == 'push' && steps.auth.outputs.mode == 'oidc'
         run: |
           pkg="$(node -p "require('./package.json').name")"
           version="$(tr -d '\r\n' < VERSION)"
@@ -127,12 +127,19 @@ jobs:
 
       # 建 GitHub Release，正文取 CHANGELOG 里 `## [<version>]` 那一节——
       # 不另写一份发布说明，免得「代码里的变更记录」和「Release 页面」各说各话。
+      #
+      # 幂等：Release 已存在就跳过。否则同一个 tag 重跑（补建、排障、改 notes）会在
+      # npm 那步已成功之后栽在 `release already exists` 上，把无害重跑变成红灯。
       - name: 建 GitHub Release
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version="${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::notice::Release $GITHUB_REF_NAME 已存在，跳过"
+            exit 0
+          fi
           # 从 `## [<version>]` 起，到下一个 `## [` 之前为止。
           awk -v v="$version" '
             index($0, "## [" v "]") == 1 { found = 1; next }
@@ -151,5 +158,5 @@ jobs:
           fi
 
       - name: 预演（只打包，不发布）
-        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        if: github.event_name == 'workflow_dispatch'
         run: npm pack --dry-run

@@ -5,6 +5,13 @@ install-manifest.json
 # install/uninstall backups of cordis.patch.yml
 *.bak-*
 
+# 依赖与打包产物：本地跑一次 npm install 或 npm pack 就会产生。
+# 这几个不忽略会直接挡住 release.mjs 的「工作区必须干净」前置条件，
+# 让人误以为仓库脏了。
+node_modules/
+package-lock.json
+*.tgz
+
 # OS / editor
 .DS_Store
 Thumbs.db

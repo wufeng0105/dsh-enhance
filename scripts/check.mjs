@@ -272,9 +272,20 @@ function gateSyntax(base = root) {
     const result = run(['--check', file], base, 30_000)
     if (result.code !== 0) broken.push(relative(base, file))
   }
+
+  // `node --check` 只解析不执行，抓不到「跑起来才炸」的错误——最典型的是作用域：
+  // `scripts/release.mjs` 曾经把 `const npmUser` 缩进进一个 if 块、又在块外引用，
+  // 语法完全合法，但任何非 `--check` 模式一跑就 ReferenceError，而当时七道门全绿。
+  // 所以这里真的把它跑一遍冒烟：`--dry` 不打网络、不写文件，只走到汇总打印为止。
+  const smoke = run(['scripts/release.mjs', '0.0.0', '--dry'], base, 60_000)
+  if (smoke.code !== 0) {
+    const first = smoke.output.split('\n').find((line) => /Error|error/.test(line)) ?? smoke.output.slice(0, 200)
+    broken.push(`scripts/release.mjs（--dry 冒烟失败：${first.trim()}）`)
+  }
+
   return {
     pass: broken.length === 0,
-    detail: broken.length === 0 ? `${files.length} files` : `broken: ${broken.slice(0, 5).join(', ')}`,
+    detail: broken.length === 0 ? `${files.length} files · release.mjs --dry 冒烟通过` : `broken: ${broken.slice(0, 5).join(', ')}`,
   }
 }
 

@@ -97,8 +97,10 @@ Brand persona needs no restart: the next message picks it up. Choose **keep** to
 ### Uninstall
 
 ```powershell
-dsh plugin --profile desktop remove dsh-enhance
+dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 ```
+
+If you installed under the pre-1.2.x unscoped name (`dsh-enhance`), your profile dependency key still carries that name — remove it under the old name first, then add the new one.
 
 Then restart. Your text and switches under `<DSH_HOME>/enhance/` are kept; delete that directory to remove them too.
 
@@ -158,7 +160,7 @@ Writing it is the only action in this package that touches host configuration, a
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/wufeng0105/dsh-enhance/issues). Before opening a pull request, run `node scripts/check.mjs` — it runs seven gates (version, syntax, tests, structure, docs, readme, bundle) and must exit 0. Contributions must keep the terms in [docs/terminology.md](./docs/terminology.md) consistent, and the compatibility sentence in this README is derived from `package.json`, so changing the version range means changing the declaration first.
+Issues and pull requests are welcome on [GitHub](https://github.com/wufeng0105/dsh-enhance/issues). Before opening a pull request, run `node scripts/check.mjs` — it runs seven gates (version, syntax, tests, graph, docs, readme, bundle) and must exit 0. Contributions must keep the terms in [docs/terminology.md](./docs/terminology.md) consistent, and the compatibility sentence in this README is derived from `package.json`, so changing the version range means changing the declaration first.
 
 ## License
 

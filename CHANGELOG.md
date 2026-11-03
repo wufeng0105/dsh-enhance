@@ -25,6 +25,12 @@
 - 本地门禁：`node scripts/check.mjs` 七道全过；`--self-test` 全过（`orphan bundle entry red` 那条负例的替换锚点已跟着入口名更新，否则它会因为「回退替换没命中」而静默失效）；
 - 首次发布后核对：`npm view @wufeng0105/dsh-enhance version` 与仓库 `VERSION` 一致。
 
+### 已知（发布史，别踩）
+
+- **`2.0.0` 这个版本号永久作废。** 本版最初发布为 `2.0.0`，随后整包从 npm 撤除、重新发布为 `1.3.0`。npm 的 packument 里 `time` 仍记着 `2.0.0` 曾发布，按规则被撤除的版本号不可重用——所以**下一个可用 major 是 `2.0.1`**，不是 `2.0.0`。`scripts/release.mjs` 现在会在写盘前先查这件事并拒绝。
+- **npm 上留着一个 `0.0.0-stage` 占位版本**（`description: Temporary package placeholder for staged publishing`，无 license / 无 repository）。它是 npm 暂存发布流程的副产物，不在 `dist-tags` 里，`latest` 不受影响，正常安装不会碰到它。
+- **`1.2.0` 与 `1.2.1` 只有提交、没有 tag 与 Release。** 那两个版本存在于入库 npm 之前（对应提交 `4aec0a4`、`13292fb`），所以按本 CHANGELOG 找不到对应的标签——这是历史事实，不回补。
+
 ## [1.2.1] — 2026-11-02
 
 ### 新增

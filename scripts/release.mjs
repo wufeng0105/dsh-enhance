@@ -50,12 +50,15 @@ const publish = args.includes('--publish')
 const ship = args.includes('--ship')
 // 只读核对，不改任何文件：npm / git tag / GitHub Release 三家是否指同一个版本。
 const checkOnly = args.includes('--check')
+// 冒烟：跑通全部只读逻辑（含顶部汇总打印）后退出，不写文件、不联网发布。
+// 存在的唯一理由是有东西能自动发现「这个脚本根本跑不起来」。
+const dry = args.includes('--dry')
 // npm 对发布强制二次验证，手动发布必然要带验证码（30 秒一次、用过即废）。
 // 也可以不用这个开关，改成在 npmjs.com 配 OIDC 可信发布后由 CI 发。
 const otpArg = args.find((a) => a.startsWith('--otp='))
 const otp = otpArg === undefined ? null : otpArg.slice('--otp='.length)
 const bumpArg = args.find((a) => !a.startsWith('--'))
-const KNOWN_FLAGS = new Set(['--publish', '--ship', '--check'])
+const KNOWN_FLAGS = new Set(['--publish', '--ship', '--check', '--dry'])
 const unknown = args.filter((a) => a.startsWith('--') && !KNOWN_FLAGS.has(a) && !a.startsWith('--otp='))
 if (unknown.length) usage(`认不出的开关：${unknown.join(' ')}`)
 if (ship && publish) usage('--ship 与 --publish 二选一：前者推标签让 CI 发，后者从本机发')
@@ -104,6 +107,38 @@ function git(argv) {
 function fail(message) {
   console.error(`\nrelease: ${message}`)
   process.exit(1)
+}
+
+/**
+ * 拒绝一个「曾经发布过、后来又被撤除」的版本号。
+ *
+ * npm 的 packument 里 `time` 记着每个版本**曾经**发布的时刻，`versions` 只列现在还活着的。
+ * 两者一比对就能认出来：`time` 有、`versions` 没有 = 这个号已经被烧掉，**永远不能再发**。
+ *
+ * 为什么必须提前拦：那种号 `npm publish` 会在最后一步 403，而此时提交和标签可能已经推
+ * 出去了——正好制造出 `--check` 想防的三方错位。2026-11-03 那次「发 2.0.0 → 整包删除 →
+ * 重发 1.3.0」就把 2.0.0 永久烧掉了，而 `major` 分支从 1.3.0 算出来正好是 2.0.0。
+ *
+ * 拿不到注册表就放行：宁可漏拦，也不要因为网络问题挡住正常发版。
+ */
+async function assertVersionUsable(name, version) {
+  const url = `https://registry.npmjs.org/${name.replace('/', '%2F')}`
+  let doc
+  try {
+    const res = await fetch(url, { headers: { 'cache-control': 'no-cache' } })
+    if (!res.ok) return // 404 = 包还不存在，首发没有历史包袱
+    doc = await res.json()
+  } catch {
+    return
+  }
+  const everPublished = doc?.time?.[version]
+  const stillLive = doc?.versions?.[version] !== undefined
+  if (everPublished !== undefined && !stillLive) {
+    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
+    const escaped = m === null ? '（换一个更高的号）' : `${m[1]}.${Number(m[2]) + 1}.0`
+    fail(`版本 ${version} 曾经在 ${everPublished} 发布过、之后被撤除——npm 不允许再用这个号。`
+      + `\n  换一个未用过的号，比如 ${escaped}，再跑一次。`)
+  }
 }
 
 /**
@@ -178,23 +213,28 @@ if (checkOnly) consistencyCheck()
 
 // ---------------------------------------------------------------- 1. 前置检查
 
-// 工作区干净：带未提交改动发版，等于发一个仓库里不存在的版本。
-const status = git(['status', '--porcelain'])
-if (status.status !== 0) fail(`git status 读不到：${status.stderr ?? ''}`)
-if ((status.stdout ?? '').trim() !== '') {
-  fail(`工作区不干净，先提交或 stash：\n${status.stdout}`)
+// `--dry` 跳过所有环境前置检查（工作区 / 分支 / 远端同步）——它只用来证明
+// 「这个脚本能跑到底而不抛异常」，CI 里的分支和工作区状态都不满足发版条件。
+// 它 exercvise 的正是曾经出过事的那几行（顶部汇总打印），所以由 syntax 门调用。
+if (!dry) {
+  // 工作区干净：带未提交改动发版，等于发一个仓库里不存在的版本。
+  const status = git(['status', '--porcelain'])
+  if (status.status !== 0) fail(`git status 读不到：${status.stderr ?? ''}`)
+  if ((status.stdout ?? '').trim() !== '') {
+    fail(`工作区不干净，先提交或 stash：\n${status.stdout}`)
+  }
+
+  // 必须在 main 上：从特性分支发版，main 上就没有这个版本。
+  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'])
+  const currentBranch = (branch.stdout ?? '').trim()
+  if (currentBranch !== 'main') fail(`当前分支是 ${currentBranch}，发版要在 main 上`)
+
+  // 与远端同步：仓库里没有的版本不发。
+  git(['fetch', 'origin', 'main', '--quiet'])
+  const head = (git(['rev-parse', 'HEAD']).stdout ?? '').trim()
+  const remote = (git(['rev-parse', 'origin/main']).stdout ?? '').trim()
+  if (head !== remote) fail('本地 main 与 origin/main 不一致，先 git pull --rebase origin main')
 }
-
-// 必须在 main 上：从特性分支发版，main 上就没有这个版本。
-const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'])
-const currentBranch = (branch.stdout ?? '').trim()
-if (currentBranch !== 'main') fail(`当前分支是 ${currentBranch}，发版要在 main 上`)
-
-// 与远端同步：仓库里没有的版本不发。
-git(['fetch', 'origin', 'main', '--quiet'])
-const head = (git(['rev-parse', 'HEAD']).stdout ?? '').trim()
-const remote = (git(['rev-parse', 'origin/main']).stdout ?? '').trim()
-if (head !== remote) fail('本地 main 与 origin/main 不一致，先 git pull --rebase origin main')
 
 // 包名与 bundle 入口前缀必须一致：不一致时装完两个入口解析不到，插件等于没装上。
 const pkg = JSON.parse(readFileSync(PKG_FILE, 'utf8'))
@@ -210,12 +250,17 @@ if (pkg.publishConfig?.access !== 'public') fail('package.json 缺 publishConfig
 
 // npm 身份：只有「从本机直接发」才需要。`--ship` 走的是推标签 + CI 的 OIDC，
 // 本机根本没有 npm 登录态也该能打标签——所以这条检查跟着 `publish` 走。
+//
+// ⚠️ 声明必须在块外：下面第 238 行要打印它。曾经缩进进这个 if 里，于是所有
+// 非 `--check` 模式一跑就 ReferenceError（`--check` 提前 exit 了所以看不出）。
+// 语法门只解析不执行，抓不到这类作用域错误——由 `--dry` 冒烟守着（见 check.mjs）。
+let npmUser = '（未登录：走 CI 时不需要）'
 if (publish && !ship) {
   const who = npm(['whoami', '--registry', NPM_REGISTRY])
   if (who.status !== 0) {
     fail(`npm 未登录或登录已失效（--registry ${NPM_REGISTRY}）。先跑：npm login --registry ${NPM_REGISTRY}`)
   }
-  const npmUser = (who.stdout ?? '').trim()
+  npmUser = (who.stdout ?? '').trim()
   const scope = pkg.name.startsWith('@') ? pkg.name.split('/')[0].slice(1) : null
   if (scope !== null && scope !== npmUser) {
     fail(`包名 scope 是 "@${scope}"，但当前 npm 账号是 "${npmUser}"——只有该 scope 的持有者能发布`)
@@ -236,13 +281,20 @@ else usage(`版本参数认不出：${bumpArg}（要 patch / minor / major / x.y
 console.log(`# 包     ${pkg.name}`)
 console.log(`# 版本   ${next === current ? `${current}（不变）` : `${current} -> ${next}`}`)
 console.log(`# 账号   ${npmUser}`)
-console.log(`# 模式   ${publish ? '自检后发布到 npm' : '只自检，不发布'}`)
+console.log(`# 模式   ${dry ? '冒烟（不写文件、不发布）' : publish ? '自检后发布到 npm' : ship ? '推标签，CI 发版' : '只自检，不发布'}`)
 console.log()
+
+if (dry) {
+  console.log('# 冒烟通过：脚本执行到汇总打印为止没有抛异常。')
+  process.exit(0)
+}
 
 // 显式传当前版本是合法用法（「把这个已经改好版本的包发出去」）。这时不要重写文件——
 // `JSON.stringify` 的排版未必与原文件逐字节相同，重写会平白制造一个 diff，
 // 而这个脚本的前置检查正是「工作区必须干净」，等于自己把自己卡住。
-if (next !== current) {
+if (!dry && next !== current) {
+  // 写盘之前先确认这个号还能用：被撤除过的版本号发不出去，而那时提交和标签可能已经推了。
+  await assertVersionUsable(pkg.name, next)
   writeFileSync(VERSION_FILE, `${next}\n`, 'utf8')
   writeFileSync(PKG_FILE, `${JSON.stringify({ ...pkg, version: next }, null, 2)}\n`, 'utf8')
 }
