@@ -2,7 +2,7 @@
 
 本文件自 `1.1.0` 起维护；版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)，条目格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [2.0.0] — 2026-11-03
+## [1.3.0] — 2026-11-03
 
 ### 变更（破坏性）
 
