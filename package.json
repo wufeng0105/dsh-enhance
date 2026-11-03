@@ -7,6 +7,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "type": "module",
+  "main": "index.js",
   "description": "在 DeepSeek Harness 系统提示的末尾追加一段你自己写的文本：写破甲词、人设或内容规矩，存盘即生效，可开关、可检查；还可以一键把 Enhanced 权限档写进你的 profile。",
   "keywords": [
     "dsh",

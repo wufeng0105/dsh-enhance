@@ -49,6 +49,7 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道闸与�
 | 改冒烟断言数 | docs | [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions` |
 | 新增常驻源码文件 | graph | `code-map.json` 登记；新增 `ctx.on(...)` 事件还要登记 `events` |
 | 改 `cordis.patch.yml` 的入口 | bundle | 入口 `name` 必须指向真实存在的文件，且前缀等于 `package.json` 的 `name` |
+| 删掉包根的 `index.js` 或 `package.json` 的 `main` | bundle | 市场装后校验会判这个包 broken 并当场删除（上游 dsh-market/dsh-market#1091）；下面那段判定就是为它加的 |
 | 改 `package.json` 的 `name` | version、bundle、readme | `cordis.patch.yml` 的入口前缀、两个 README 里 `dsh plugin add` / `remove` 的包名 |
 | 改 `VERSION` 或 `package.json` 的 `version` | version | 两处必须逐字相同；两个 README 的「适用版本」句由 `engines.dsh` 派生 |
 | 增删 README 的二级标题 | readme | 有目录则须覆盖全部二级标题 |
@@ -170,6 +171,10 @@ node scripts/release.mjs patch --publish --otp=<6 位验证码>
 发布这一步不需要人工闸门，因为闸门已经在前面了：`--ship` 的前置检查、门禁、CI 里的「标签 == `VERSION`」逐字核对。再加一个只能人点的按钮，收益是零，代价是自动化全废。
 
 核对当前生效的设置：`gh api repos/wufeng0105/dsh-enhance/branches/main/protection`。要临时放宽（比如真需要改写 `main` 的历史），用 `gh api -X DELETE repos/wufeng0105/dsh-enhance/branches/main/protection` 关掉，改完再按同一份配置开回来。
+
+**包根那个 `index.js` 是一处绕行，而且带拆除条件。** 它不承载任何功能，宿主从不加载它——存在的唯一理由是市场插件装完包后会跑一次 `hasLoadableEntry`，它要求包根有 `main` / `exports` / 根 `index.js` 三者之一，而纯 patch 载体按构造就没有，于是被判「没有可安装的内容」并当场删掉。上游那 4 行判据把「载体自己的子路径」当成了「另一个包目录」，已提 dsh-market/dsh-market#1091。
+
+它**有门禁守着**（bundle 门那条「包根缺可加载入口」），所以删了会红，不会静默坏掉。**上游修好 #1091 之后，拆掉它要三处一起**：删根 `index.js`、删 `package.json` 的 `main`、删 bundle 门里那段判定。
 
 另外一处已知取舍：工作流里的 `actions/checkout@v4`、`actions/setup-node@v4` 是**有意不钉 SHA** 的。发布 job 带 `contents: write` + `id-token: write`，按供应链习惯本该钉 commit SHA；这里没钉，理由是单人仓库加只有这两个官方 action，钉了却没有自动升级，会变成「安全补丁永远收不到」的另一种风险。这是被接受的取舍，不是疏忽。
 

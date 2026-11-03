@@ -423,8 +423,29 @@ function gateBundle(base = root) {
       currentId = undefined
     }
   }
+
+  // 市场装后校验要求包根有一个「可加载入口」：`main` / `exports` / 根 `index.js` 三者之一，
+  // 且指向的文件真实存在（dshmarket 的 hasLoadableEntry → entryArtifactExists）。
+  //
+  // 纯 patch 载体按构造就没有它——这是市场的一个误判，已提 dsh-market/dsh-market#1091。
+  // 根 `index.js` 就是为绕开那一条而存在的绕行物，宿主从不加载它（bundle 只加载 patch 里的行）。
+  //
+  // ⚠️ 为什么这条判定必须留在门禁里：删掉根入口 → 从市场装这个包会被判 broken 并当场删掉，
+  // 而本仓的七道门**看不见市场**，不会有任何信号。这条把「靠人记得」变成「删了就红」。
+  // 上游修好 #1091 之后，拆掉这个绕行要三处一起：删根 `index.js`、删 `package.json` 的
+  // `main`、删这一段判定。
+  const rootCandidates = []
+  if (typeof pkg.main === 'string') rootCandidates.push(pkg.main)
+  const rootExport = typeof pkg.exports === 'string' ? pkg.exports : pkg.exports?.['.']
+  if (typeof rootExport === 'string') rootCandidates.push(rootExport)
+  if (rootCandidates.length === 0) rootCandidates.push('index.js')
+  if (!rootCandidates.some((rel) => existsSync(resolve(base, rel)))) {
+    problems.push('包根缺可加载入口（`main` / `exports` / 根 `index.js` 需有一个且真实存在）'
+      + '——市场装后校验会因此判这个包 broken 并删除，见 dsh-market/dsh-market#1091')
+  }
+
   if (problems.length > 0) return { pass: false, detail: problems.join(' | ') }
-  return { pass: true, detail: `${patches.length} 个 bundle patch` }
+  return { pass: true, detail: `${patches.length} 个 bundle patch · 包根入口在` }
 }
 
 function gateStrict(base = root) {

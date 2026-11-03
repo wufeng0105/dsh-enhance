@@ -7,6 +7,12 @@
   ],
   "modules": [
     {
+      "id": "packaging.root-entry",
+      "layer": "core",
+      "path": "index.js",
+      "owns": "包根入口的占位——只为满足市场插件的装后校验（上游 dsh-market/dsh-market#1091），宿主从不加载它（bundle 只加载 patch 行所指的模块）。拆除条件见 index.js 顶部注释与 check.mjs 的 gateBundle 里那段判定"
+    },
+    {
       "id": "core.state",
       "layer": "core",
       "path": "shared/state.mjs",
