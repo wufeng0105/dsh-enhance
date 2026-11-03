@@ -201,7 +201,7 @@ function check(map) {
 
 const map = loadMap()
 if (!cli.check) {
-  console.error('graph: 用法：node tools/graph.mjs --check [--root <项目根>]')
+  console.error('graph: 用法：node tools/graph.mjs --check')
   process.exit(1)
 }
 
