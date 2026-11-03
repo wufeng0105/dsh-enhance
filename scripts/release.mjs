@@ -25,7 +25,7 @@
  * 退出码：0 成功 / 1 某一步失败 / 2 用法错。
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -188,6 +188,25 @@ function consistencyCheck() {
   }
   add('GitHub Release', releaseValue, releaseOk)
 
+  // 发布凭据的到期日。这一类问题五处版本号核对**看不见**：token 过期后
+  // npm 那步会 401，而 VERSION / tag / latest / Release 仍然一片对齐。
+  // 所以单独读一个记着到期日的文件，提前 30 天开始提醒，过期就算不一致。
+  const expiryFile = join(root, '.github', 'npm-token-expiry.json')
+  if (existsSync(expiryFile)) {
+    try {
+      const expiry = JSON.parse(readFileSync(expiryFile, 'utf8')).NPM_TOKEN?.expires
+      if (typeof expiry === 'string') {
+        const days = Math.ceil((new Date(`${expiry}T23:59:59Z`) - new Date()) / 86_400_000)
+        const label = 'NPM_TOKEN 到期'
+        if (days < 0) add(label, `${expiry}（已过期 ${-days} 天）`, false)
+        else if (days <= 30) add(label, `${expiry}（还有 ${days} 天）`, false)
+        else add(label, `${expiry}（还有 ${days} 天）`, true)
+      }
+    } catch {
+      /* 文件坏了不影响主核对 */
+    }
+  }
+
   console.log(`# 版本一致性核对：${pkg.name}\n`)
   for (const row of rows) {
     const mark = row.ok === null ? '·' : row.ok ? '✅' : '❌'
@@ -205,7 +224,7 @@ function consistencyCheck() {
     }
     process.exit(1)
   }
-  console.log('\n五处一致。')
+  console.log(`\n${rows.length} 处一致。`)
   process.exit(0)
 }
 
@@ -355,7 +374,7 @@ if (ship) {
 # 接下来由 .github/workflows/release.yml 完成，不用你管：
 #   1. 核对「标签 == VERSION」
 #   2. 跑七道门禁
-#   3. OIDC 可信发布到 npm
+#   3. 发到 npm（身份按仓库有没有 NPM_TOKEN 自动选：token 或 OIDC）
 #   4. 用 CHANGELOG 里 [${next}] 那一节建 GitHub Release
 #
 # 想看结果：gh run watch

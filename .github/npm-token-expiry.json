@@ -1,0 +1,8 @@
+{
+  "note": "发布凭据的到期日。仓库 secret NPM_TOKEN 是 npm 上勾了 bypass 2FA 的 granular access token，最长 90 天。到期后 release.yml 的发布步骤会 401，而五处版本号仍然一致——--check 看不见这类问题，所以单独记在这里，由 --check 与 consistency 工作流提前告警。换 token 后改这个日期。",
+  "NPM_TOKEN": {
+    "expires": "2027-02-01",
+    "created": "2026-11-03",
+    "replaceWith": "npmjs.com → Access Tokens → Generate New Token（Granular，勾 Bypass 2FA，Read and write，90 天），然后 gh secret set NPM_TOKEN，再把本文件的 expires 改掉"
+  }
+}

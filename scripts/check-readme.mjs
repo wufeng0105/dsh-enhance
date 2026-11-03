@@ -72,12 +72,31 @@ export function gateReadme(base = repo) {
     check(file, h1 !== undefined, '有 H1 标题')
     check(file, /^# dsh-enhance\b/.test(h1 ?? ''), `H1 与仓库名对应（实际：${h1 ?? '无'}）`)
 
+    // 1.5 `dsh plugin add/remove` 里的包名必须等于 package.json 的 name。
+    //
+    // 为什么需要：2026-11-03 包名从无 scope 的 `dsh-enhance` 改成 `@wufeng0105/dsh-enhance`，
+    // 安装命令改了、卸载命令漏改——用户装得上、按文档卸不掉，而当时 132 项检查全绿。
+    // 门禁只看结构与链接，从不看命令里写的是哪个包，于是这道缝一直开着。
+    // 允许两种替代写法：`github:<owner>/<repo>`（从 GitHub 装）与 `./`、`.\`（从 clone 装）。
+    const expectedName = JSON.parse(readFileSync(resolve(base, 'package.json'), 'utf8')).name
+    const commandSpecs = [...raw.matchAll(/dsh\s+plugin[^\n`]*?\b(?:add|remove)\s+(\S+)/g)].map((m) => m[1].replace(/[`。，）)]+$/, ''))
+    const wrongSpecs = commandSpecs.filter((spec) => !spec.startsWith('github:') && !spec.startsWith('.') && spec !== expectedName)
+    check(file, wrongSpecs.length === 0, `dsh plugin add/remove 的包名应为 ${expectedName}（不符：${[...new Set(wrongSpecs)].join(', ') || '无'}）`)
+
     // 2. 一句话简介：独立成行、<120 字符、不以 > 开头。
     //    定位方式：H1 之后第一段「既不是标题、也不是徽章/图片、也不是语言切换」的行。
+    //
+    // ⚠️ 语言切换行必须显式排除。它的形状是 `简体中文 | [English](./README.en.md)`：
+    // 中文开头，所以 `!l.startsWith('[')` 拦不住它；长度 32 字符，<120 也拦不住。
+    // 曾经的实际后果是——把真正的简介整行删掉，门禁照样绿，因为它把切换行当成了简介。
+    // 这类「守的东西没了却报通过」比报红更危险，所以两条都补上。
+    const isLangSwitch = (l) => /\[English\]\(\.\/README\.en\.md\)|\[简体中文\]\(\.\/README\.md\)/.test(l)
     const afterH1 = lines.slice(lines.findIndex((l) => l.startsWith('# ')) + 1)
-    const intro = afterH1.find((l) => l.trim() !== '' && !l.startsWith('#') && !l.startsWith('[') && !l.startsWith('![') && !l.startsWith('>'))
+    const intro = afterH1.find((l) => l.trim() !== '' && !l.startsWith('#') && !l.startsWith('[') && !l.startsWith('![') && !l.startsWith('>') && !isLangSwitch(l))
     check(file, intro !== undefined && intro.trim().length < 120, `一句话简介 <120 字符（实际 ${intro?.trim().length ?? 0}）`)
     check(file, intro !== undefined && !intro.trim().startsWith('>'), '一句话简介不以 > 开头')
+    // 下限 20 字符：防「随便一行短文本」冒充简介。
+    check(file, intro !== undefined && intro.trim().length >= 20, `一句话简介确有内容（≥20 字符，实际 ${intro?.trim().length ?? 0}）`)
 
     // 3. 章节顺序
     const rawHeadings = lines.filter((l) => /^## /.test(l)).map((l) => l.slice(3).trim())
