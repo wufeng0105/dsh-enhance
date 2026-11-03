@@ -2,13 +2,15 @@
 /**
  * 文档计数一致性门（补审计 §4.3 的「计数无人管」）。
  *
- * 单一来源是 `scripts/known-counts.json`：测试条数、`--self-test` 负例数、门数、README 结构
+ * 单一来源是 `scripts/known-counts.json`：测试条数、`--self-test` 负例数、README 结构
  * 检查项数、冒烟断言数、设置组数、触点条数。这个工具做四件事：
  *
- *   1. **生产事实先自证**：设置组数从 `ui/client.js` 的 `group("enh-block-…")` 现场数；
- *      门数由 `check.mjs` 通过 `--gates` 传进来现场比对。来源写错就红，不是「文档抄来源」的循环论证。
- *   2. **扫文档里的计数声明**：`NN 项测试` / `NN 个负例` / `N 道闸|门` / `NN 项检查` /
+ *   1. **生产事实先自证**：设置组数从 `ui/client.js` 的 `group("enh-block-…")` 现场数。
+ *      来源写错就红，不是「文档抄来源」的循环论证。
+ *   2. **扫文档里的计数声明**：`NN 项测试` / `NN 个负例` / `NN 项检查` /
  *      `NN 条断言` / `N 组|个组名` / `NN 条触点`，与来源值比对；不等就红。
+ *      门数**不在**这个体系里（本仓主动拆掉的承诺位）：门数是 `scripts/check.mjs` 的
+ *      运行时读数，文档不写数字，加一道门不需要同步任何文档。
  *   3. **必需声明位**：每一项计数（除 README 检查项，见下）至少有一处**点名声明**；
  *      把那行删掉 → 「缺声明」红，不是「没找到就算过」的空转。
  *   4. **历史不按现值校验**：以日期开头的标题（`### 2026-10-30（…）`）下面记的是**当时的读数**，
@@ -27,7 +29,7 @@
  *     既没有文档声明位、也抓不到缺陷，钉住它只会逼人「改 README 章节就同步一个 JSON」。
  *     readme 门现在只判「结构检查有没有过」，不再比对总数。
  *
- * 用法：node tools/counts-check.mjs [--root <项目根>] [--gates <本次运行的门的数量>] [--report]
+ * 用法：node tools/counts-check.mjs [--root <项目根>] [--gates <仍接受：docs 门会传，见下>] [--report]
  * 退出码：0 全一致；1 有漂移/缺声明/用法错。
  */
 
@@ -37,9 +39,9 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-/** 中文数字（文档里写「七道闸」「五组」），只到十：再大就不是这些计数了。 */
+/** 中文数字（文档里写「五个组名」），只到十：再大就不是这些计数了。 */
 const CN_DIGITS = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 }
-/** 英文数字（`README.en.md` 写 `seven gates` / `five groups`）。 */
+/** 英文数字（`README.en.md` 写 `five groups`）。 */
 const EN_DIGITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
 
 /**
@@ -91,8 +93,6 @@ const SCAN = [
   { count: 'selfTestCases', regex: /(\d+)\s*negative (?:cases|examples)/gi },
   { count: 'selfTestCases', regex: /--self-test[^\n\d]{0,12}(\d+)\s*\/\s*(\d+)/g },
 
-  { count: 'gates', regex: /([一二三四五六七八九十\d]+)\s*道(?:闸|门|门禁)/g },
-  { count: 'gates', regex: /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+gates?\b/gi },
   // readmeChecks 不再参与比对（见文件头口径边界），所以它那两个扫描式也一并去掉：
   // 留着只会让「文档里写了 N 项结构检查」指向一个不存在的来源值。
   { count: 'smokeAssertions', regex: /([一二三四五六七八九十\d]+)\s*(?:条|项)\s*断言/g },
@@ -118,13 +118,13 @@ const SCAN = [
  * 为什么只留这些：契约文档（`docs/brand-persona.md`）里的测试数 / 冒烟数 / 触点
  * 「现为 NN 条」原先也是必需位，结果是**每加一个测试都得去改契约的措辞**，否则门禁
  * 红——那是把「计数必须说对」错做成了「计数必须提到」。现在这三处改为：写了就按现值
- * 校验，没写不算错；对外承诺（README 的门数与组数、CONTRIBUTING 的负例数）与口径
+ * 校验，没写不算错；对外承诺（README 的组数、CONTRIBUTING 的负例数）与口径
  * 权威（compatibility 的触点数、terminology 的组名）仍然强制，因为它们是对读者的承诺。
+ *
+ * 门数**不在这张表里**：门数不是文档承诺，加一道门也不该逼人改三份文档——本仓拆掉
+ * 门数承诺位时把它从 REQUIRED / SCAN / 单一来源三处一起移除了。
  */
 const REQUIRED = [
-  { doc: 'README.md', count: 'gates', what: '七道门禁', regex: /([一二三四五六七八九十\d]+)\s*道门禁/g },
-  { doc: 'README.en.md', count: 'gates', what: 'seven gates', regex: /\b(seven|six|eight|\d+)\s+gates?\b/gi },
-  { doc: 'CONTRIBUTING.md', count: 'gates', what: '七道闸', regex: /([一二三四五六七八九十\d]+)\s*道闸/g },
   { doc: 'CONTRIBUTING.md', count: 'selfTestCases', what: 'NN 个负例', regex: /(\d+)\s*个负例/g },
   { doc: 'docs/compatibility.md', count: 'hostContacts', what: '共 NN 条', regex: /共\s*(\d+)\s*条/g },
   { doc: 'docs/terminology.md', count: 'settingsGroups', what: 'N 个组名', regex: /([一二三四五六七八九十\d]+)\s*个组名/g },
@@ -230,9 +230,9 @@ else if (source.settingsGroups !== undefined && groups.value !== source.settings
   problems.push(`设置组数漂移：ui/client.js 里数到 ${groups.value} 组（${groups.names.join(' / ')}），单一来源写 ${source.settingsGroups}`)
 }
 
-if (cli.gates !== undefined && source.gates !== undefined && !agrees('gates', cli.gates)) {
-  problems.push(`门数漂移：本次运行 gates=${cli.gates}，单一来源${sourceKind.gates === 'floor' ? '的地板' : '写'} ${source.gates}（门数变了要连文档一起改）`)
-}
+// `--gates` 仍被接受但**不参与比对**：`scripts/check.mjs` 的 docs 门仍会传它（那边的门禁
+// 逻辑本批冻结），而单一来源已不记门数——门数不是机器钉住的承诺位了。参数留着是为了不把
+// 「未知参数」变成一个假红项；比对本身删掉，免得有人把 gates 加回来源时它悄悄复活。
 
 // ---------------------------------------------------------------- 文档声明
 
@@ -347,9 +347,27 @@ for (const file of docs) {
 
 // ---------------------------------------------------------------- 必需声明位
 
+/**
+ * **实际核过**的规则序号。汇总行只报这个集合的大小，不再报 `REQUIRED.length`：
+ * 规则表里有一条指向不存在的来源值时，旧写法会 `continue` 跳过它，却仍按规则表长度
+ * 打印「N 个必需声明位都一致」——本批实测过：报 8 的时候其中 3 条根本没核。
+ */
+const requiredChecked = new Set()
+
 for (const [ruleIndex, required] of REQUIRED.entries()) {
   const expected = source[required.count]
-  if (expected === undefined) continue
+  if (expected === undefined) {
+    // 规则在、来源值不在 = 这条规则永远核不到。跳过它却把它算进汇总行就是虚报，
+    // 所以这里判红（fail-closed），不是静默 continue。
+    problems.push(`必需声明位规则 ${ruleIndex + 1}（${required.doc} 的「${required.what}」）指向单一来源里不存在的计数 ${required.count}：补来源值，或把这条规则删掉`)
+    requiredSites.push({
+      rule: ruleIndex + 1, file: required.doc, line: 0, count: required.count,
+      what: required.what, text: '', value: undefined, second: undefined, ok: false,
+      missing: `规则指向不存在的计数 ${required.count}`,
+    })
+    continue
+  }
+  requiredChecked.add(ruleIndex + 1)
   const path = join(root, required.doc)
   const missingSite = (reason) => requiredSites.push({
     rule: ruleIndex + 1, file: required.doc, line: 0, count: required.count,
@@ -385,6 +403,9 @@ for (const [ruleIndex, required] of REQUIRED.entries()) {
   }
 }
 
+/** 汇总行报的 R：这一轮**实际核过**的规则条数（不是规则表长度，见上面的洞）。 */
+const requiredCount = requiredChecked.size
+
 // ---------------------------------------------------------------- 报告模式
 
 /**
@@ -396,8 +417,9 @@ for (const [ruleIndex, required] of REQUIRED.entries()) {
  *   2. 必需声明位单独成节，不与扫到的混在一起；
  *   3. 末行固定 `[counts] report: <M> 处声明 / <R> 个必需声明位`。
  *
- * M 取 `sites.length`（清单本身），R 取 `REQUIRED.length`（与常规运行「N 个必需声明位」
- * 同一个表达式）：两数都是当轮现算。清单被截断或伪造一条，M 会变——这是判据的抓手。
+ * M 取 `sites.length`（清单本身），R 取 `requiredCount`（实际核过的规则数，与常规运行
+ * 「N 个必需声明位」同一个表达式）：两数都是当轮现算。清单被截断或伪造一条，M 会变；
+ * 规则表里有一条核不到，R 会跟着少——这是判据的抓手。
  * 本分支**不写盘、不改文件**；有 problems 时照常打红到 stderr 并 exit 1。
  */
 if (cli.report) {
@@ -434,10 +456,10 @@ if (cli.report) {
       console.log(`  缺：${site.file}  ${site.count}（${site.missing}）——必需位一处都没命中，这是红`)
       continue
     }
-    console.log(`  ${where(site)}  ${site.count}=${site.value}  「${site.text}」  ${verdict(site)}（必需位 ${site.rule}/${REQUIRED.length}：${site.what}）`)
+    console.log(`  ${where(site)}  ${site.count}=${site.value}  「${site.text}」  ${verdict(site)}（必需位 ${site.rule}/${requiredCount}：${site.what}）`)
   }
   console.log('[counts]')
-  console.log(`[counts] report: ${sites.length} 处声明 / ${REQUIRED.length} 个必需声明位`)
+  console.log(`[counts] report: ${sites.length} 处声明 / ${requiredCount} 个必需声明位`)
   process.exit(problems.length > 0 ? 1 : 0)
 }
 
@@ -449,5 +471,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 const manual = Object.entries(known.counts).filter(([, entry]) => entry.kind === 'manual').map(([key]) => key)
-console.log(`[counts] OK：${Object.keys(source).length} 个计数（${manual.length} 个人工维护：${manual.join(' / ')}）/ ${docs.length} 份文档 / ${scanned} 处声明 / ${REQUIRED.length} 个必需声明位都一致（CHANGELOG.md 是历史事实，不按现值校验）`)
+console.log(`[counts] OK：${Object.keys(source).length} 个计数（${manual.length} 个人工维护：${manual.join(' / ')}）/ ${docs.length} 份文档 / ${scanned} 处声明 / ${requiredCount} 个必需声明位都一致（CHANGELOG.md 是历史事实，不按现值校验）`)
 process.exit(0)

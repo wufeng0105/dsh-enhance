@@ -31,11 +31,11 @@ Node.js **≥ 22**；一个可用的 DeepSeek Harness（版本在 `package.json`
 ## 改之前先跑一遍门禁
 
 ```powershell
-node scripts/check.mjs              # 七道闸
-node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道闸与每个内嵌 check 组件都真的能红
+node scripts/check.mjs              # 全部门禁
+node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁与每个内嵌 check 组件都真的能红
 ```
 
-`七道闸`是 `tools/counts-check.mjs` 钉住的字面（改门数要连它一起改），后文统称**门禁**。七道是 version / syntax / tests / graph / docs / readme / bundle。CI 在 `windows-latest` 上跑 `--layer fast`（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)），**PR 要让这两条都 exit 0**。
+门禁一共这些：version / syntax / tests / graph / docs / readme / bundle——**门数不写进文档**，也不由 `tools/counts-check.mjs` 钉住，以 `node scripts/check.mjs` 的输出为准。CI 在 `windows-latest` 上跑 `--layer fast`（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)），**PR 要让这两条都 exit 0**。
 
 ## 改动会被谁挡住
 
@@ -45,7 +45,7 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道闸与�
 
 | 你改了什么 | 门禁 | 要同步什么 |
 |---|---|---|
-| 加 / 删测试、改 `--self-test` 负例、新增门禁 | tests、docs | [`scripts/known-counts.json`](scripts/known-counts.json) 的 `tests` / `selfTestCases` / `gates` |
+| 加 / 删测试、改 `--self-test` 负例 | tests、docs | [`scripts/known-counts.json`](scripts/known-counts.json) 的 `tests` / `selfTestCases` |
 | 改冒烟断言数 | docs | [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions` |
 | 新增常驻源码文件 | graph | `code-map.json` 登记；新增 `ctx.on(...)` 事件还要登记 `events` |
 | 改 `cordis.patch.yml` 的入口 | bundle | 入口 `name` 必须指向真实存在的文件，且前缀等于 `package.json` 的 `name` |

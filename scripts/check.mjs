@@ -794,8 +794,11 @@ if (layer === 'full') {
 }
 
 /**
- * 已发布计数「七道门」指的是 fast 层。`graph-strict` 是 full 层附加的一步，
- * 不算进这个数——否则 `--layer full` 会让 docs 门的门数比对误红。
+ * fast 层的门数：`graph-strict` 是 full 层附加的一步，不算进这个数。
+ *
+ * 它**不再是承诺位**：`known-counts.json` 已不记门数，三份文档也不写数字（加一道门
+ * 不需要同步文档）。docs 门仍把这个数当 `--gates` 传下去，但 counts-check 已不拿它比对
+ * ——传参保留是为了不动本文件的逻辑，那个参数在 counts-check 里仍被接受。
  */
 const coreGateCount = gates.filter(([name]) => name !== 'graph-strict').length
 

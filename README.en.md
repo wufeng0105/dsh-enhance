@@ -160,7 +160,7 @@ Writing it is the only action in this package that touches host configuration, a
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/wufeng0105/dsh-enhance/issues). Before opening a pull request, run `node scripts/check.mjs` — it runs seven gates (version, syntax, tests, graph, docs, readme, bundle) and must exit 0. Contributions must keep the terms in [docs/terminology.md](./docs/terminology.md) consistent, and the compatibility sentence in this README is derived from `package.json`, so changing the version range means changing the declaration first.
+Issues and pull requests are welcome on [GitHub](https://github.com/wufeng0105/dsh-enhance/issues). Before opening a pull request, run `node scripts/check.mjs` — it runs every gate (version, syntax, tests, graph, docs, readme, bundle; the current count is whatever it prints) and must exit 0. Contributions must keep the terms in [docs/terminology.md](./docs/terminology.md) consistent, and the compatibility sentence in this README is derived from `package.json`, so changing the version range means changing the declaration first.
 
 ## License
 

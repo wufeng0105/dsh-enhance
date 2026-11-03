@@ -36,14 +36,14 @@ SHA、npm 账号 scope 与包名匹配、发布身份走哪条腿、`main` 的�
 | `CONTRIBUTING.md` | 每类改动各由哪道门禁守着；哪几条靠纪律 | README 结尾把维护者引过来 | ——（末端） |
 
 **一个论点只能出现在一篇名下。** 安装与卸载命令属于 README；「改完跑什么」属于 CONTRIBUTING。
-例外只有计数声明位：`七道闸` 与 `五组` 在中英 README、`七道闸` 与 `至少 20 个负例` 在 CONTRIBUTING
+例外只有计数声明位：`五组` 在中英 README、`至少 20 个负例` 在 CONTRIBUTING
 都出现——那是 `tools/counts-check.mjs` 的**必需声明位**，删掉即红，不算重复。
 
 ## 术语账本
 
 | 定为 | 不许再叫 | 备注 |
 |---|---|---|
-| 门禁 | 闸、检查项、gate | `七道闸` 是 `counts-check` 钉住的字面，整篇保留一处并当场声明「后文统称门禁」 |
+| 门禁 | 闸、检查项、gate | 各篇统一写「门禁」；门数不写进文档、也不由 `counts-check` 钉住，以 `node scripts/check.mjs` 的输出为准 |
 | 发版链 | 发布流程、release 流程 | 指 `--ship` → 标签 → CI → npm + GitHub Release 这一条 |
 | 靠纪律 | 约定、注意事项、软约束 | 与「门禁会红」相对的那一类；只有这类才写「靠纪律」 |
 
