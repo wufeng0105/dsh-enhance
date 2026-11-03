@@ -7,11 +7,13 @@
  * 上——那是宿主**未文档化**的内部字段。一旦生产代码真的去点它，宿主改个名就静默失效；
  * 而 `graph` 门只比自家 `code-map.json`，看不见这类入口。
  *
- * 所以：生产代码（`enhance-scope/`、`shared/`、`ui/`）里出现 `layers` / `*.layers`
- * / `layers.*` / `systemPrompt.layers` 这类入口即红，**除非**登记在
- * `scripts/host-fields-allowlist.json`（每条写清 field + 文件 + 为什么非用不可）。
+ * 所以：生产代码（`enhance-scope/`、`auto-approve/`、`shared/`、`ui/` 与包根 `index.js`）
+ * 里出现 `layers` / `*.layers` / `layers.*` / `systemPrompt.layers` 这类入口即红，**除非**
+ * 登记在 `scripts/host-fields-allowlist.json`（每条写清 field + 文件 + 为什么非用不可）。
  *
- * 不静默放过：三个生产目录缺一个、或者一个文件都没扫到，判红——「扫不到」不是「干净」。
+ * 不静默放过：生产目录/根文件缺一个、或者一个文件都没扫到，判红——「扫不到」不是「干净」。
+ * （2026-11-04 补：`auto-approve/` 与包根 `index.js` 原先不在扫描范围，实测往里注入
+ * `ctx.systemPrompt.layers` 后 graph 门仍绿；两处都是宿主会加载/校验的产品文件。）
  *
  * 用法：node tools/field-check.mjs [--root <项目根>]
  * 退出码：0 干净；1 有未登记入口 / 目录缺失 / 用法错。
@@ -21,7 +23,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const PRODUCTION_DIRS = ['enhance-scope', 'shared', 'ui']
+export const PRODUCTION_DIRS = ['enhance-scope', 'shared', 'ui', 'auto-approve']
+export const PRODUCTION_ROOT_FILES = ['index.js']
 export const ALLOWLIST_PATH = 'scripts/host-fields-allowlist.json'
 
 /** 未文档化入口的词根。要加新词根时先问：宿主文档里有没有它？ */
@@ -72,6 +75,14 @@ function productionFiles(root) {
       }
     }
     walk(path)
+  }
+  for (const file of PRODUCTION_ROOT_FILES) {
+    const path = join(root, file)
+    if (!existsSync(path)) {
+      errors.push(`生产文件不在：${file}（禁令无从检查，判红）`)
+      continue
+    }
+    files.push(path)
   }
   if (files.length === 0 && errors.length === 0) errors.push('生产目录里一个 .js/.mjs 都没扫到（禁令静默失效，判红）')
   return { files, errors }
@@ -158,6 +169,6 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith('field-check.mjs')
     for (const error of result.errors) console.error(`  - ${error}`)
     process.exit(1)
   }
-  console.log(`[fields] OK：${PRODUCTION_DIRS.length} 个生产目录 / ${result.files} 个文件里没有未登记的宿主字段入口（扫到 ${result.entries} 处 layers，${result.allowed} 处已登记放行）`)
+  console.log(`[fields] OK：${PRODUCTION_DIRS.length} 个生产目录 + ${PRODUCTION_ROOT_FILES.length} 个根文件 / ${result.files} 个文件里没有未登记的宿主字段入口（扫到 ${result.entries} 处 layers，${result.allowed} 处已登记放行）`)
   process.exit(0)
 }

@@ -541,6 +541,8 @@ const NEGATIVE_ROSTER = [
   { name: 'counts-check red', gate: 'docs' },
   { name: 'smoke count red', gate: 'docs' },
   { name: 'field-check red', gate: 'graph' },
+  { name: 'field-check auto-approve red', gate: 'graph' },
+  { name: 'field-check root red', gate: 'graph' },
   { name: 'host-check red', gate: 'version' },
 ]
 
@@ -856,6 +858,31 @@ function runSelfTest() {
       const text = readFileSync(file, 'utf8')
       appendFileSync(file, '\n// probe: ctx.systemPrompt.layers\n')
       assertMutated(copy, 'enhance-scope/index.js', text, readFileSync(file, 'utf8'))
+    },
+    (copy) => expectRed('未文档化宿主字段入口')(gateGraph(copy)),
+  ))
+
+  cases.push(withCopy(
+    'field-check auto-approve red', 'graph',
+    // 覆盖缺口：auto-approve/ 也是宿主加载的产品入口。此前 PRODUCTION_DIRS 不含它，
+    // 往里面注入未登记宿主字段 graph 仍绿。本例若因该目录被移出扫描范围而变绿，自检就红。
+    (copy) => {
+      const file = join(copy, 'auto-approve', 'index.js')
+      const text = readFileSync(file, 'utf8')
+      appendFileSync(file, '\n// probe: ctx.systemPrompt.layers\n')
+      assertMutated(copy, 'auto-approve/index.js', text, readFileSync(file, 'utf8'))
+    },
+    (copy) => expectRed('未文档化宿主字段入口')(gateGraph(copy)),
+  ))
+
+  cases.push(withCopy(
+    'field-check root red', 'graph',
+    // 同上：包根 index.js 是市场装后校验的绕行物，也是「生产代码」，但不在任何生产目录下。
+    (copy) => {
+      const file = join(copy, 'index.js')
+      const text = readFileSync(file, 'utf8')
+      appendFileSync(file, '\n// probe: ctx.systemPrompt.layers\n')
+      assertMutated(copy, 'index.js', text, readFileSync(file, 'utf8'))
     },
     (copy) => expectRed('未文档化宿主字段入口')(gateGraph(copy)),
   ))
