@@ -360,7 +360,10 @@ function gateReadmeGate(base = root) {
  * bundle 门禁：能 `dsh plugin add` 的仓库必须同时满足
  *   - `package.json` 声明 `dsh.bundle.patch`（字符串或字符串数组）；
  *   - 声明的 patch 文件存在；
- *   - patch 里每条 insert 的 `name` 是本包路径（`<包名>/…`），且有对应文件。
+ *   - patch 里每条 insert 的 `name` 是本包路径（`<包名>/…`），且有对应文件；
+ *   - 包根有可加载入口（市场装后校验）；
+ *   - `ui/package.json` 的浏览器半发现契约（dsh.client.platform=web + exports["./client"]）
+ *     完整且指向真实文件——它是设置页出现的唯一开关，此前零门禁覆盖（实测删掉它七门全绿）。
  * 解析只够用：按行找 `- id:` 后紧跟的 `name:`，不做完整 YAML。
  */
 function gateBundle(base = root) {
@@ -430,8 +433,36 @@ function gateBundle(base = root) {
       + '——市场装后校验会因此判这个包 broken 并删除，见 dsh-market/dsh-market#1091')
   }
 
+  // ---- 浏览器半（设置页）的发现契约 ----
+  //
+  // 宿主的 dsh.client 发现只认「包的精确包名」或「路径里的最近 package.json」
+  // （cordis.patch.yml:4-9 的实测注释），所以设置页能不能出现，全押在
+  // ui/package.json 的 `dsh.client.platform = "web"` 与 `exports["./client"]` 两行上。
+  // 这两条此前零门禁覆盖：实测删掉 ui/package.json 七门全绿，而 docs/compatibility.md
+  // 早已把「设置页整个消失」列为失效面。宿主实机本仓验证不了（asar 未解包），
+  // 门禁是唯一能替你看着它的东西——形状不对就红，不许按缺省值静默放过。
+  const uiManifestPath = join(base, 'ui', 'package.json')
+  let uiManifest
+  try {
+    uiManifest = JSON.parse(readFileSync(uiManifestPath, 'utf8'))
+  } catch (error) {
+    problems.push(`读不到 ui/package.json（设置页的浏览器半靠它被发现）：${String(error?.message ?? error)}`)
+  }
+  if (uiManifest !== undefined) {
+    const platform = uiManifest?.dsh?.client?.platform
+    if (platform !== 'web') {
+      problems.push(`ui/package.json 的 dsh.client.platform 必须是 "web"，现在是 ${JSON.stringify(platform ?? null)}——宿主靠它决定装载不装载设置页`)
+    }
+    const clientEntry = uiManifest?.exports?.['./client']
+    if (typeof clientEntry !== 'string' || clientEntry.trim() === '') {
+      problems.push('ui/package.json 缺 exports["./client"]（或不是字符串）——设置页的浏览器半没有入口，宿主不会装载')
+    } else if (!existsSync(resolve(base, 'ui', clientEntry))) {
+      problems.push(`ui/package.json 的 exports["./client"] 指向不存在的文件：${clientEntry}`)
+    }
+  }
+
   if (problems.length > 0) return { pass: false, detail: problems.join(' | ') }
-  return { pass: true, detail: `${patches.length} 个 bundle patch · 包根入口在` }
+  return { pass: true, detail: `${patches.length} 个 bundle patch · 包根入口在 · 浏览器半契约在` }
 }
 
 // ---------------------------------------------------------------- gates
@@ -497,6 +528,8 @@ const NEGATIVE_ROSTER = [
   { name: 'syntax counts tracked files', gate: 'syntax' },
   { name: 'derive refuses oversize text', gate: 'tests' },
   { name: 'orphan bundle entry red', gate: 'bundle' },
+  { name: 'ui client platform red', gate: 'bundle' },
+  { name: 'ui client export red', gate: 'bundle' },
   { name: 'version mismatch red', gate: 'version' },
   { name: 'compat declaration red', gate: 'version' },
   { name: 'compat missing red', gate: 'version' },
@@ -675,6 +708,32 @@ function runSelfTest() {
       assertMutated(copy, 'cordis.patch.yml', text, reverted)
     },
     (copy) => expectRed('指向不存在的文件')(gateBundle(copy)),
+  ))
+
+  cases.push(withCopy(
+    'ui client platform red', 'bundle',
+    // 设置页的浏览器半发现契约：删掉 dsh.client.platform 必须判红。
+    // 此前七门全绿——宿主实机行为本仓验证不了，门禁是唯一哨兵。
+    (copy) => {
+      const file = join(copy, 'ui', 'package.json')
+      const pkg = JSON.parse(readFileSync(file, 'utf8'))
+      delete pkg.dsh.client.platform
+      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
+    },
+    (copy) => expectRed('dsh.client.platform')(gateBundle(copy)),
+  ))
+
+  cases.push(withCopy(
+    'ui client export red', 'bundle',
+    // 第三证（空转检查）：删掉 exports["./client"] 必须红，不许按缺省值静默放过——
+    // 否则「设置页整个消失」又会退回零信号状态。
+    (copy) => {
+      const file = join(copy, 'ui', 'package.json')
+      const pkg = JSON.parse(readFileSync(file, 'utf8'))
+      delete pkg.exports['./client']
+      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
+    },
+    (copy) => expectRed('exports["./client"]')(gateBundle(copy)),
   ))
 
   cases.push(withCopy(
