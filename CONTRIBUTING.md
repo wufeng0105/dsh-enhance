@@ -1,12 +1,10 @@
 # 参与开发
 
-## 这个仓库是什么
+## 改动时要守的边界
 
-一个 DeepSeek Harness 的**插件 bundle**——装进 profile 后由宿主直接加载，靠 `cordis.patch.yml` 里那三条入口接上去。它做什么、装完是什么样，是 [README.md](README.md) 的事；这里只讲改动时要守的东西。
+装的是什么、文件怎么分层，见 [BOOTSTRAP.md](BOOTSTRAP.md)；它对外能干什么，见 [README.md](README.md)。这里只说改的时候不能越的那条线：**不碰宿主程序**；默认设置下，除声明层那几处外，也不碰宿主自带的提示词——声明层的准确定义只有一处，在 [docs/terminology.md](docs/terminology.md)。
 
-对改动者真正要紧的是它的边界：不碰宿主程序；默认设置下，除声明层那几处外，也不碰宿主自带的提示词。声明层的准确定义只有一处，在 [docs/terminology.md](docs/terminology.md)。
-
-可选的「隐藏宿主说明」不是纯品牌改动：它会连着抹掉两段带操作约定的文字与**两条 runtime context**——`pwd`（不要从 checkout 路径推断工作目录）、「别为了让改动生效另起服务器」、客户端插件改动何时才生效（HMR 要看 `pnpm run dev:web` 在不在跑）。对改 DSH / 写插件的人是实打实的行为退化，改文案时别写成「只是换个名字」。
+可选的「隐藏宿主说明」不是纯品牌改动：它会连着抹掉两段带操作约定的文字与两条 runtime context，代价逐条列在 [docs/brand-persona.md](docs/brand-persona.md) 的那张对照表里。改文案时别写成「只是换个名字」。
 
 ## 哪里放什么
 
@@ -24,7 +22,7 @@
 
 Node.js **≥ 22**；一个可用的 DeepSeek Harness（版本在 `package.json` 的 `engines.dsh` 区间内）。端到端冒烟另需 `pwsh`（PowerShell 7）与 `dsh` CLI。
 
-要在真机上试一次，跑 `tools/smoke.ps1`：它在一个一次性 `DSH_HOME` 里装本仓库、跑完 44 条断言、再把那个 home 删掉——不碰你日常在用的 profile。它验的是「装得上、组合得出三个入口、写档读档都对」，替代不了真会话（那要模型凭据）。
+真装冒烟怎么跑、验什么、为什么进不了门禁，见下面「发版」一节的「发版前必跑：真装冒烟」——它同时是发版的硬步骤，不是改完代码的例行动作。
 
 ## 改之前先跑一遍门禁
 
@@ -47,7 +45,7 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁�
 | 改冒烟断言数 | docs | `tools/smoke.mjs` 的 `EXPECTED_ASSERTIONS` 与 [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions`，两处必须相等（计数门现场对账） |
 | 新增常驻源码文件 | graph | `code-map.json` 登记；新增 `ctx.on(...)` 事件还要登记 `events` |
 | 改 `cordis.patch.yml` 的入口 | bundle | 入口 `name` 必须指向真实存在的文件，且前缀等于 `package.json` 的 `name` |
-| 删掉包根的 `index.js` 或 `package.json` 的 `main` | bundle | 市场装后校验会判这个包 broken 并当场删除（上游 dsh-market/dsh-market#1091）；下面那段判定就是为它加的 |
+| 删掉包根的 `index.js` 或 `package.json` 的 `main` | bundle | 市场插件装后会判这个包 broken 并当场删除（上游 dsh-market/dsh-market#1091）；下面那段判定就是为它加的 |
 | 改 `package.json` 的 `name` | version、bundle、readme | `cordis.patch.yml` 的入口前缀、两个 README 里 `dsh plugin add` / `remove` 的包名 |
 | 改 `VERSION` 或 `package.json` 的 `version` | version | 两处必须逐字相同；两个 README 的「适用版本」句由 `engines.dsh` 派生 |
 | 增删 README 的二级标题 | readme | 有目录则须覆盖全部二级标题 |
@@ -62,6 +60,7 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁�
 | 事项 | 为什么没有门禁 | 怎么守 |
 |---|---|---|
 | `.zhll/` 永不入库 | 它在 `.gitignore` 里，[`scripts/code-files.mjs`](scripts/code-files.mjs) 的 `SKIP_DIRS` 也跳过它，所以里面的 `.mjs` 连语法门都不过 | 提交前看一眼改动清单；别对它用 `git add -f`，别为了「统一」把它挪到会被跟踪的位置 |
+| 计数键不许删 | 计数门按 `known-counts.json` 里**现有的键**逐个比对，键没了那一项就整个消失，不会红 | 只改值、加键，不删键；删一个键等于静悄悄关掉一项比对 |
 | 发布身份走哪条腿 | 取决于仓库有没有 `NPM_TOKEN` secret，门禁读不到 secret | 看 `release.yml` 里「选发布身份」那一步的日志 |
 | 工作流 action 不钉 SHA | 钉了却不会有自动升级（除非先配 Dependabot），会变成「安全补丁永远收不到」 | 哪天配了 Dependabot 再钉 |
 | `main` 禁强推 | 已经是仓库设置，门禁管不到 | 真要改写历史时先关保护，改完开回来 |
@@ -77,11 +76,9 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁�
 
 ## 术语与文风
 
-[docs/terminology.md](docs/terminology.md) 是术语的**唯一权威**：一个东西一个名字；中文界面名与机读标识符 1:1 对应、不许合并；另有几组「看着像同一个东西、其实不能合并」的例外。**改任何面向人的文案之前，先对一遍这张表。**
+[docs/terminology.md](docs/terminology.md) 是命名的**唯一权威**：一个东西一个名字；中文界面名与机读标识符 1:1 对应、不许合并；同名两物的消歧写法与「看着像同一个东西、其实不能合并」的例外也都在那张表里。**改任何面向人的文案之前，先对一遍账本。**
 
-账本里有**四层分工**（定位层 / 操作层 / 契约层 / 机读层）：入口页 `README.md` 的开篇用**定位层**的说法（「破甲」），设置页与契约用**操作层 / 契约层**的词（「内容边界」「品牌人设」…）。这不是同物异名——是同一功能在四个读者层上的四种叫法，**别把入口页的招揽口吻搬进设置页，也别把设置页的规格写法搬进入口页**。跨层指代时落到该层的名字：README 指向设置页要说「内容边界」。
-
-一个名字在本仓库指了两件事，必须拆开写：**「检查」**既指门禁（[`scripts/check.mjs`](scripts/check.mjs)）又指设置页第 5 组（把会话日志读回来，证明文本真的进了提示词）。前者一律写「门禁」，后者一律写「设置页的检查项」——不能选一个留下，两个都要有名字。
+最容易踩的一条单独提醒：同一功能在入口页、设置页、契约、机读四处各有各的名字（入口页叫「破甲」，设置页叫「内容边界」…），**别把一层的口吻搬进另一层**。这四套名字怎么分、跨层指代该落到哪个名字，见账本的「命名分层」一节——那是「命名」的分层，与 BOOTSTRAP 说的「文件分层」不是一回事，别互相借用。
 
 ## 发版
 
@@ -93,7 +90,7 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁�
 pwsh -NoProfile -File tools/smoke.ps1
 ```
 
-`--ship` 的门禁全绿只证明「静态没坏」。这个包吃宿主私有 API，**DSH 升级后唯一能证明它还能装、还能跑的东西是真装冒烟**：在一个一次性 `DSH_HOME` 里真装本包、组合出三个入口、验三态与品牌人设遮蔽、写档摘档后再组合（断言条数的单一来源在 [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions`，与 `tools/smoke.mjs` 的常量互相咬）。
+`--ship` 的门禁全绿只证明「静态没坏」。这个包吃宿主私有 API，**DSH 升级后唯一能证明它还能装、还能跑的东西是真装冒烟**：在一个一次性 `DSH_HOME` 里真装本包、组合出三个入口、验三态与品牌人设遮蔽、写档摘档后再组合，跑完 44 条断言（断言条数的单一来源在 [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions`，与 `tools/smoke.mjs` 的常量互相咬）。
 
 它**不进** `--ship`、也不进 CI，这是有意的：它要 `pwsh` + 真机 DSH CLI，CI 的 ubuntu runner 给不了；塞进发布脚本只会让紧急热修在没有装 DSH 的机器上发不出去，而「这次发布要不要信静态门禁」的判断本来就该由人做。所以它是**发版纪律里的硬步骤**：每次发版（哪怕 patch）先跑，红了就停下，按 [`docs/compatibility.md`](docs/compatibility.md) 的「例行核验」查，核验过了再动 `engines.dsh` 区间。
 
@@ -150,17 +147,15 @@ node scripts/release.mjs patch --publish --otp=<6 位验证码>
 
 它做的前四步与 `--ship` 相同，只是发完之后不提交、不打标签，脚本会把该跑的 git 命令打出来。它显式发到官方源 `registry.npmjs.org`。本机 `.npmrc` 若指向镜像（本机是 `npmmirror`），那是只读的、发不上去——所以脚本不吃全局配置。
 
-**发完之后不用管市场**：awesome-dsh-plugin 每夜采集一次 npm，自动更新卡片上的版本号、30 天下载量、能力标签，以及「宿主要求」那一格（它读的是 npm 清单里的 `engines.dsh`）。描述文字不在自动采集范围内，那部分要改 `data/plugins/wufeng0105__dsh-enhance.yml` 并向上游提 PR。
+**发完之后不用管收录目录**：`awesome-dsh-plugin` 每夜采集一次 npm，自动更新卡片上的版本号、30 天下载量、能力标签，以及「宿主要求」那一格（它读的是 npm 清单里的 `engines.dsh`）。描述文字不在自动采集范围内，那部分要改 `data/plugins/wufeng0105__dsh-enhance.yml` 并向上游提 PR。
 
 **包名不可随意改**：`@wufeng0105/dsh-enhance` 与 `cordis.patch.yml` 的入口名前缀、老用户的 profile 依赖键三处绑定，两个 README 的命令也跟着它。发版脚本会拒绝在名字与入口不一致时发布。
 
 ## 兼容性
 
-`engines.dsh` 声明了核验过的宿主版本区间，宿主自己在**安装**与**启动**时都会执行它。要把新版本并进区间，先按 [docs/compatibility.md](docs/compatibility.md) 的例行核验跑一遍（约 15 分钟）。
+`engines.dsh` 声明了核验过的宿主版本区间，宿主在**安装**与**启动**时都会执行它。区间为什么是半开的、正式版与 rc 在 semver 上差在哪、宿主具体在哪三个时机读它，都在 [docs/compatibility.md](docs/compatibility.md) 的「声明」一节。这里只留动作：**扩区间前，先按那边的例行核验跑一遍（约 15 分钟）**，两端一起动。
 
-**rc 与正式版之间有个 semver 陷阱**：区间上界一旦停在某个 rc（例如 `<0.2.1-rc.6`），按 semver 排序，正式版就**大于**它——`0.2.1` > `0.2.1-rc.6`。所以 DSH 一发正式版，这个上界就会把它挡在门外，插件对用新宿主的用户变成装不上。这不是缺陷，是硬闸的应有行为；但它意味着「宿主发正式版」和「宿主发 rc」一样要触发一次例行核验加扩区间，别等到有人装不上才发现。上界停在哪，看 `package.json` 的 `engines.dsh`。
-
-本机 DSH 升级到区间之外时 `version` 门会红——那是提醒你按例行核验扩区间，不是误报；CI 不装 DSH，所以只有本机会看到。
+本机 DSH 升级到区间之外时 `version` 门会红——那是提醒你按例行核验扩区间，不是误报；CI 不装 DSH，所以只有本机会看到。宿主发正式版和发 rc 一样，都要触发这一轮核验，别等到有人装不上才发现。
 
 ## 仓库设置与已知取舍
 

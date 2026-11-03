@@ -277,13 +277,13 @@ DSH 自己的口径是：
 - `renderPrompt()` 丢弃空文本段，`renderContextSections()` 丢弃空文本 context；
 - 先例：`dsh-persona`、`dsh-subagent` 都据此工作。
 
-`docs/compatibility.md` 的改法：在「cordis 插件 API」那一行的接缝清单里加 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」，并按 `docs/compatibility.md` 自己的计数口径把独立触点项总数重数一遍（该节现为 **36 条**；口径与公式以那一节为准，别在这里另立）。`packages/core/system-prompt/src` 已在 tree-diff 清单里，不新增目录；`packages/interaction/agent`（若存在）视核验结果决定是否加入。
+`docs/compatibility.md` 的改法：在「cordis 插件 API」那一行的接缝清单里加 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」，并按那一节自己的计数口径把独立触点项总数重数一遍——**总数、公式与拆条规则都以那一节为准，别在这里另立**。`packages/core/system-prompt/src` 已在 tree-diff 清单里，不新增目录；`packages/interaction/agent`（若存在）视核验结果决定是否加入。
 
 任一条不成立 → 本功能失效，其余功能不受影响。降级路径不再只有「人工记账」一条：
 
 - **装没装上**：状态快照里的 `identityInstall`（机读）与设置页品牌人设组那一行说明（人读）会如实说「已生效 / 已接上 / 未生效」，例如「未生效：本版宿主没有可注入的 agent 上下文（agent.ctx.inject 不可用）」；「还没有 agent 可判」是三态的 `null`，不压成「失败」。
-- **遮蔽是否真的生效**：由「检查」里 `inject` 那一项的第二路证伪——`custom` 要在会话日志里命自定义文本、`remove` 要用反向探针确认最新一份装配记录里已经没有宿主原句；`keep` 不判。
-- **仍要人工记的**：真机验收的限制不变——`hideHarness` 在桌面 / web profile 上的效果仍未核（见文末「仍未核验」），`compatibility.md` 该记的轮次照记。
+- **遮蔽是否真的生效**：由设置页的检查项里 `inject` 那一项的第二路证伪——`custom` 要在会话日志里命自定义文本、`remove` 要用反向探针确认最新一份装配记录里已经没有宿主原句；`keep` 不判。
+- **仍要人工记的**：装配层验收在桌面会话上已验通（结论与复跑条件在 [`docs/compatibility.md`](compatibility.md) 的「核验记录」）；还剩 `hideHarness` 在桌面 / web profile 上的效果未核，见下面「仍未核验」。
 
 ## 10. 落地状态与剩余边界
 
@@ -294,5 +294,5 @@ DSH 自己的口径是：
 
 契约只需要记住两条**不会随发版消失**的边界：
 
-- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。补它的条件见 `compatibility.md` 的历轮汇总。
-- **装配层验收**：做法与结论记在 `compatibility.md`；真会话那一半要**一次有余额的会话**才能复跑。
+- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。补它的条件见 [`docs/compatibility.md`](compatibility.md) 的「核验记录」。
+- **装配层验收**：做法与结论记在 [`docs/compatibility.md`](compatibility.md) 的「核验记录」——桌面会话上已验通（内容边界进提示、遮蔽生效），headless 那一半要**一次有余额的会话**才能复跑。

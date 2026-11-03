@@ -2,23 +2,25 @@
 
 本文件自 `1.1.0` 起维护；版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)，条目格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+本文件记的是**时间轴**：每个版本改了什么、那一版当时的验证读数。条目里的数字（门禁几道、测试几项、断言几条、适用区间）都是**当时**的读数，不按现值校验——现行规则以 [CONTRIBUTING.md](CONTRIBUTING.md) 为准，接手现状以 [BOOTSTRAP.md](BOOTSTRAP.md) 为准，核验结论以 [docs/compatibility.md](docs/compatibility.md) 为准；计数的现值只住在 `scripts/known-counts.json` 一处。门数现在不是承诺位（口径见 CONTRIBUTING 的「改之前先跑一遍门禁」），早期条目里提到的单一来源条目也有增删（门数、README 检查项都已移出），同样以那份 JSON 的现值为准。
+
 ## [1.3.2] — 2026-11-03
 
 ### 修复
 
-- **从插件市场安装会被判「没有可安装的内容」并当场删掉。** 现象是：pnpm 真的装上了（`+ @wufeng0105/dsh-enhance 1.3.1`，`exit 0`），紧接着装后校验把这个包删除，界面报「插件需要构建授权（allowBuilds，默认拦截）或未附带构建产物」。**该包不需要构建、也不缺产物**——零依赖、无构建脚本、产物就是源码；`dsh plugin add` 从同一条 npm 源装 `exit 0`，三个入口齐全，宿主多次正常启动。那条文案是市场 `routes.js` 里 `notAPlugin` 的兜底分支（市场源码自己记过同类误判，#258），与构建无关。
-- 根因在**市场侧**：`hasLoadableEntry`（`lib/profile.js`）只认「包根有 `main`/`exports`/根 `index.js`」或「某个 patch 目标是**独立的包目录**」。纯 patch 载体按构造没有前者；而本包的三个入口全是**载体自身的子路径**，被整串当成目录名去找 `<target>/package.json`，9 个探测点全部落空 ⇒ 判 broken ⇒ 删除。已提上游：**dsh-market/dsh-market#1091**（与该仓库 #203 / #906 / #792 同一家族，但那三次修的都是「目标指向别人」，这次是「指向载体自己」）。
+- **从市场插件（`dsh-market/dsh-market`）的界面安装会被判「没有可安装的内容」并当场删掉。** 现象是：pnpm 真的装上了（`+ @wufeng0105/dsh-enhance 1.3.1`，`exit 0`），紧接着装后校验把这个包删除，界面报「插件需要构建授权（allowBuilds，默认拦截）或未附带构建产物」。**该包不需要构建、也不缺产物**——零依赖、无构建脚本、产物就是源码；`dsh plugin add` 从同一条 npm 源装 `exit 0`，三个入口齐全，宿主多次正常启动。那条文案是市场插件 `routes.js` 里 `notAPlugin` 的兜底分支（上游源码自己记过同类误判，#258），与构建无关。
+- 根因在**市场插件那一侧**：`hasLoadableEntry`（`lib/profile.js`）只认「包根有 `main`/`exports`/根 `index.js`」或「某个 patch 目标是**独立的包目录**」。纯 patch 载体按构造没有前者；而本包的三个入口全是**载体自身的子路径**，被整串当成目录名去找 `<target>/package.json`，9 个探测点全部落空 ⇒ 判 broken ⇒ 删除。已提上游：**dsh-market/dsh-market#1091**（与该仓库 #203 / #906 / #792 同一家族，但那三次修的都是「目标指向别人」，这次是「指向载体自己」）。
 
 ### 新增
 
-- 包根 **`index.js`** 与 `package.json` 的 `main`。它**不承载任何功能**，宿主从不加载它（bundle 只加载 patch 行所指的模块）——存在的唯一理由是满足市场那道装后校验。实测：加上它之后 `--dump-config` 仍然只有那三个入口，冒烟 **44/44** 照过。
-- **bundle 门新增一条判定**：包根必须有 `main` / `exports` / 根 `index.js` 之一且真实存在。删掉这个绕行物会**直接变红**——本仓的门禁看不见市场，这条是它唯一的哨兵。
+- 包根 **`index.js`** 与 `package.json` 的 `main`。它**不承载任何功能**，宿主从不加载它（bundle 只加载 patch 行所指的模块）——存在的唯一理由是满足市场插件那道装后校验。实测：加上它之后 `--dump-config` 仍然只有那三个入口，冒烟 **44/44** 照过。
+- **bundle 门新增一条判定**：包根必须有 `main` / `exports` / 根 `index.js` 之一且真实存在。删掉这个绕行物会**直接变红**——本仓的门禁看不见市场插件，这条是它唯一的哨兵。
 - `code-map.json` 登记 `packaging.root-entry`；CONTRIBUTING 在「改动会被谁挡住」表里加一行，并在「仓库设置与已知取舍」里写清**拆除条件**（上游修好 #1091 后，删根 `index.js`、删 `main`、删那段判定，三处一起）。
 
 ### 验证
 
 - 本地门禁七道全过、`--self-test` 20/20；真机冒烟 **44/44**（一次性 `DSH_HOME`，装的是带根入口的本仓库）；
-- 用市场自己的函数复算：`entryArtifactExists` 与 `hasLoadableEntry` 现在都返回 **true**（1.73.1 与 1.73.9 两版同）；
+- 用市场插件自己的函数复算：`entryArtifactExists` 与 `hasLoadableEntry` 现在都返回 **true**（1.73.1 与 1.73.9 两版同）；
 - `npm pack --dry-run`：`index.js` 已进包（`main` 指向的文件 npm 始终收录），39 个文件。
 
 ## [1.3.1] — 2026-11-03
@@ -70,7 +72,7 @@
 
 ### 已知（发布史，别踩）
 
-- **`2.0.0` 这个版本号永久作废。** 本版最初发布为 `2.0.0`，随后整包从 npm 撤除、重新发布为 `1.3.0`。npm 的 packument 里 `time` 仍记着 `2.0.0` 曾发布，按规则被撤除的版本号不可重用——所以**下一个可用 major 是 `2.0.1`**，不是 `2.0.0`。`scripts/release.mjs` 现在会在写盘前先查这件事并拒绝。
+- **`2.0.0` 这个版本号永久作废。** 本版最初发布为 `2.0.0`，随后整包从 npm 撤除、重新发布为 `1.3.0`。npm 的 packument 里 `time` 仍记着 `2.0.0` 曾发布，按规则被撤除的版本号不可重用——所以**下一个可用的号是 `2.0.1`**（它不是一次 major 升位，只是 2.x 里最小的可用号；`major` 从 1.3.x 算出来仍是 `2.0.0`，脚本会在写盘前拒绝）。
 - **npm 上留着一个 `0.0.0-stage` 占位版本**（`description: Temporary package placeholder for staged publishing`，无 license / 无 repository）。它是 npm 暂存发布流程的副产物，不在 `dist-tags` 里，`latest` 不受影响，正常安装不会碰到它。
 - **`1.2.0` 与 `1.2.1` 只有提交、没有 tag 与 Release。** 那两个版本存在于入库 npm 之前（对应提交 `4aec0a4`、`13292fb`），所以按本 CHANGELOG 找不到对应的标签——这是历史事实，不回补。
 
@@ -102,7 +104,7 @@
 - **干净基线远端机的重装终验已执行**（WP15）：远端测试机先全量重置为干净 `0.2.1-rc.5`，随后真装本包 **1.2.1**——`dsh plugin --profile smoke add` **exit 0**、一次性 home 冒烟 **`pass=38 fail=0 total=38`**、持久装进 `headless` profile 后 `--dump-config` 三入口齐（`enhance-scope` / `auto-approve` / `enhance-ui`）、`cordis.patch.yml` 仍 `[]`；核验前后远端仓库 68 文件的 sha256 清单无差异。**设置页四项只有结构证据**：冒烟只断言 `checks` 的名字与顺序恰为 `["plugins","text","inject","preset"]`，四项各自的 `pass`/`na` 取值没有断言，也没有 GUI 证据（该机只装 `headless` profile，组合里没有 web 服务宿主）；
 - **设置页四项的取值断言（补在后续批次里，2026-11-02）**：一次性 home 冒烟的断言由 **38** 条增至 **44** 条——`plugins` / `text` / `inject` / `preset` 四项不再只断言名字与顺序，各自的 `pass` / `na` 取值都钉住了（`inject` 分两态：没有会话日志时**如实红**、detail 点明「没有会话日志」；用合成会话日志命中时绿。品牌人设第二路 `identity=custom` 另用一份合成日志走一遍绿）。合成日志只证明探针判定链路通，**不**替代真机会话证据——真会话那一条仍阻塞在余额上。上面 38/38 与「四项只有结构证据」是 WP15 当时的读数，保持不变；
 - **本轮未复现**：五张图「源 JSON → 成品」的逐字节一致性没有重跑（本机没有 archify），其中 `02-prompt-injection` 与 `04-compat-verify` 是源 JSON 与 SVG 同时手改、`02` 的遮罩宽度按字宽估算；`1.1.2` 那条是那一轮自己的记录，不是本轮的复现凭证；
-- **仍阻塞**：真机会话上的装配层验收——远端真会话跑一次即 `QUOTA: Insufficient Balance`（exit 1，未重试），模型凭据余额为 0，本轮只有单测、门禁与合成日志，没有真机会话日志；要复跑缺**一次有余额的会话**。`hideHarness` 在桌面 / web profile 上的效果同样未验。
+- **本轮仍阻塞**：真机会话上的装配层验收复跑——远端真会话跑一次即 `QUOTA: Insufficient Balance`（exit 1，未重试），模型凭据余额为 0，本轮只有单测、门禁与合成日志，没有真机会话日志；要复跑缺**一次有余额的会话**。`hideHarness` 在桌面 / web profile 上的效果同样未验。
 
 ## [1.2.0] — 2026-11-02
 
@@ -144,7 +146,7 @@
 - `scripts/extract-figure-svg.mjs`：从 Archify 的交互式 HTML 抽出可独立渲染的 SVG（补 `xmlns`、内联类规则与 CSS 变量、CDATA 包裹）；
 - `scripts/check-readme.mjs`：README 门禁，114 项结构检查（章节顺序、站内链接、图存在、ToC 覆盖、代码块语言、许可证在最后、两个语言版本互链）。
 
-> 以上三行与图相关的条目是当时（1.2.1）的事实。**图与图源后来已整体删除**（图改由 Archify 在仓外生成，不再进仓库维护），`scripts/extract-figure-svg.mjs` 一并移除——当时写的路径现已不存在。
+> 上面三条与图相关的路径**现已不存在**：图与图源、`scripts/extract-figure-svg.mjs` 都已从仓库删除，架构图改由 Archify 在仓外生成，不再进仓维护。
 
 ### 变更
 

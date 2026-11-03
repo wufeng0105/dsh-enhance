@@ -4,7 +4,7 @@
 
 贯穿四条的是同一句话：**这个仓不靠「写对代码」维持，靠的是每条事实只有一个家——机读的那份叫单一来源，人读的那份叫权威——而那个家被门禁现场核对。** 所以在这里动手，先找家，再改；改完能不能信，看两层校验是不是都兑现。
 
-操作规程的权威是 [CONTRIBUTING.md](CONTRIBUTING.md)：改完跑什么、发版链路每一步、提交与 PR 怎么走，都在那边。本文不复制步骤，只给入口、通则、红线与信号。
+操作规程在 [CONTRIBUTING.md](CONTRIBUTING.md)。这六篇是一组：本文给**归属与此刻**——每类事实归哪一篇、眼下是什么状态；其余五篇各自独占一件事——怎么改（CONTRIBUTING）、对宿主负责到哪（[docs/compatibility.md](docs/compatibility.md)）、一个东西该叫什么（[docs/terminology.md](docs/terminology.md)）、品牌人设为什么这样设计（[docs/brand-persona.md](docs/brand-persona.md)）、什么时候改了什么（[CHANGELOG.md](CHANGELOG.md)）。**本文不复制它们的话**：每件事只在它那一篇里展开，别处只指向。
 
 ## 这是什么仓，装的是什么
 
@@ -49,7 +49,7 @@ node scripts/check.mjs              # 门禁：静态、离线、一次跑完
 node scripts/check.mjs --self-test  # 负例：逐条把门禁弄红，证明它们真的会红
 ```
 
-CI 在 `windows-latest` 上跑的就是这两条（[.github/workflows/ci.yml](.github/workflows/ci.yml)），PR 也要求两条都 `exit 0`。门禁里面有几道，以它自己的输出为准——**门数不是承诺位，文档里不写数字**，加一道门不需要同步任何文档。
+PR 与 CI 都要求这两条 `exit 0`（CI 跑在哪、还跑什么，见 CONTRIBUTING 的「改之前先跑一遍门禁」）。门禁里面有几道，以它自己的输出为准——**门数不是承诺位，文档里不写数字**，加一道门不需要同步任何文档。
 
 负例不是「多跑一遍求安心」。「全绿」有两种：真的没问题，和门禁已经失效。负例排除后者——每条负例在**负例名册**里登记它守哪道门，**删掉一条、或把它改挂到别的门，都会红**。
 
@@ -63,24 +63,24 @@ CI 在 `windows-latest` 上跑的就是这两条（[.github/workflows/ci.yml](.g
 - **真机**：装不装得上、跑不跑得起来，只有一次性 `DSH_HOME` 的真装冒烟、和从市场插件界面装卸能回答。真机上用 `pwsh` 7，不要用 `powershell` 5.1——5.1 的 `-Encoding utf8` 会写 BOM，宿主读到会崩。
 - **外部状态**：npm 撤没撤过号、上游修没修、收录目录有没有人采集——都在仓库外。
 
-**已知盲区，写清楚不装**：`scripts/known-counts.json` 的计数键被删掉时，门禁不会红——那项比对跟着键一起消失。删一个键等于静悄悄关掉一项比对，这是红线里「不许删计数键」的根据。
+**门禁也有它守不到的地方**：`scripts/known-counts.json` 的计数键被删掉时，那项比对会跟着键一起消失，门禁不会红。这类「没有门禁、只有纪律」的事，逐条列在 CONTRIBUTING 的「靠纪律的」那张表里——那张表就是它们的家。
 
 改完分别跑什么：
 
 - 每次改动：上面那两条命令。
-- 发版前：另跑真装冒烟 `pwsh -NoProfile -File tools/smoke.ps1`（一次性 `DSH_HOME`，不碰日常 profile）。它**不进** CI、也不进 `--ship`，是发版纪律里的硬步骤——为什么不塞进发布脚本，理由在 CONTRIBUTING 的「发版前必跑：真装冒烟」。
+- 发版前：另跑真装冒烟 `pwsh -NoProfile -File tools/smoke.ps1`（一次性 `DSH_HOME`，不碰日常 profile）。它是发版的硬步骤，定位与「为什么不塞进发布脚本」见 CONTRIBUTING 的「发版前必跑：真装冒烟」。
 - 发版后、或任何想核的时候：`node scripts/release.mjs --check`。VERSION、`package.json`、最新 git tag、npm latest、GitHub Release 五处，外加发布凭据到期日；联网、只读、不在门禁里（门禁必须能离线跑），`consistency` 工作流每天跑一次。它红了不代表门禁坏了，代表仓外那六样东西分叉了。
 
 ## 哪些线绝对不能碰
 
 上一节说门禁判不了的三类事落在纪律上；这一节是纪律里最硬的几条。按踩到之后的破坏力排，没有「先问人再放宽」这一档——越过任何一条，门禁都不会替你喊：有的会让「事实有家、家被核」这套结构本身失效，有的会让接着的每一步都卡住。
 
-1. **不要 unpublish、不要删 npm 上的版本。** 撤掉的号永久不可再用——`2.0.0` 就是这么烧掉的（曾发布、整包撤除、重发 1.3.0），而 `release.mjs` 的 `major` 从 1.3.2 算出来正好是它，脚本会在写盘前拒绝。发布史三条坑与下一个可用号，以 [CHANGELOG.md](CHANGELOG.md) 的「已知（发布史，别踩）」为准，动版本号之前先读那一节。
-2. **不要 force-push 或删除 `main`。** 分支保护只开了这两条（禁强推、禁删分支，`enforce_admins: true`）。理由一句就够：npm 上的发布版改不了，标签指向的提交一旦被从 `main` 抹掉，仓库里再也说不出「我装的这版」对应哪次提交。
+1. **不要 unpublish、不要删 npm 上的版本。** 撤掉的号永久不可再用——`2.0.0` 已经这么烧掉过一次，而 `release.mjs` 的 `major` 从 1.3.x 算出来正好是它，脚本会在写盘前拒绝，别绕。发布史三条坑与下一个可用的号，以 [CHANGELOG.md](CHANGELOG.md) 的「已知（发布史，别踩）」为准，动版本号之前先读那一节。
+2. **不要 force-push 或删除 `main`。** 分支保护只开了这两条；为什么只开这两条、为什么管理员不豁免，见 CONTRIBUTING 的「仓库设置与已知取舍」。一句话版本：发布出去的版本改不了，历史一旦改写就再也对不上号。
 3. **发版只走 `--ship`，不要 `--publish --otp`。** 验证码 30 秒有效、只有人拿得到，Agent 走这条路必卡死。真需要手工发，让在场的人自己敲那一步。
 4. **不要改 `package.json` 的 `name`，也不要把 `private: true` 加回来。** 名字与 `cordis.patch.yml` 的入口前缀、老用户 profile 依赖键、两个 README 的命令三处绑定；改错了不一定是报错——宿主可能只打一句 warning，插件就不激活。`private: true` 会让 `npm publish` 直接拒绝，门禁也会红。
 5. **`.zhll/` 永不入库。** 里面是本地草稿与审计档案（含对自身缺陷的详细描述）。它在 `.gitignore` 里、语法门也跳过它，**没有任何门禁守着**，只有提交前看一眼改动清单这一道人防。别对它 `git add -f`，也别为了「统一」把它挪到会被跟踪的位置。
-6. **不要删 `scripts/known-counts.json` 的计数键。** 键没了，那项比对跟着消失，门禁不会替你要回来——上一节那句「已知盲区」就是这一条的根据。
+6. **不要删 `scripts/known-counts.json` 的计数键。** 键没了，那项比对跟着消失，门禁不会替你要回来——为什么、怎么守，见 CONTRIBUTING 的「靠纪律的」表。
 7. **不要绕过门禁，也不要把断言放宽到绿灯。** 红灯修到绿，绿灯才可信；删负例、改松断言、把 `selfTestCases` 的下限往下压，都能变绿，也都让门禁失去意义。这个下限的规矩是只许增、不许减。
 
 下面三类不是红线，是权限边界——它们要人拍板：
@@ -97,11 +97,11 @@ CI 在 `windows-latest` 上跑的就是这两条（[.github/workflows/ci.yml](.g
 
 | 事项 | 现在的状态 | 信号到了做什么 |
 |---|---|---|
-| 包根 `index.js` 绕行 | 在。它不承载功能，只满足市场插件的装后校验（上游 dsh-market/dsh-market#1091 把「载体自身的子路径」当成了别的包目录） | 上游修复合入 **npm `latest`** 渠道后，三处一起拆：删根 `index.js`、删 `package.json` 的 `main`、删 `check.mjs` 里 `gateBundle` 那段判定，`code-map.json` 的登记跟着删。只拆一处 bundle 门会红——那是故意的：市场插件看不见它，门禁是它唯一的哨兵 |
+| 包根 `index.js` 绕行 | 在。它不承载功能，只满足市场插件的装后校验（上游 dsh-market/dsh-market#1091 把「载体自身的子路径」当成了别的包目录） | 上游修复合入 **npm `latest`** 后三处一起拆——删根 `index.js`、删 `package.json` 的 `main`、删 `check.mjs` 里 `gateBundle` 那段判定，`code-map.json` 的登记跟着改；完整理由与「只拆一处会红」见 CONTRIBUTING 的「仓库设置与已知取舍」 |
 | 已修好、未发版的 `sessionOmits` 假红 | 代码已修（1.3.2 之后的提交），npm 上的 1.3.2 仍带着它：切过品牌人设的遮蔽之后，「设置页的检查项」会误报 | 下一次发版：先跑真装冒烟，再走 `--ship`。发出去之前，1.3.2 的用户点那一项就是会看到误报 |
 | `NPM_TOKEN` 到期 | 记在 [.github/npm-token-expiry.json](.github/npm-token-expiry.json)（2027-02-01） | 剩 30 天内 `--check` 判红，`consistency` 工作流每天替你看着；换法就在那个文件里。这条门禁看不见：token 过期时五处版本号仍一片对齐，只有 npm 那一步 401 |
-| DSH 出 0.2.1 正式版，或出新 rc | 声明区间停在 `<0.2.1-rc.6`，真机只在 rc.5 上验过 | `version` 门会红——正式版按 semver 大于 rc 上界，这不是误报，是硬闸的应有行为。按 [docs/compatibility.md](docs/compatibility.md) 的例行核验跑一遍，过了再两端一起扩区间 |
-| 真会话上的装配层验收 | 桌面会话已验通（rc.5）：内容边界确实进了系统提示，品牌人设遮蔽确实生效。headless 真会话仍被凭据余额挡住（`QUOTA: Insufficient Balance`），rc.1–rc.4 没有真机证据 | 等一次有余额的会话，补 headless 那一半。`docs/compatibility.md` 的核验记录里这一条仍停在「未验」，这一轮还没并进去——以本节为准 |
+| DSH 出新 rc，或发 0.2.1 正式版 | 真机只在 rc.5 上验过；区间现值以 `package.json` 的 `engines.dsh` 为准（验过哪些版本见 compatibility 的「声明」） | `version` 门会红——正式版按 semver 大于 rc 上界，这不是误报，是硬闸的应有行为。按 [docs/compatibility.md](docs/compatibility.md) 的例行核验跑一遍，过了再两端一起扩区间 |
+| 真会话上的装配层验收 | 桌面会话上已验通（rc.5）：内容边界确实进了系统提示，品牌人设遮蔽确实生效。headless 真会话仍被凭据余额挡住（`QUOTA: Insufficient Balance`），rc.1–rc.4 没有真机证据 | 等一次有余额的会话，补 headless 那一半；结论与复跑条件记在 [docs/compatibility.md](docs/compatibility.md) 的「核验记录」 |
 | 收录目录上的卡片 | 版本、下载量、宿主要求由每夜采集自动追平 | 只有**描述文字**不自动：要改就向上游 `data/plugins/wufeng0105__dsh-enhance.yml` 提 PR，条目里不许手写 `npm:`。仓库侧不用管 |
 | 市场插件那条报错文案 | 上游 #1091 里记了，单独一条处理，未修 | 上游的事，我们这侧修不了——文案在对方包里。别在本仓为它打补丁 |
 

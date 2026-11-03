@@ -1,6 +1,6 @@
 # DSH 版本支持
 
-**适用版本**：DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）。这句与 `README.md` / `README.en.md` 里那两句逐字同源，都由 `package.json` 派生；2026-10-30、2026-10-31 与 2026-11-02 各做过一轮干净安装终验（三轮各有前提，逐条复跑条件见「核验记录」每轮末尾）。
+**适用版本**：DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）。这句与 `README.md` / `README.en.md` 里那两句逐字同源，都由 `package.json` 派生；2026-10-30、2026-10-31 与 2026-11-02 各做过一轮干净安装终验（三轮各有前提，逐条复跑条件见「核验记录」每轮末尾），2026-11-03/04 另有一轮真机桌面会话上的装配层验收。
 
 版本支持不是「尽量兼容」的承诺，而是一份有界、可复跑、由一处声明驱动的契约：声明写清我们核过哪些版本，宿主自己执行同一条声明，流程写清新版本来了怎么核，核验结果留档。这篇文档就是契约的全部内容。
 
@@ -33,6 +33,8 @@
 README 里那句适用版本是这份声明的派生文本，`node scripts/check.mjs` 要求两处逐字一致。它同时核对声明形状（区间解析与成员判定在 `shared/compat.mjs`，唯一实现）；探测到本机 DSH 版本不在区间内时判红，提示先跑本文的例行核验再扩区间。
 
 为什么 README 不能是第二权威：散文会被人顺手改，声明不会。两处各写各的，就会「改了声明忘改 README」与「改了 README 忘改声明」各错一次。为什么是区间不是版本数组：宿主读的就是这个字段——理由在「宿主怎么执行这条声明」一节。
+
+**正式版与 rc 的排序陷阱**：上界停在某个 rc 之前时（现在是 `<0.2.1-rc.6`），按 semver 排序 `0.2.1` **大于** `0.2.1-rc.6`——上游一发正式版，它就落在区间外，插件对用新宿主的用户变成装不上。这不是缺陷，是半开区间的应有行为；代价是「上游发正式版」和「上游发 rc」一样，都要先走一轮例行核验再扩区间。
 
 ## 宿主怎么执行这条声明
 
@@ -67,7 +69,7 @@ README 里那句适用版本是这份声明的派生文本，`node scripts/check
 | 浏览器半装载 | `window.__ModuleLoader__.load({id, factory})`、factory 参数 `require('react')`、`dsh.client` 发现规则（`exports["./client"]` + 裸包名行才挂浏览器半） | 设置页整个消失（服务端功能仍在） |
 | 宿主视觉 token | 23 个 `--dsw-*`/`--ds-*` 变量、`body[data-ds-dark-theme]` 属性钩子、排版刻度 | 页面不可读 / 深色模式错乱 |
 | profile 配置与解析 | `profileContext` 形状（`patchPath`）、`DSH_PROFILE_DIR` + `cordis.patch.yml` 文件名、`profiles/<name>/` 布局、patch 顶层数组 + `config` 整块替换 + `- id: permission` 行、`presets`/`defaultPreset` 契约、档位菜单显示契约（表外档名纯文字行）、宿主侧档位中文名文案、审批策略 `approval/policy` 取 `never` 时前置拒绝 | 写档 409 或写坏用户配置 / 播种错开关档（默认档位的审批策略是 `never` 时，种「自动同意」会被宿主前置拒绝，须种「先问我」） |
-| 会话日志探针 | `sessions/<workspace>/<session>/session.v4.jsonl.zstd` 文件名与两层目录、zstd 多帧追加（宿主 Node **≤24.21** 的 `zstdDecompressSync` 只解第一帧，**24.22.1 起解全**；所以探针按魔数逐帧切，不赌版本）、`"system-prompt"` 行标记；另有正反两个探针（`sessionContains` 判「该在的文本在不在」，`sessionOmits` 判「不该在的文本还在不在」——**两者极性不同**：存在性任一命中即证明，缺失性只看**最新一份**含 `"system-prompt"` 装配记录的日志，按 mtime 倒序取第一份，不能扫「最近 N 份都不含」，否则切换设置前的旧日志会把刚生效的遮蔽永久判红） | 「检查」的 inject 项永远红，或品牌人设遮蔽失效却全绿 |
+| 会话日志探针 | `sessions/<workspace>/<session>/session.v4.jsonl.zstd` 文件名与两层目录、zstd 多帧追加（宿主 Node **≤24.21** 的 `zstdDecompressSync` 只解第一帧，**24.22.1 起解全**；所以探针按魔数逐帧切，不赌版本）、`"system-prompt"` 行标记；另有正反两个探针（`sessionContains` 判「该在的文本在不在」，`sessionOmits` 判「不该在的文本还在不在」——**两者极性不同**：存在性任一命中即证明，缺失性只看**最新一份**含 `"system-prompt"` 装配记录的日志，按 mtime 倒序取第一份，不能扫「最近 N 份都不含」，否则切换设置前的旧日志会把刚生效的遮蔽永久判红） | 设置页的检查项里 `inject` 那一项永远红，或品牌人设遮蔽失效却全绿 |
 | 版本探测链 | `DSH_VERSION` → `@deepseek-ai/dsh-package-manifest` → 安装作用域核心包 → `app.asar` 头布局 → `LOCALAPPDATA` 安装根 → `dsh-runtimes/<runtime>/runtime.json` | 版本行退化成「读不到本机版本」（其余功能不受影响） |
 | home | `DSH_HOME` / `~/.dsh`、`<home>/enhance/` 数据目录 | 自家数据无处落 |
 | 装载与冒烟工具链 | bundle patch entry 解析规则（name 相对本包目录）、`dsh` CLI 与安装根、profile `package.json` 装载痕迹 | 装不上 / 例行核验流程断 |
@@ -173,7 +175,7 @@ $b64 = gh api "repos/$repo/git/blobs/<sha>" --jq '.content'
 
 ### 4. 冒烟
 
-用独立 `DSH_HOME`，别碰日常使用的 profile。仓库自带脚本，一条命令跑完：
+用独立 `DSH_HOME`，别碰日常使用的 profile。仓库自带脚本，一条命令跑完（它同时是**发版前的硬步骤**：定位、断言口径与「为什么不进 CI」在 [CONTRIBUTING.md](../CONTRIBUTING.md) 的「发版前必跑：真装冒烟」，这里只把当例行核验用）：
 
 ```powershell
 pwsh -NoProfile -File tools/smoke.ps1
@@ -220,7 +222,7 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 
 每改一次声明区间前后各核一轮。**细节不在这里复述**：每一轮当时的完整叙述都在 git 历史里（`git log -p docs/compatibility.md`），本表只留三样——核了什么、结论是什么、想复跑要什么条件。这样记录不随版本数无限膨胀，而结论与复跑条件一条不少。
 
-### 2026-10-30 – 2026-11-02（历轮汇总）
+### 2026-10-30 – 2026-11-04（历轮汇总）
 
 **源码级区间（2026-10-30）**：9 个包的 5 个 tag 逐个比 tree SHA。取法即「例行核验」第 2 步那条脚本；「同左」= 与 rc.1 同一个 SHA（不是「没测」）。
 
@@ -244,9 +246,10 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 | 10-30 · rc.5 干净环境终验 | 远端重置后真装 → `--dump-config` 三入口、patch 仍 `[]` → 隔离 home 冒烟 → GUI 侧 `/enhance/api` 命中真实会话 | 装包、组合、冒烟通过；GUI 注入命中（当时有可用会话） | 前三步**可复跑**；GUI 那一环**不可复跑**（要桌面 GUI + 一次有余额的会话） |
 | 10-31 · 远端全量重置后重装 | 杀进程 → 删 `.dsh`／安装根／卸载项 → 静默重装 rc.5 → 复对 SHA → 装包 → 冒烟 | SHA 9/9 一致；装包 exit 0；冒烟当时全过；空 patch 三种写法必败；组合树 `presets` 三档全表、不含 `defaultPreset` | 重置本身**不可复跑**（需可整机重置的测试机）；空 patch 探针**可复跑**（下面那段命令） |
 | 11-02 · 36 条触点那一轮（1.2.0） | 宿主侧 asar 逐条核对新触点；远端真机端到端（双 profile 装包、设置页五组） | 契约假设全部成立；装配层验收在真机会话日志上成立（`custom` 第一句为自定义文本、宿主原句 0 命中；切回 `keep` 逐字回原句） | asar 核对**可复跑**（基准见下）；远端那轮**不可复跑**（桌面 GUI + 有余额的会话） |
-| 11-02 · 1.2.1 收口轮 | 干净基线远端真装 1.2.1（**1.2.0 那轮的包装不含本轮新增的 `identityInstall` 与 `inject` 两路探针**） | 装包 exit 0；三入口齐；patch 仍 `[]`；远端 68 文件 sha256 前后无差异；冒烟当轮 38 条（现值见 `CHANGELOG`） | 装包**不可复跑**（需那台测试机）；冒烟**可复跑** |
-| 11-03 · 市场安装路径（1.3.2） | 远端服务器上从**插件市场界面**安装与卸载本包（`@wufeng0105/dsh-enhance`） | **能装能卸**。此前 1.3.1 会「装上后立刻被市场装后校验判 broken 并删除」——根因在市场侧（`hasLoadableEntry` 把载体自身子路径的 patch 目标当独立包目录探测，上游 #1091），本仓以包根 `index.js` 绕行，bundle 门守着它不被删 | 需一台**能连市场**的远端机器；`--check` 证明不了这一环 |
-| 每一轮的真会话 | 真会话里的装配结果、桌面 `hideHarness` | **仍未验**：`QUOTA: Insufficient Balance`（余额 0），只记录、不下结论 | **不可复跑**，缺**一次有余额的会话**（+ `custom`/`keep` 两份日志对照） |
+| 11-02 · 1.2.1 收口轮 | 干净基线远端真装 1.2.1（**1.2.0 那轮的包装不含本轮新增的 `identityInstall` 与 `inject` 两路探针**） | 装包 exit 0；三入口齐；patch 仍 `[]`；远端 68 文件 sha256 前后无差异；冒烟当轮 38 条（现值以 `scripts/known-counts.json` 的 `smokeAssertions` 为准） | 装包**不可复跑**（需那台测试机）；冒烟**可复跑** |
+| 11-03 · 市场安装路径（1.3.2） | 远端服务器上从**市场插件**（`dsh-market/dsh-market`）的界面安装与卸载本包（`@wufeng0105/dsh-enhance`） | **能装能卸**。此前 1.3.1 会「装上后立刻被装后校验判 broken 并删除」——根因在插件那一侧（`hasLoadableEntry` 把载体自身子路径的 patch 目标当独立包目录探测，上游 #1091），本仓以包根 `index.js` 绕行，bundle 门守着它不被删 | 需一台**能连市场插件**的远端机器；`--check` 证明不了这一环 |
+| 11-03/04 · 真机桌面会话（rc.5） | 桌面端会话日志里的装配结果：内容边界文本有没有逐字进系统提示；品牌人设遮蔽有没有真的顶掉宿主自称句 | **两条都成立**：装配记录末尾逐字含内容边界那句；遮蔽后首句是部署人设句，宿主自称句在整份日志里 0 命中 | **不可复跑**（要桌面 GUI + 一次能跑通的会话）；同一轮的 headless 真会话仍被余额挡住，见下一行 |
+| headless 真会话 · `hideHarness` | `dsh headless` 上的装配结果；`hideHarness` 在桌面 / web profile 上的效果 | **仍未验**：headless 一跑就 `QUOTA: Insufficient Balance`（余额 0）；`hideHarness` 那两段在桌面 / web 上也还没有基线——`headless` 组合里本来就没有 `webApp`，那两段注册不到 | **不可复跑**，缺**一次有余额的会话**（+ `custom`/`keep` 两份日志对照） |
 
 **三条容易忘的边界**
 
