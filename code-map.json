@@ -70,7 +70,7 @@
       "id": "tool.counts-check",
       "layer": "cli",
       "path": "tools/counts-check.mjs",
-      "owns": "文档计数一致性：读 scripts/known-counts.json 单一来源，扫文档里的测试/负例/门数/检查项/断言/组数/触点声明；生产事实（设置组数、门数）先自证，历史核验记录不按现值校验"
+      "owns": "文档计数一致性：读 scripts/known-counts.json 单一来源，扫文档里的测试/负例/检查项/断言/组数/触点声明；生产事实（设置组数）先自证，历史核验记录不按现值校验；`--report` 只读列出每一处声明位清单，不改判定"
     },
     {
       "id": "tool.field-check",
