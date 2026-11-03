@@ -154,6 +154,14 @@ node scripts/release.mjs patch --publish
 
 要临时放宽（比如真需要改写 `main` 的历史），用 `gh api -X DELETE repos/wufeng0105/dsh-enhance/branches/main/protection` 关掉，改完再按上面的 JSON 开回来。
 
+### 给 Agent 的三条
+
+日常操作多半由 Agent 执行，这三条是它需要知道、但从代码里读不出来的：
+
+1. **发版走 `--ship`，不要走 `--publish --otp`。** 后者需要验证器 App 生成的 6 位码，30 秒有效——**只有人拿得到**。Agent 用它会卡死。`--ship` 推标签后由 CI 用仓库里的 `NPM_TOKEN` 发，全程不需要人。真需要手工发时，让人来做。
+2. **`.zhll/` 永不入库。** 它是本地草稿与审计档案（50+ 文件，含对自身缺陷的详细描述），已在 `.gitignore` 里。别对它用 `git add -f`、别为了「统一」把它改到会被跟踪的位置、`git clean` 时留心。这条没有门禁守着——`scripts/code-files.mjs` 的 `SKIP_DIRS` 跳过它，所以里面的 `.mjs` 连语法门都不过。
+3. **工作流里的 `actions/checkout@v4`、`actions/setup-node@v4` 是有意不钉 SHA 的。** 发布 job 带 `contents: write` + `id-token: write`，按供应链习惯本该钉 commit SHA；这里没钉，理由是单人仓库 + 只有这两个官方 action，钉了却没有自动升级（无 Dependabot），会变成「安全补丁永远收不到」的另一种风险。**这是个已知的、被接受的取舍**，不是疏忽。真要加强就先配 Dependabot 再钉。
+
 ## 提交与 PR
 
 - 一个逻辑改动一个提交，信息写清「改了什么、为什么」
