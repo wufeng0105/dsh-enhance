@@ -1,0 +1,38 @@
+name: consistency
+
+# 版本号五处（VERSION / package.json / git tag / npm latest / GitHub Release）
+# 是各自独立写入的，谁也不会自动跟着谁变。这个工作流定时把它们并排比一遍，
+# 漂移了就用红灯说话——而不是等某天有人发现「npm 上是 1.4.0，仓库还停在 1.3.0」。
+#
+# 它只读不写，不会自动修。修法见 CONTRIBUTING 的「发布」一节：
+# 补标签、补 Release，或重跑一次发布。
+
+on:
+  schedule:
+    # 每天 03:00 UTC（北京时间 11:00）。放在每夜采集之后，比的是当天的真实状态。
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: version-consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `--check` 要看全部标签，浅克隆会只看到最新的那个。
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # `--check` 用 gh 查 GitHub Release 是否存在。
+      - name: 核对五处版本号
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release.mjs --check
