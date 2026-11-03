@@ -100,9 +100,9 @@ Brand persona needs no restart: the next message picks it up. Choose **keep** to
 dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 ```
 
-If you installed under the pre-1.2.x unscoped name (`dsh-enhance`), your profile dependency key still carries that name — remove it under the old name first, then add the new one.
-
 Then restart. Your text and switches under `<DSH_HOME>/enhance/` are kept; delete that directory to remove them too.
+
+If you installed under the pre-1.2.x unscoped name (`dsh-enhance`), your profile dependency key still carries that name — remove it under the old name first, then add the new one.
 
 ## How it fits together
 

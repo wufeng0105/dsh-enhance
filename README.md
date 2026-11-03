@@ -3,7 +3,7 @@
 [![CI](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml/badge.svg)](https://github.com/wufeng0105/dsh-enhance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-换掉 DeepSeek Harness 系统提示开头那句品牌声明，或在末尾追加一段你自己写的文本。存盘即生效，下一条消息就带上。不用重启，不改宿主文件。
+换掉 DeepSeek Harness 系统提示开头那句品牌声明，或在末尾追加一段你自己写的文本。
 
 简体中文 | [English](./README.en.md)
 
@@ -100,9 +100,9 @@ notepad "$env:USERPROFILE\.dsh\enhance\identity.txt"
 dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 ```
 
-如果你是从 1.2.x 之前的旧包名（无 scope 的 `dsh-enhance`）装的，profile 里那条依赖键还写着旧名字，要先按旧名卸掉、再用上面的新名装回来。
-
 然后重启。`<DSH_HOME>/enhance/` 里你写的文本和开关会保留；想一并清掉就删掉那个目录。
+
+如果你是从 1.2.x 之前的旧包名（无 scope 的 `dsh-enhance`）装的，profile 里那条依赖键还写着旧名字——要先按旧名卸掉，再用上面的新名装回来。
 
 ## 它怎么接进去的
 
