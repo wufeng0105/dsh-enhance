@@ -208,15 +208,18 @@ if (badEntries.length) {
 if (typeof pkg.private === 'boolean' && pkg.private) fail('package.json 声明了 private，npm publish 会拒绝')
 if (pkg.publishConfig?.access !== 'public') fail('package.json 缺 publishConfig.access: "public"，scope 包发出去会是私有的')
 
-// npm 身份：没登录或登错账号，发布一定失败。
-const who = npm(['whoami', '--registry', NPM_REGISTRY])
-if (who.status !== 0) {
-  fail(`npm 未登录或登录已失效（--registry ${NPM_REGISTRY}）。先跑：npm login --registry ${NPM_REGISTRY}`)
-}
-const npmUser = (who.stdout ?? '').trim()
-const scope = pkg.name.startsWith('@') ? pkg.name.split('/')[0].slice(1) : null
-if (scope !== null && scope !== npmUser) {
-  fail(`包名 scope 是 "@${scope}"，但当前 npm 账号是 "${npmUser}"——只有该 scope 的持有者能发布`)
+// npm 身份：只有「从本机直接发」才需要。`--ship` 走的是推标签 + CI 的 OIDC，
+// 本机根本没有 npm 登录态也该能打标签——所以这条检查跟着 `publish` 走。
+if (publish && !ship) {
+  const who = npm(['whoami', '--registry', NPM_REGISTRY])
+  if (who.status !== 0) {
+    fail(`npm 未登录或登录已失效（--registry ${NPM_REGISTRY}）。先跑：npm login --registry ${NPM_REGISTRY}`)
+  }
+  const npmUser = (who.stdout ?? '').trim()
+  const scope = pkg.name.startsWith('@') ? pkg.name.split('/')[0].slice(1) : null
+  if (scope !== null && scope !== npmUser) {
+    fail(`包名 scope 是 "@${scope}"，但当前 npm 账号是 "${npmUser}"——只有该 scope 的持有者能发布`)
+  }
 }
 
 // ---------------------------------------------------------------- 2. 版本
