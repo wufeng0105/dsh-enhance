@@ -56,7 +56,7 @@ node scripts/check.mjs --self-test  # 20 个负例，证明每道闸与每个内
 
 那张表的第一行（新增常驻源码要登记）有一句必须逐字保留的表述，由 graph 门断言钉住——**常驻源码（不含 `scripts/`、`tests/`）必须登记进 `code-map.json`**。登记时写 `id` / `layer` / `path` / `owns`，前三个是判据，别随手改；`scripts/` 与 `tests/` 由语法门与测试门自己守着，不进模型比对（改豁免范围要两处一起改）。
 
-还有两类**不**挡你——它们原先挡，后来按维护成本放开了：README 有没有目录（现在可选）；README 增删章节导致的检查项数变化（结构检查项数不再钉在 `known-counts.json` 上）。
+还有两类**不**挡你——它们原先挡，后来按维护成本放开了：README 有没有目录（可选）；README 增删章节导致的检查项数变化（结构检查项数不再钉在 `known-counts.json` 上）。
 
 ### 靠纪律的（没有门禁守）
 
@@ -64,7 +64,7 @@ node scripts/check.mjs --self-test  # 20 个负例，证明每道闸与每个内
 |---|---|---|
 | `.zhll/` 永不入库 | 它在 `.gitignore` 里，[`scripts/code-files.mjs`](scripts/code-files.mjs) 的 `SKIP_DIRS` 也跳过它，所以里面的 `.mjs` 连语法门都不过 | 提交前看一眼改动清单；别对它用 `git add -f`，别为了「统一」把它挪到会被跟踪的位置 |
 | 发布身份走哪条腿 | 取决于仓库有没有 `NPM_TOKEN` secret，门禁读不到 secret | 看 `release.yml` 里「选发布身份」那一步的日志 |
-| 工作流 action 不钉 SHA | 钉了却没有自动升级（仓库没有 Dependabot），会变成「安全补丁永远收不到」 | 哪天配了 Dependabot 再钉 |
+| 工作流 action 不钉 SHA | 钉了却不会有自动升级（除非先配 Dependabot），会变成「安全补丁永远收不到」 | 哪天配了 Dependabot 再钉 |
 | `main` 禁强推 | 已经是仓库设置，门禁管不到 | 真要改写历史时先关保护，改完开回来 |
 | npm 账号的 scope 与包名匹配 | 要联网查 npm 账号 | 发版脚本的前置检查会替你查（见「发版」） |
 
@@ -113,9 +113,9 @@ node scripts/release.mjs patch --ship
 | 有 | granular access token（勾了 bypass 2FA） |
 | 没有 | OIDC 可信发布（`id-token: write`） |
 
-当前走的是 token 那条。OIDC 是目标态：把可信发布者配好、再把 secret 删掉，工作流自动切换，`release.yml` 一个字都不用改。配法是 npm 上包的 Settings → Trusted Publisher → GitHub Actions，仓库填 `wufeng0105/dsh-enhance`、工作流文件名填 `release.yml`，勾上 publish 与 manage dist-tags。
+OIDC 是目标态：把可信发布者配好、再把 secret 删掉，工作流自动切换，`release.yml` 一个字都不用改。配法是 npm 上包的 Settings → Trusted Publisher → GitHub Actions，仓库填 `wufeng0105/dsh-enhance`、工作流文件名填 `release.yml`，勾上 publish 与 manage dist-tags。
 
-这一步行不行，取决于账号有没有**安全密钥**：npm 把「改包设置」归为敏感操作，而网页端只提供安全密钥（WebAuthn）这一种方式——需要 Windows Hello PIN、手机通行证或 USB 安全钥匙。账号现有的 TOTP（`auth-and-writes`）够发版，不够改包设置，所以在这台机器上暂时走 token 那条腿。
+这一步行不行，取决于账号有没有**安全密钥**：npm 把「改包设置」归为敏感操作，而网页端只提供安全密钥（WebAuthn）这一种方式——Windows Hello PIN、手机通行证或 USB 安全钥匙都算。TOTP 够发版，不够改包设置。
 
 要迁到 OIDC 的原因不是偏好：npm 在 2026-07 的公告里写明，勾了「bypass 2FA」的 granular access token 从 2026-08 起不能做账号与包管理动作，**约 2027-01 起连直接发布也不行**，发布会收缩成「暂存 + 人工用 2FA 批准」。长期 token 是条死路。
 
@@ -139,7 +139,7 @@ node scripts/release.mjs patch --publish --otp=<6 位验证码>
 
 **Agent 不要走这条**：验证码由验证器 App 生成、30 秒有效，只有人拿得到，Agent 用它会卡死。真需要手工发时让人来操作。
 
-它做的前四步与 `--ship` 相同，只是发完之后不提交、不打标签，脚本会把该跑的 git 命令打出来。它显式发到官方源 `registry.npmjs.org`——本机 `.npmrc` 里配的是 `npmmirror` 镜像，只读，发不上去，脚本不吃全局配置。
+它做的前四步与 `--ship` 相同，只是发完之后不提交、不打标签，脚本会把该跑的 git 命令打出来。它显式发到官方源 `registry.npmjs.org`。本机 `.npmrc` 若指向镜像（本机是 `npmmirror`），那是只读的、发不上去——所以脚本不吃全局配置。
 
 **发完之后不用管市场**：awesome-dsh-plugin 每夜采集一次 npm，自动更新卡片上的版本号、30 天下载量、能力标签，以及「宿主要求」那一格（它读的是 npm 清单里的 `engines.dsh`）。描述文字不在自动采集范围内，那部分要改 `data/plugins/wufeng0105__dsh-enhance.yml` 并向上游提 PR。
 
@@ -149,7 +149,7 @@ node scripts/release.mjs patch --publish --otp=<6 位验证码>
 
 `engines.dsh` 声明了核验过的宿主版本区间，宿主自己在**安装**与**启动**时都会执行它。要把新版本并进区间，先按 [docs/compatibility.md](docs/compatibility.md) 的例行核验跑一遍（约 15 分钟）。
 
-**rc 与正式版之间有个 semver 陷阱**：区间上界一旦停在某个 rc（现在正是 `<0.2.1-rc.6`），按 semver 排序，正式版就**大于**它——`0.2.1` > `0.2.1-rc.6`。所以 DSH 一发正式版，这个上界就会把它挡在门外，插件对用新宿主的用户变成装不上。这不是缺陷，是硬闸的应有行为；但它意味着「宿主发正式版」和「宿主发 rc」一样要触发一次例行核验加扩区间，别等到有人装不上才发现。
+**rc 与正式版之间有个 semver 陷阱**：区间上界一旦停在某个 rc（例如 `<0.2.1-rc.6`），按 semver 排序，正式版就**大于**它——`0.2.1` > `0.2.1-rc.6`。所以 DSH 一发正式版，这个上界就会把它挡在门外，插件对用新宿主的用户变成装不上。这不是缺陷，是硬闸的应有行为；但它意味着「宿主发正式版」和「宿主发 rc」一样要触发一次例行核验加扩区间，别等到有人装不上才发现。上界停在哪，看 `package.json` 的 `engines.dsh`。
 
 本机 DSH 升级到区间之外时 `version` 门会红——那是提醒你按例行核验扩区间，不是误报；CI 不装 DSH，所以只有本机会看到。
 
@@ -169,7 +169,7 @@ node scripts/release.mjs patch --publish --otp=<6 位验证码>
 
 发布这一步不需要人工闸门，因为闸门已经在前面了：`--ship` 的前置检查、门禁、CI 里的「标签 == `VERSION`」逐字核对。再加一个只能人点的按钮，收益是零，代价是自动化全废。
 
-要临时放宽（比如真需要改写 `main` 的历史），用 `gh api -X DELETE repos/wufeng0105/dsh-enhance/branches/main/protection` 关掉，改完再按同一份配置开回来。
+核对当前生效的设置：`gh api repos/wufeng0105/dsh-enhance/branches/main/protection`。要临时放宽（比如真需要改写 `main` 的历史），用 `gh api -X DELETE repos/wufeng0105/dsh-enhance/branches/main/protection` 关掉，改完再按同一份配置开回来。
 
 另外一处已知取舍：工作流里的 `actions/checkout@v4`、`actions/setup-node@v4` 是**有意不钉 SHA** 的。发布 job 带 `contents: write` + `id-token: write`，按供应链习惯本该钉 commit SHA；这里没钉，理由是单人仓库加只有这两个官方 action，钉了却没有自动升级，会变成「安全补丁永远收不到」的另一种风险。这是被接受的取舍，不是疏忽。
 
