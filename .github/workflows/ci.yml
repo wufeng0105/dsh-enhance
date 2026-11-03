@@ -24,3 +24,5 @@ jobs:
           node-version: '24'
       - name: Gates
         run: node scripts/check.mjs --layer fast
+      - name: Self-test
+        run: node scripts/check.mjs --self-test
