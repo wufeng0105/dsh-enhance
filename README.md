@@ -108,8 +108,6 @@ dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 
 这个 bundle 往 profile 的 `cordis.patch.yml` 里插三条入口。宿主其他地方一律不碰。
 
-![宿主组合与三个插件的接缝](./docs/figures/01-host-seams.svg)
-
 `enhance-scope` 注册提示词段、给设置页提供唯一那个接口；`auto-approve` 应答审批请求；界面那半挂在宿主的设置槽位上。
 
 「声明层」指系统提示里描述 harness 自身的注册项——准确定义只有一处，在 [docs/terminology.md](./docs/terminology.md)。品牌人设动的是下面这 **5 个注册项、3 个名字**，一个不多：
@@ -126,15 +124,11 @@ dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 
 你的文字是靠宿主每次装配时回调一个函数进入提示词的——这一段的 order 是从宿主自己的 persona suffix 顺序读来的，不是写死的数。
 
-![一条消息怎么进到系统提示末尾](./docs/figures/02-prompt-injection.svg)
-
 想看这套装配的完整推演——原版注册表怎么现场排序、我们怎么在最后一档贴一页纸、怎么用会话日志证明它真的进去了——另有一页长文：[系统提示是怎么拼起来的](./showcase/prompt-assembly.html)——那页写于 1.1.1 / DSH 0.2.1-rc.3，页末标了它自己的核对依据；它讲的那条链没变，之后新增的能力不在这条链上。
 
 ### 一次保存的全程
 
 设置页走宿主本地 HTTP 服务上唯一那条路由。文字先验大小、**再**改状态，所以超限的保存不会把两个文件改坏。
-
-![设置页一次保存的往返](./docs/figures/03-save-roundtrip.svg)
 
 ## 兼容性
 
@@ -142,15 +136,11 @@ dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 
 DeepSeek Harness 出了新版本，下面这套流程约 15 分钟跑完，最后只剩一处可审的 diff：
 
-![例行核验五步](./docs/figures/04-compat-verify.svg)
-
 完整契约——核了哪些宿主接缝、这条区间怎么被执行、怎么扩区间——在 [docs/compatibility.md](./docs/compatibility.md)。
 
 ## Enhanced 权限档
 
 `danger-full-access` 的意思是「沙箱全开 **而且** 从不问人」。想要「沙箱全开、但仍问你」，得有一个自定义档，而宿主只认 profile 里定义过的档名。
-
-![Enhanced 档的写入、生效与撤净](./docs/figures/05-enhanced-preset.svg)
 
 写档是这个包里唯一会碰宿主配置的动作，而且只在你点那个按钮时才发生。档位表是写全的——profile patch 的 `config` 是整块替换而不是合并，只写新档会把内置三档一起抹掉。你的默认档位不会被改，每次写档都会在 patch 旁边留一份带时间戳的 `.bak`。
 

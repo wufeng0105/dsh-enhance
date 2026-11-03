@@ -35,7 +35,7 @@ node scripts/check.mjs              # 全部门禁
 node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁与每个内嵌 check 组件都真的能红
 ```
 
-门禁一共这些：version / syntax / tests / graph / docs / readme / bundle——**门数不写进文档**，也不由 `tools/counts-check.mjs` 钉住，以 `node scripts/check.mjs` 的输出为准。CI 在 `windows-latest` 上跑 `--layer fast`（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)），**PR 要让这两条都 exit 0**。
+门禁一共这些：version / syntax / tests / graph / docs / readme / bundle——**门数不写进文档**，也不由 `tools/counts-check.mjs` 钉住，以 `node scripts/check.mjs` 的输出为准。CI 在 `windows-latest` 上跑 `node scripts/check.mjs` 与 `node scripts/check.mjs --self-test`（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)），**PR 要让这两条都 exit 0**。
 
 ## 改动会被谁挡住
 

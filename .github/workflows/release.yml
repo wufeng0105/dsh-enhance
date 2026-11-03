@@ -78,7 +78,7 @@ jobs:
 
       # 发之前先过门禁：这个包已经在 npm 上，发一个坏版本比不发更糟。
       - name: 门禁
-        run: node scripts/check.mjs --layer fast
+        run: node scripts/check.mjs
 
       # 幂等：这个版本已经在 npm 上就跳过发布，只往下建 Release。
       # 用途是补一条已经手工发过的版本，以及工作流重跑时不因为「版本已存在」整条红掉。

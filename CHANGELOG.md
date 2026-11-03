@@ -139,10 +139,12 @@
 
 ### 新增
 
-- [`docs/figures/`](docs/figures/)：五张架构图（宿主接缝、注入路径、保存往返、例行核验、Enhanced 档生命周期），README 里按叙事顺序嵌入；SVG 是自包含的，GitHub 直接渲染；
-- [`docs/figures/sources/`](docs/figures/sources/)：图的源 JSON 与复现步骤——源 → 交互式 HTML → 独立 SVG，两步都能跑；
+- 「docs/figures/」：五张架构图（宿主接缝、注入路径、保存往返、例行核验、Enhanced 档生命周期），README 里按叙事顺序嵌入；SVG 是自包含的，GitHub 直接渲染；
+- 「docs/figures/sources/」：图的源 JSON 与复现步骤——源 → 交互式 HTML → 独立 SVG，两步都能跑；
 - `scripts/extract-figure-svg.mjs`：从 Archify 的交互式 HTML 抽出可独立渲染的 SVG（补 `xmlns`、内联类规则与 CSS 变量、CDATA 包裹）；
 - `scripts/check-readme.mjs`：README 门禁，114 项结构检查（章节顺序、站内链接、图存在、ToC 覆盖、代码块语言、许可证在最后、两个语言版本互链）。
+
+> 以上三行与图相关的条目是当时（1.2.1）的事实。**图与图源后来已整体删除**（图改由 Archify 在仓外生成，不再进仓库维护），`scripts/extract-figure-svg.mjs` 一并移除——当时写的路径现已不存在。
 
 ### 变更
 

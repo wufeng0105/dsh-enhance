@@ -108,8 +108,6 @@ If you installed under the pre-1.2.x unscoped name (`dsh-enhance`), your profile
 
 The bundle inserts three entries into the profile's `cordis.patch.yml`. Nothing else in the host is touched.
 
-![Host composition and the three plugin seams](./docs/figures/01-host-seams.svg)
-
 `enhance-scope` registers the prompt section and serves the settings page's only endpoint; `auto-approve` answers approval requests; the browser half of the UI mounts into the host's settings slot.
 
 The **declaration layer** is the set of registrations in the system prompt that describe the harness itself — the definition lives in exactly one place, [docs/terminology.md](./docs/terminology.md). Brand persona touches these **5 registrations under 3 names**, no more:
@@ -126,15 +124,11 @@ With the default settings none of the three names is touched; they are only repl
 
 Your text reaches the prompt through a callback the host invokes on every assembly — the section's order is read from the host's own persona-suffix order, not hard-coded.
 
-![How one message reaches the system prompt](./docs/figures/02-prompt-injection.svg)
-
 For the full walkthrough — how the host's registry is sorted at request time, where this package slips one extra section in, and how the session log proves it landed — there is a long-form page: [How the system prompt is assembled](./showcase/prompt-assembly.html) (Chinese) — written against 1.1.1 / DSH 0.2.1-rc.3, and it states its own verification basis at the end. The chain it describes has not changed; the capabilities added later are not on that chain.
 
 ### One save, end to end
 
 The settings page writes through one route on the host's own local HTTP server. The text is size-checked *before* any state changes, so an oversized save leaves both files exactly as they were.
-
-![The settings page save round trip](./docs/figures/03-save-roundtrip.svg)
 
 ## Compatibility
 
@@ -142,15 +136,11 @@ The settings page writes through one route on the host's own local HTTP server. 
 
 When a new DeepSeek Harness release appears, the routine check below takes about 15 minutes and ends in one reviewable diff:
 
-![The routine compatibility check](./docs/figures/04-compat-verify.svg)
-
 The full contract — which host seams are verified, how the range is enforced, and how to widen it — lives in [docs/compatibility.md](./docs/compatibility.md).
 
 ## The Enhanced preset
 
 `danger-full-access` means "sandbox fully open **and** never ask". If you want "sandbox fully open, still ask", you need a custom preset, and the host only knows preset names defined in your profile.
-
-![Writing, activating and removing the Enhanced preset](./docs/figures/05-enhanced-preset.svg)
 
 Writing it is the only action in this package that touches host configuration, and it happens only when you click the button. The preset table is written in full, because a profile patch replaces `config` wholesale rather than merging it — writing only the new preset would silently delete the three built-in ones. Your default preset is never changed, and every write leaves a timestamped `.bak` beside the patch.
 

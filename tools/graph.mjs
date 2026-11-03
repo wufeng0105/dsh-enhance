@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
- * 代码 → 图。唯一图源是 `code-map.json`；本脚本负责两件事：
+ * 代码结构门禁。唯一模型源是 `code-map.json`；本脚本只做一件事：
  *
  *   --check  把模型和真实源码比对：模块文件是否存在、import 边是否都声明了、
  *            接缝（ctx.on / systemPrompt.section / webServer）是否都登记了。
- *            `--strict` 再渲染一遍并与仓库里的 SVG 逐字节比对；不带 strict 不碰图。
- *   --emit   把 `diagrams` 渲染成 SVG，写到 `docs/generated/`。
  *
- * 为什么要有 --check：手画的图会漂移，漂移的图比没有图更坏。没有 `docs/generated/`
- * 时用默认模式，只守结构；带图产物的树用 `--check --strict`，产物是纯输出，
- * 改代码不重新生成就过不了门。
+ * 为什么要有 --check：声明会漂移——新加的源码文件没登记、删掉的模块没撤、import 边漏写。
+ * 漂移的模型比没有模型更坏，因为它让登记表说出与代码不符的话。
+ *
+ * **图不归它管。** 架构图由 Archify 在仓外生成，产物直接进 `docs/figures/`，不经本脚本。
+ * 早先这里有一台 `--emit` / `--strict` 的渲染机（把 `code-map.json` 的 `diagrams` 渲染成
+ * SVG 写进 `docs/generated/`，再逐字节比对），它**从未接电**——`docs/generated/` 在 git
+ * 全历史中不存在、`--emit` 无任何调用方、CI 只跑 fast 层、`gateStrict` 在缺产物时恒 SKIP。
+ * 2026-11-03 连同 `code-map.json` 的 `diagrams` 段一起删除。
  *
  * 用法：
- *   node tools/graph.mjs --check [--strict] [--root <项目根>]
- *   node tools/graph.mjs --emit   [--root <项目根>]
+ *   node tools/graph.mjs --check [--root <项目根>]
  */
 
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkFields } from './field-check.mjs'
@@ -36,12 +38,10 @@ function valueOf(argv, index, flag) {
 }
 
 function parseArgs(argv) {
-  const options = { check: false, emit: false, strict: false, root: enhanceRoot }
+  const options = { check: false, root: enhanceRoot }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--check') options.check = true
-    else if (arg === '--emit') options.emit = true
-    else if (arg === '--strict') options.strict = true
     else if (arg === '--root') { options.root = resolve(valueOf(argv, index, '--root')); index += 1 }
     else throw new Error(`未知参数：${arg}`)
   }
@@ -57,7 +57,6 @@ try {
 }
 
 const projectRoot = cli.root
-const outDir = join(projectRoot, 'docs', 'generated')
 
 /** 不参与模型检查的：自指的这个文件 + `tests/` 整个目录；其余 tools/ 下的脚本必须登记进 `code-map.json`。 */
 const IGNORED = new Set(['tools/graph.mjs', 'tests'])
@@ -124,7 +123,7 @@ function resolveSpecifier(fromFile, spec) {
   return toPosix(relative(enhanceRoot, target))
 }
 
-function check(map, strict = false) {
+function check(map) {
   const errors = []
   const files = walk(enhanceRoot).filter((file) => !IGNORED.has(file))
   const byId = new Map(map.modules.map((module) => [module.id, module]))
@@ -185,35 +184,7 @@ function check(map, strict = false) {
     }
   }
 
-  if (strict) {
-    // 5. 图产物漂移
-    for (const diagram of map.diagrams) {
-      const svg = renderDiagram(diagram)
-      const path = join(outDir, diagram.id + '.svg')
-      let current
-      try {
-        current = readFileSync(path, 'utf8')
-      } catch {
-        errors.push(`图未生成：docs/generated/${diagram.id}.svg（跑 --emit）`)
-        continue
-      }
-      if (current !== svg) errors.push(`图与模型不一致：${diagram.id}.svg（跑 --emit 重新生成）`)
-    }
-
-    // 6. 反向：目录里多出来的 SVG 也要报——删掉模型项而忘了删文件，同样算漂移
-    const expected = new Set(map.diagrams.map((diagram) => diagram.id + '.svg'))
-    let present = []
-    try {
-      present = readdirSync(outDir).filter((name) => name.endsWith('.svg'))
-    } catch {
-      present = []
-    }
-    for (const name of present) {
-      if (!expected.has(name)) errors.push(`多余的图：docs/generated/${name}（从 code-map 删掉了模型项？删文件或登记回去）`)
-    }
-  }
-
-  // 7. 登记豁免与 CONTRIBUTING.md 逐字对得上（审计 §3.3 那处矛盾）
+  // 5. 登记豁免与 CONTRIBUTING.md 逐字对得上（审计 §3.3 那处矛盾）
   let contributing = ''
   try {
     contributing = readFileSync(join(enhanceRoot, 'CONTRIBUTING.md'), 'utf8')
@@ -234,115 +205,18 @@ function check(map, strict = false) {
   return { errors, fields }
 }
 
-// ---------- SVG 渲染（无第三方依赖，固定布局） ----------
-
-const BOX_W = 186
-const BOX_H = 58
-const GAP_X = 74
-const GAP_Y = 34
-
-function escapeXml(value) {
-  return String(value).replace(/[<>&"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[char]))
-}
-
-function layout(diagram) {
-  const positions = new Map()
-  if (diagram.layout === 'row') {
-    diagram.nodes.forEach((node, index) => {
-      positions.set(node.id, { x: 40 + index * (BOX_W + GAP_X), y: 120 })
-    })
-    return { positions, width: 40 + diagram.nodes.length * (BOX_W + GAP_X), height: 260 }
-  }
-  const columns = new Map()
-  for (const node of diagram.nodes) {
-    const group = node.group ?? 0
-    if (!columns.has(group)) columns.set(group, [])
-    columns.get(group).push(node)
-  }
-  const sorted = [...columns.keys()].sort((a, b) => a - b)
-  let maxRows = 0
-  sorted.forEach((group, columnIndex) => {
-    const rows = columns.get(group)
-    maxRows = Math.max(maxRows, rows.length)
-    rows.forEach((node, rowIndex) => {
-      positions.set(node.id, { x: 40 + columnIndex * (BOX_W + GAP_X), y: 110 + rowIndex * (BOX_H + GAP_Y) })
-    })
-  })
-  return { positions, width: 40 + sorted.length * (BOX_W + GAP_X), height: 150 + maxRows * (BOX_H + GAP_Y) }
-}
-
-function renderDiagram(diagram) {
-  const { positions, width, height } = layout(diagram)
-  const parts = []
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-labelledby="${diagram.id}-title ${diagram.id}-desc">`)
-  // 无障碍契约：<title> 必须是第一个子元素，id 带图 slug，aria-labelledby 先 title 后 desc
-  parts.push(`<title id="${diagram.id}-title">${escapeXml(diagram.title)}</title>`)
-  parts.push(`<desc id="${diagram.id}-desc">${escapeXml(diagram.subtitle ?? diagram.title)}</desc>`)
-  parts.push(`<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8a8a90"/></marker></defs>`)
-  parts.push(`<style>
-    .t { font: 600 18px -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; fill: #1d1d1f }
-    .s { font: 13px -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; fill: #6b6b70 }
-    .n { font: 14px -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; fill: #1d1d1f }
-    .b { fill: #ffffff; stroke: #d9d9d5; rx: 12 }
-    .e { stroke: #b9b9c0; stroke-width: 1.6; fill: none }
-    .el { font: 12px -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; fill: #8a8a90 }
-    @media (prefers-color-scheme: dark) { .t,.n { fill: #ececf0 } .b { fill: #1f1f23; stroke: #35353c } .e { stroke: #4a4a52 } .s,.el { fill: #9b9ba4 } }
-  </style>`)
-  parts.push(`<rect width="100%" height="100%" fill="none"/>`)
-  parts.push(`<text class="t" x="40" y="42">${escapeXml(diagram.title)}</text>`)
-  if (diagram.subtitle) parts.push(`<text class="s" x="40" y="64">${escapeXml(diagram.subtitle)}</text>`)
-
-  for (const edge of diagram.edges) {
-    const from = positions.get(edge.from)
-    const to = positions.get(edge.to)
-    if (!from || !to) continue
-    const sameRow = Math.abs(from.y - to.y) < 1
-    const x1 = sameRow ? from.x + BOX_W : from.x + BOX_W / 2
-    const y1 = sameRow ? from.y + BOX_H / 2 : from.y + BOX_H
-    const x2 = sameRow ? to.x : to.x + BOX_W / 2
-    const y2 = sameRow ? to.y + BOX_H / 2 : to.y
-    const dash = edge.dashed ? ' stroke-dasharray="5 4"' : ''
-    if (sameRow) {
-      parts.push(`<line class="e" x1="${x1}" y1="${y1}" x2="${x2 - 8}" y2="${y2}"${dash} marker-end="url(#arrow)"/>`)
-    } else if (Math.abs(x1 - x2) < 1) {
-      parts.push(`<line class="e" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2 - 8}"${dash} marker-end="url(#arrow)"/>`)
-    } else {
-      const midY = to.y - 18
-      parts.push(`<polyline class="e" points="${x1},${y1} ${x1},${midY} ${x2},${midY} ${x2},${y2 - 8}"${dash} marker-end="url(#arrow)"/>`)
-    }
-    if (edge.label) parts.push(`<text class="el" x="${(x1 + x2) / 2 + 6}" y="${(y1 + y2) / 2 - 6}">${escapeXml(edge.label)}</text>`)
-  }
-
-  for (const node of diagram.nodes) {
-    const position = positions.get(node.id)
-    if (!position) continue
-    parts.push(`<rect class="b" x="${position.x}" y="${position.y}" width="${BOX_W}" height="${BOX_H}" stroke-width="1.2"/>`)
-    parts.push(`<text class="n" x="${position.x + BOX_W / 2}" y="${position.y + BOX_H / 2 + 5}" text-anchor="middle">${escapeXml(node.label)}</text>`)
-  }
-  parts.push('</svg>')
-  return parts.join('\n') + '\n'
-}
-
 // ---------- 入口 ----------
 
 const map = loadMap()
-if (cli.emit) {
-  mkdirSync(outDir, { recursive: true })
-  for (const diagram of map.diagrams) {
-    writeFileSync(join(outDir, diagram.id + '.svg'), renderDiagram(diagram), 'utf8')
-    console.log(`emitted docs/generated/${diagram.id}.svg`)
-  }
-} else if (cli.check) {
-  const strict = cli.strict
-  if (!strict && !existsSync(outDir)) console.log('[graph] docs/generated 不存在：跳过图比对（--strict 才会要求图产物）')
-  const { errors, fields } = check(map, strict)
-  if (errors.length > 0) {
-    console.error(`[graph] 模型与代码/产物不一致（${errors.length} 项）：`)
-    for (const error of errors) console.error(`  - ${error}`)
-    process.exit(1)
-  }
-  console.log(`[graph] OK：${map.modules.length} 个模块 / ${map.edges.length} 条边 / ${fields.files} 个生产文件无未登记的宿主字段入口${strict ? ` / ${map.diagrams.length} 张图与模型一致` : '（结构检查；加 --strict 才逐字节比图）'}`)
-} else {
-  console.error('graph: 用法：node tools/graph.mjs --check [--strict] | --emit [--root <项目根>]')
+if (!cli.check) {
+  console.error('graph: 用法：node tools/graph.mjs --check [--root <项目根>]')
   process.exit(1)
 }
+
+const { errors, fields } = check(map)
+if (errors.length > 0) {
+  console.error(`[graph] 模型与代码不一致（${errors.length} 项）：`)
+  for (const error of errors) console.error(`  - ${error}`)
+  process.exit(1)
+}
+console.log(`[graph] OK：${map.modules.length} 个模块 / ${map.edges.length} 条边 / ${fields.files} 个生产文件无未登记的宿主字段入口`)

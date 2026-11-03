@@ -14,7 +14,7 @@
  *   3. **必需声明位**：每一项计数（除 README 检查项，见下）至少有一处**点名声明**；
  *      把那行删掉 → 「缺声明」红，不是「没找到就算过」的空转。
  *   4. **历史不按现值校验**：以日期开头的标题（`### 2026-10-30（…）`）下面记的是**当时的读数**，
- *      是事实、不是承诺（`CHANGELOG.md` 同理由 `known-counts.json` 的 note 与 `.zhll/OUTLINE.md`
+ *      是事实、不是承诺（`CHANGELOG.md` 同理由 `known-counts.json` 的 note 与仓库根的 `OUTLINE.md`
  *      的「旧计数不改」定下），不参与现值比对。
  *   5. **`--report` 只读**：把 2/3 两步扫到的每一处声明位打成清单（`文件:行` + 现写值 +
  *      是否与来源一致），必需声明位单独成节，末行固定是
@@ -34,7 +34,7 @@
  *     既没有文档声明位、也抓不到缺陷，钉住它只会逼人「改 README 章节就同步一个 JSON」。
  *     readme 门现在只判「结构检查有没有过」，不再比对总数。
  *
- * 用法：node tools/counts-check.mjs [--root <项目根>] [--gates <仍接受：docs 门会传，见下>] [--report]
+ * 用法：node tools/counts-check.mjs [--root <项目根>] [--report]
  * 退出码：0 全一致；1 有漂移/缺声明/用法错。
  */
 
@@ -44,8 +44,6 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-/** 中文数字（文档里写「五个组名」），只到十：再大就不是这些计数了。 */
-const CN_DIGITS = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 }
 /** 英文数字（`README.en.md` 写 `five groups`）。 */
 const EN_DIGITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
 
@@ -142,17 +140,13 @@ const DATED_HEADING = /^\d{4}-\d{1,2}-\d{1,2}\b/
 
 /** 用法错只打一行、exit 1。 */
 function parseArgs(argv) {
-  const options = { root: resolve(here, '..'), gates: undefined, report: false }
+  const options = { root: resolve(here, '..'), report: false }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     const value = argv[index + 1]
     if (arg === '--root') {
       if (typeof value !== 'string' || value.trim() === '') throw new Error('--root 需要一个值')
       options.root = resolve(value)
-      index += 1
-    } else if (arg === '--gates') {
-      if (typeof value !== 'string' || !/^\d+$/.test(value.trim())) throw new Error('--gates 需要一个是整数的值')
-      options.gates = Number(value.trim())
       index += 1
     } else if (arg === '--report') {
       options.report = true
@@ -234,10 +228,6 @@ if (groups.error !== undefined) problems.push(`设置组数算不出来：${grou
 else if (source.settingsGroups !== undefined && groups.value !== source.settingsGroups) {
   problems.push(`设置组数漂移：ui/client.js 里数到 ${groups.value} 组（${groups.names.join(' / ')}），单一来源写 ${source.settingsGroups}`)
 }
-
-// `--gates` 仍被接受但**不参与比对**：`scripts/check.mjs` 的 docs 门仍会传它（那边的门禁
-// 逻辑本批冻结），而单一来源已不记门数——门数不是机器钉住的承诺位了。参数留着是为了不把
-// 「未知参数」变成一个假红项；比对本身删掉，免得有人把 gates 加回来源时它悄悄复活。
 
 // ---------------------------------------------------------------- 文档声明
 
@@ -475,6 +465,5 @@ if (problems.length > 0) {
   for (const problem of problems) console.error(`  - ${problem}`)
   process.exit(1)
 }
-const manual = Object.entries(known.counts).filter(([, entry]) => entry.kind === 'manual').map(([key]) => key)
-console.log(`[counts] OK：${Object.keys(source).length} 个计数（${manual.length} 个人工维护：${manual.join(' / ')}）/ ${docs.length} 份文档 / ${scanned} 处声明 / ${requiredCount} 个必需声明位都一致（CHANGELOG.md 是历史事实，不按现值校验）`)
+console.log(`[counts] OK：${Object.keys(source).length} 个计数 / ${docs.length} 份文档 / ${scanned} 处声明 / ${requiredCount} 个必需声明位都一致（CHANGELOG.md 是历史事实，不按现值校验）`)
 process.exit(0)

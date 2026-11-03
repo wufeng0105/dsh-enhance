@@ -2,13 +2,11 @@
 /**
  * 门禁总入口。
  *
- * 分层：
- *   fast  version、syntax、tests、graph（结构 + 宿主字段禁令）、docs（文档机械残渣 + 计数一致性）、
- *         readme、bundle
- *   full  fast + 有 docs/generated 时的 graph --strict
+ * 七道门：version、syntax、tests、graph（结构 + 宿主字段禁令）、
+ *         docs（文档机械残渣 + 计数一致性）、readme、bundle。
  *
  * 每道门禁都必须能红。`--self-test` 用一次性副本证明这一点：坏语法文件、坏测试、
- * 未登记的源文件、死链、坏 README 里的图路径、坏 bundle 声明、超限文本。
+ * 未登记的源文件、死链（README 站内链接指向不存在的文件）、坏 bundle 声明、超限文本。
  *
  * **门数不是承诺位**：`scripts/known-counts.json` 已不记它，文档也不写数字——加一道门不需要
  * 同步任何文档，当前门数看本命令的输出。两个计数别并成一种口径：负例数（`selfTestCases`）
@@ -19,15 +17,15 @@
  * README.en.md 并进 `version` 的适用版本句校验。
  *
  * 用法：
- *   node scripts/check.mjs [--layer fast|full] [--self-test]
+ *   node scripts/check.mjs [--self-test] [--dsh-version <版本>]
  *
  * 退出码：0 请求的门禁全过 / 自检全部能红；1 有门禁失败或负例没能变红；2 用法错。
  */
 
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { codeFiles as codeFilesIn } from './code-files.mjs'
 import { copyRepoTree } from './repo-copy.mjs'
@@ -60,22 +58,12 @@ function knownCount(name) {
 }
 
 const args = process.argv.slice(2)
-const layerIndex = args.indexOf('--layer')
-const layer = layerIndex >= 0 ? args[layerIndex + 1] : 'fast'
 const selfTest = args.includes('--self-test')
 const dshVersionIndex = args.indexOf('--dsh-version')
 const dshVersion = dshVersionIndex >= 0 ? args[dshVersionIndex + 1] : undefined
 
-if (layerIndex >= 0 && args[layerIndex + 1] === undefined) {
-  console.error('check: --layer needs a value')
-  process.exit(2)
-}
 if (dshVersionIndex >= 0 && (dshVersion === undefined || dshVersion.startsWith('--'))) {
   console.error('check: --dsh-version needs a value')
-  process.exit(2)
-}
-if (layerIndex >= 0 && !['fast', 'full'].includes(layer)) {
-  console.error(`check: unknown --layer ${layer}`)
   process.exit(2)
 }
 
@@ -315,25 +303,22 @@ function gateTests(base = root) {
   }
 }
 
-function gateGraph(base = root, strict = false) {
-  const graphArgs = ['tools/graph.mjs', '--check', ...(strict ? ['--strict'] : [])]
-  const result = run(graphArgs, base)
+function gateGraph(base = root) {
+  const result = run(['tools/graph.mjs', '--check'], base)
   if (result.code === 0) {
     // 把 graph 的读数带进门禁行：模块/边/生产文件数都是现场核过的事实，不只是「structure」
     const line = result.output.split(/\r?\n/).find((item) => item.startsWith('[graph] OK'))
-    const detail = line === undefined ? (strict ? 'structure + diagrams' : 'structure') : line.replace(/^\[graph\] OK：/, '').replace(/（[^）]*）$/, '')
+    const detail = line === undefined ? 'structure' : line.replace(/^\[graph\] OK：/, '').replace(/（[^）]*）$/, '')
     return { pass: true, detail }
   }
   const failed = result.output.split(/\r?\n/).filter((line) => line.trim().startsWith('- ')).slice(0, 3).map((line) => line.trim())
   return { pass: false, detail: failed.join(' | ') || 'graph exited non-zero' }
 }
 
-function gateDocs(base = root, options = {}) {
+function gateDocs(base = root) {
   const problems = []
   const docs = run(['tools/docs-check.mjs', '--root', base], base)
-  const countsArgs = ['tools/counts-check.mjs', '--root', base]
-  if (Number.isInteger(options.gateCount)) countsArgs.push('--gates', String(options.gateCount))
-  const counts = run(countsArgs, base)
+  const counts = run(['tools/counts-check.mjs', '--root', base], base)
   // 两个**曾经**的人工维护值各自的可机算来源：它们原先标 manual，判据是「某份日志里写着
   // total=NN」——日志不进仓，等于没人核。这里让它们现场数出来与单一来源对账。
   const contacts = run(['tools/contacts-count.mjs', '--root', base], base)
@@ -447,12 +432,6 @@ function gateBundle(base = root) {
 
   if (problems.length > 0) return { pass: false, detail: problems.join(' | ') }
   return { pass: true, detail: `${patches.length} 个 bundle patch · 包根入口在` }
-}
-
-function gateStrict(base = root) {
-  const generated = join(base, 'docs', 'generated')
-  if (!existsSync(generated)) return { pass: true, skipped: true, detail: 'no docs/generated' }
-  return gateGraph(base, true)
 }
 
 // ---------------------------------------------------------------- self-test
@@ -672,14 +651,14 @@ function runSelfTest() {
 
   cases.push(withCopy(
     'readme red',
-    // README 门禁：图路径改成不存在的文件必须判红——链接红掉没人知道是常事
+    // README 门禁：站内链接指向不存在的文件必须判红——链接红掉没人知道是常事
     (copy) => {
       const file = join(copy, 'README.md')
       const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('./docs/figures/01-host-seams.svg', './docs/figures/nope.svg')
+      const reverted = text.replace('(./docs/terminology.md)', '(./docs/nope.md)')
       assertMutated(copy, 'README.md', text, reverted)
     },
-    (copy) => expectRed('图片存在')(gateReadmeGate(copy)),
+    (copy) => expectRed('站内链接')(gateReadmeGate(copy)),
   ))
 
   // ---- 内嵌 check 组件各自的负例 ----
@@ -790,31 +769,14 @@ const gates = [
   ['readme', gateReadmeGate],
   ['bundle', gateBundle],
 ]
-if (layer === 'full') {
-  gates.push(['graph-strict', gateStrict])
-}
-
-/**
- * fast 层的门数：`graph-strict` 是 full 层附加的一步，不算进这个数。
- *
- * 它**不再是承诺位**：`known-counts.json` 已不记门数，三份文档也不写数字（加一道门
- * 不需要同步文档）。docs 门仍把这个数当 `--gates` 传下去，但 counts-check 已不拿它比对
- * ——传参保留是为了不动本文件的逻辑，那个参数在 counts-check 里仍被接受。
- */
-const coreGateCount = gates.filter(([name]) => name !== 'graph-strict').length
 
 let failed = 0
 let skipped = 0
 const started = Date.now()
 for (const [name, gate] of gates) {
   const at = Date.now()
-  // 只给需要上下文的门传第二个参数：version 要 --dsh-version，docs 要本次运行的门数
-  // （与单一来源比对）；其余门显式只传 root，免得把 options 误当 gateGraph 的 strict。
-  const result = name === 'version'
-    ? gate(root, { dshVersion, gateCount: coreGateCount })
-    : name === 'docs'
-      ? gate(root, { gateCount: coreGateCount })
-      : gate(root)
+  // 只给需要上下文的门传第二个参数：version 要 --dsh-version；其余门显式只传 root。
+  const result = name === 'version' ? gate(root, { dshVersion }) : gate(root)
   const ms = Date.now() - at
   if (result.skipped) skipped += 1
   if (!result.pass) failed += 1

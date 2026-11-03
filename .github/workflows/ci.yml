@@ -23,6 +23,6 @@ jobs:
         with:
           node-version: '24'
       - name: Gates
-        run: node scripts/check.mjs --layer fast
+        run: node scripts/check.mjs
       - name: Self-test
         run: node scripts/check.mjs --self-test
