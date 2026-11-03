@@ -14,8 +14,13 @@
  *
  * 用法：
  *   node scripts/release.mjs patch              # 1.2.1 -> 1.2.2，只改版本并自检，不发
- *   node scripts/release.mjs minor --publish    # 1.2.1 -> 1.3.0，自检通过后发到 npm
- *   node scripts/release.mjs 3.0.0-rc.1         # 指定版本（必须 x.y.z，不带预发布标签）
+ *   node scripts/release.mjs minor --ship       # 改版本 → 门禁 → 提交 → 打标签 → 推
+ *   node scripts/release.mjs minor --publish    # 自检通过后从本机直接发到 npm
+ *   node scripts/release.mjs --check            # 只核对 npm / git tag / GitHub Release 是否一致
+ *   node scripts/release.mjs 3.0.0              # 指定版本（必须 x.y.z，不带预发布标签）
+ *
+ * `--ship` 是推荐路径：它把「版本、标签、Release、npm」四件事绑成一条链——
+ * 推标签后由 `.github/workflows/release.yml` 用 OIDC 发 npm 并建 GitHub Release。
  *
  * 退出码：0 成功 / 1 某一步失败 / 2 用法错。
  */
@@ -35,25 +40,60 @@ const CHANGELOG_FILE = join(root, 'CHANGELOG.md')
 /** 用法错：直接退出，不动任何文件。 */
 function usage(why) {
   console.error(`release: ${why}`)
-  console.error('用法：node scripts/release.mjs <patch|minor|major|x.y.z> [--publish [--otp=NNNNNN]]')
+  console.error('用法：node scripts/release.mjs [patch|minor|major|x.y.z] [--ship | --publish [--otp=NNNNNN]] | --check')
   process.exit(2)
 }
 
 const args = process.argv.slice(2)
 const publish = args.includes('--publish')
+// 推标签让 CI 发：这是推荐路径，不用长期 token，也不会被 2027-01 的策略变更掐掉。
+const ship = args.includes('--ship')
+// 只读核对，不改任何文件：npm / git tag / GitHub Release 三家是否指同一个版本。
+const checkOnly = args.includes('--check')
 // npm 对发布强制二次验证，手动发布必然要带验证码（30 秒一次、用过即废）。
 // 也可以不用这个开关，改成在 npmjs.com 配 OIDC 可信发布后由 CI 发。
 const otpArg = args.find((a) => a.startsWith('--otp='))
 const otp = otpArg === undefined ? null : otpArg.slice('--otp='.length)
 const bumpArg = args.find((a) => !a.startsWith('--'))
-if (bumpArg === undefined) usage('缺版本参数')
-const unknown = args.filter((a) => a.startsWith('--') && a !== '--publish' && !a.startsWith('--otp='))
+const KNOWN_FLAGS = new Set(['--publish', '--ship', '--check'])
+const unknown = args.filter((a) => a.startsWith('--') && !KNOWN_FLAGS.has(a) && !a.startsWith('--otp='))
 if (unknown.length) usage(`认不出的开关：${unknown.join(' ')}`)
+if (ship && publish) usage('--ship 与 --publish 二选一：前者推标签让 CI 发，后者从本机发')
+if (!checkOnly && bumpArg === undefined) usage('缺版本参数（只想核对就加 --check）')
 if (otp !== null && publish && !/^\d{6}$/.test(otp)) usage('--otp 应该是 6 位数字')
 
 /** Windows 上 npm 是 .cmd，必须经 shell 解析。 */
 function npm(argv) {
   return spawnSync('npm', argv, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' })
+}
+
+/** 同步睡一会儿。脚本是同步风格（前置检查串行），不值得为一次等待改成 async。 */
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/**
+ * 发布后等 registry 真的能读到这个版本。
+ *
+ * 为什么必须轮询：npm 对新包回的是 **202 Accepted** ——「已接收，处理中」，
+ * 而不是 201。它要走安全扫描才会公开可读，实测第一次用了约 **5 分钟**。
+ * 2.0.0 那次首发就是被这条坑了：包明明发出去了，脚本立刻 `npm view` 拿到 404，
+ * 于是报「发布后核对失败」，把一次成功说成失败。所以这里是轮询，不是一次性判断。
+ */
+function waitForRegistry(name, version, { tries = 24, delayMs = 20000 } = {}) {
+  console.log(`\n# 等 registry 公开可读（npm 对新包返回 202，通常要几分钟）`)
+  let last = ''
+  for (let i = 1; i <= tries; i += 1) {
+    const out = npm(['view', name, 'version', '--registry', NPM_REGISTRY])
+    last = (out.stdout ?? '').trim()
+    if (last === version) {
+      console.log(`  第 ${i} 次就绪：${name}@${last}`)
+      return last
+    }
+    console.log(`  第 ${i}/${tries} 次还读不到（${last === '' ? '404' : `"${last}"`}），${delayMs / 1000}s 后重试`)
+    if (i < tries) sleep(delayMs)
+  }
+  return last
 }
 
 function git(argv) {
@@ -65,6 +105,76 @@ function fail(message) {
   console.error(`\nrelease: ${message}`)
   process.exit(1)
 }
+
+/**
+ * 只读核对：`VERSION` / `package.json` / 最新 git tag / npm latest / GitHub Release
+ * 五处是不是同一个版本号。
+ *
+ * 为什么需要它：这五处是**各自独立写入**的，谁也不会自动跟着谁变——
+ *   - `VERSION` 与 `package.json` 由脚本一起改，但人可能手改其中一个；
+ *   - tag 是人打的，忘了打就没有；
+ *   - npm 的 latest 由 `npm publish` 写；
+ *   - GitHub Release 由工作流建，工作流挂了就没有。
+ * 所以「它们一致」不是天然成立的，得有余检查。`--check` 就是这个检查，
+ * 不进七道门（那七道在本地跑、不联网就够了），适合挂在发版前或定时任务里。
+ */
+function consistencyCheck() {
+  const pkg = JSON.parse(readFileSync(PKG_FILE, 'utf8'))
+  const rows = []
+  const add = (label, value, ok) => rows.push({ label, value: value ?? '（读不到）', ok })
+
+  const version = readFileSync(VERSION_FILE, 'utf8').trim()
+  add('VERSION', version, true)
+  add('package.json version', pkg.version, pkg.version === version)
+
+  // 最新标签：按版本号排序取最大，不能按创建时间——补打的旧标签会排错。
+  const tagOut = git(['tag', '--list', 'v*', '--sort=-v:refname']).stdout ?? ''
+  const latestTag = tagOut.split('\n').map((s) => s.trim()).filter(Boolean)[0] ?? null
+  add('最新 git tag', latestTag, latestTag === `v${version}`)
+
+  // npm 侧：拿不到就说拿不到，不假装一致。
+  const view = npm(['view', pkg.name, 'version', '--registry', NPM_REGISTRY])
+  const npmVersion = view.status === 0 ? (view.stdout ?? '').trim() : null
+  add('npm latest', npmVersion, npmVersion === version)
+
+  // GitHub Release：`gh` 没装或没登录时如实标为「跳过」，不冒充通过。
+  const slug = /github\.com[/:]([^/]+)\/([^/.]+)/.exec(pkg.repository?.url ?? '')
+  let releaseOk = null
+  let releaseValue = '（跳过：gh 不可用）'
+  if (slug !== null) {
+    const r = spawnSync('gh', ['release', 'view', `v${version}`, '--repo', `${slug[1]}/${slug[2]}`, '--json', 'tagName'], { cwd: root, encoding: 'utf8' })
+    if (r.status === 0) {
+      releaseValue = `v${version}`
+      releaseOk = true
+    } else if (/release not found|not found/i.test(`${r.stderr ?? ''}`)) {
+      releaseValue = '（不存在）'
+      releaseOk = false
+    }
+  }
+  add('GitHub Release', releaseValue, releaseOk)
+
+  console.log(`# 版本一致性核对：${pkg.name}\n`)
+  for (const row of rows) {
+    const mark = row.ok === null ? '·' : row.ok ? '✅' : '❌'
+    console.log(`  ${mark}  ${row.label.padEnd(22)} ${row.value}`)
+  }
+
+  const bad = rows.filter((r) => r.ok === false)
+  if (bad.length) {
+    console.log(`\n${bad.length} 处不一致。补齐缺的那一两处即可：`)
+    for (const r of bad) {
+      if (r.label === 'package.json version') console.log(`  - 把 package.json 的 version 改成 ${version}`)
+      if (r.label === '最新 git tag') console.log(`  - git tag v${version} && git push origin v${version}`)
+      if (r.label === 'npm latest') console.log(`  - 发 npm：node scripts/release.mjs ${version} --publish（或推标签走 CI）`)
+      if (r.label === 'GitHub Release') console.log(`  - 建 Release：gh release create v${version} --generate-notes（或推标签让 CI 建）`)
+    }
+    process.exit(1)
+  }
+  console.log('\n五处一致。')
+  process.exit(0)
+}
+
+if (checkOnly) consistencyCheck()
 
 // ---------------------------------------------------------------- 1. 前置检查
 
@@ -161,16 +271,55 @@ try {
   console.log(pack.stdout)
 }
 
-if (!publish) {
+// ---------------------------------------------------------------- 5. 发（两条路）
+
+if (ship) {
+  // 推标签：npm / git tag / GitHub Release 三件事由同一次标签推送串起来。
+  // 提交 → 打标签 → 推，顺序不能换：先推分支再推标签，CI 才拿得到这个 commit。
+  const tag = `v${next}`
+  const existing = git(['tag', '--list', tag])
+  if ((existing.stdout ?? '').trim() !== '') fail(`标签 ${tag} 已存在——版本号没变，别重复发`)
+
+  console.log(`\n# 提交版本改动`)
+  const staged = git(['add', 'VERSION', 'package.json', 'CHANGELOG.md'])
+  if (staged.status !== 0) fail(`git add 失败：${staged.stderr ?? ''}`)
+  const committed = git(['commit', '-m', `chore: release ${next}`])
+  if (committed.status !== 0) fail(`git commit 失败（CHANGELOG 可能没改）：${committed.stderr ?? ''}`)
+
+  console.log(`# 打标签 ${tag} 并推送`)
+  const tagged = git(['tag', '-a', tag, '-m', `Release ${next}`])
+  if (tagged.status !== 0) fail(`git tag 失败：${tagged.stderr ?? ''}`)
+  const pushedBranch = git(['push', 'origin', 'main'])
+  if (pushedBranch.status !== 0) fail(`git push main 失败：${pushedBranch.stderr ?? ''}`)
+  const pushedTag = git(['push', 'origin', tag])
+  if (pushedTag.status !== 0) fail(`git push ${tag} 失败：${pushedTag.stderr ?? ''}`)
+
   console.log(`
-# 只自检，没有发布。
-# 确认上面的文件清单没问题，再跑一次带 --publish：
-#   node scripts/release.mjs ${next} --publish
+# 已推 ${tag}
+#
+# 接下来由 .github/workflows/release.yml 完成，不用你管：
+#   1. 核对「标签 == VERSION」
+#   2. 跑七道门禁
+#   3. OIDC 可信发布到 npm
+#   4. 用 CHANGELOG 里 [${next}] 那一节建 GitHub Release
+#
+# 想看结果：gh run watch
+# 想随时核对 npm / tag / Release 是否还一致：node scripts/release.mjs --check
 `)
   process.exit(0)
 }
 
-// ---------------------------------------------------------------- 5. 发布
+if (!publish) {
+  console.log(`
+# 只自检，没有发布。三条后续路径选一条：
+#   node scripts/release.mjs ${next} --ship      # 推标签，CI 发 npm 并建 Release（推荐）
+#   node scripts/release.mjs ${next} --publish   # 从本机直接发 npm（要过 2FA）
+#   node scripts/release.mjs --check             # 只核对 npm / tag / Release 是否一致
+`)
+  process.exit(0)
+}
+
+// ---------------------------------------------------------------- 6. 本机发布
 
 console.log(`\n# 发布到 ${NPM_REGISTRY}`)
 const pub = npm(['publish', '--access', 'public', '--registry', NPM_REGISTRY, ...(otp === null ? [] : ['--otp', otp])])
@@ -186,23 +335,30 @@ if (pub.status !== 0) {
       + '\n   - 加 --otp=<6 位验证码> 再跑一次（验证码 30 秒有效）；'
       + '\n   - 到 npmjs.com 建带 "Bypass two-factor authentication" 的 granular token'
       + '\n     （注意：这类 token 约 2027-01 起不能再直接发布）；'
-      + '\n   - 或者推一个 v* 标签，让 .github/workflows/release.yml 走 OIDC 可信发布。'
+      + '\n   - 或者改用 --ship 推标签，让 .github/workflows/release.yml 走 OIDC 可信发布。'
     : ''
   fail(`npm publish 失败（exit ${pub.status}）${hint}\n${pub.stderr ?? ''}`)
 }
 console.log((pub.stdout ?? '').trim())
 
-const published = (npm(['view', pkg.name, 'version', '--registry', NPM_REGISTRY]).stdout ?? '').trim()
-if (published !== next) fail(`发布后核对失败：npm 上的 version 是 "${published}"，期望 "${next}"`)
+// npm 对新包回 202（已接收、处理中），所以这里必须轮询而不是立刻判定。
+const published = waitForRegistry(pkg.name, next)
+if (published !== next) {
+  fail(`等不到 npm 上的 ${next}（最后读到 "${published || '404'}"）。`
+    + '\n  包可能仍在处理，过几分钟用 node scripts/release.mjs --check 再看。')
+}
 
 console.log(`
 # 发布成功：${pkg.name}@${next}
 #
-# 剩下的 git 动作脚本不代做（版本号被 force-push 覆盖会让 npm 与仓库对不上），你自己决定：
+# 但 npm 已经发了、git 还没有——这是**不一致**的状态。补上标签与提交：
 #   git add VERSION package.json CHANGELOG.md
 #   git commit -m "chore: release ${next}"
 #   git tag v${next}
 #   git push origin main --tags
+#
+# 或者一开始就用 --ship，让脚本替你做这一串。
+# 随时核对三家是否一致：node scripts/release.mjs --check
 #
 # 市场那边不用管：awesome-dsh-plugin 每夜采集 npm，自动更新版本号、下载量、能力标签与宿主要求。
 `)

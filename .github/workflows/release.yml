@@ -35,12 +35,16 @@ permissions:
   contents: read
   # trusted publishing 需要它来申请 OIDC 身份断言。
   id-token: write
-
 jobs:
   publish:
     name: publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # 建 GitHub Release 要写 contents。放在 job 级而不是顶层，
+    # 是为了让「只读的门禁步骤」不带写权限——同一条流水线里权限要跟着步骤走。
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,9 +78,44 @@ jobs:
       - name: 门禁
         run: node scripts/check.mjs --layer fast
 
+      # 幂等：这个版本已经在 npm 上就跳过发布，只往下建 Release。
+      # 用途是补一条已经手工发过的版本（2.0.0 就是这么补的），
+      # 以及工作流重跑时不因为「版本已存在」整条红掉。
       - name: 发布
         if: github.event_name == 'push' || inputs.dry_run == false
-        run: npm publish --access public --provenance
+        run: |
+          pkg="$(node -p "require('./package.json').name")"
+          version="$(tr -d '\r\n' < VERSION)"
+          if npm view "$pkg@$version" version >/dev/null 2>&1; then
+            echo "::notice::npm 上已有 $pkg@$version，跳过发布，继续建 Release"
+          else
+            npm publish --access public --provenance
+          fi
+
+      # 建 GitHub Release，正文取 CHANGELOG 里 `## [<version>]` 那一节——
+      # 不另写一份发布说明，免得「代码里的变更记录」和「Release 页面」各说各话。
+      - name: 建 GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # 从 `## [<version>]` 起，到下一个 `## [` 之前为止。
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && index($0, "## [") == 1 { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ -n "$(tr -d '[:space:]' < release-notes.md)" ]; then
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file release-notes.md
+          else
+            echo "::warning::CHANGELOG 里没有 [$version] 一节，改用自动生成的发布说明"
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
 
       - name: 预演（只打包，不发布）
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run

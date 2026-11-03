@@ -61,20 +61,37 @@ CI 在 `windows-latest` 上跑 `--layer fast`（`.github/workflows/ci.yml`）。
 
 有两条路。**推荐走标签那条**——它不用长期 token，也不会在 2027 年 1 月被 npm 掐掉。
 
-### 路一：推标签，CI 发（trusted publishing）
+### 路一：一条命令，`--ship`（推荐）
 
 ```powershell
-node scripts/release.mjs patch          # 只改版本 + 过门禁，不发
-git add VERSION package.json CHANGELOG.md && git commit -m "chore: release 1.2.2"
-git tag v1.2.2
-git push origin main --tags
+node scripts/release.mjs patch --ship
 ```
 
-标签推上去后 [`.github/workflows/release.yml`](.github/workflows/release.yml) 会核对「标签 == `VERSION`」、再跑一遍门禁、然后用 **OIDC 可信发布**把包发出去。没有 `NPM_TOKEN` 这类长期密钥。
+它做的是一整条链，任一步失败就停：
 
-**一次性配置（必须在 npmjs.com 上做，代码里做不了）**：包的 Settings → Trusted publishing → 添加可信发布者，仓库填 `wufeng0105/dsh-enhance`、工作流文件名填 `release.yml`。没配之前这个工作流会失败——那说明可信发布者还没登记，不是代码坏了。
+1. 前置检查：工作区干净、在 `main` 上、与 `origin/main` 同步、包名与 `cordis.patch.yml` 的入口前缀一致、npm 账号的 scope 对得上包名；
+2. 把 `VERSION` 与 `package.json` 的 `version` 一起改掉（两者必须逐字相同，`version` 门会核）；版本已是目标值时不重写文件；
+3. 跑 `node scripts/check.mjs` 全七道闸；
+4. `npm pack --dry-run` 打出会发出去的文件清单；
+5. 提交 `chore: release <版本>`、打标签 `v<版本>`、推分支与标签。
+
+标签推上去后 [`.github/workflows/release.yml`](.github/workflows/release.yml) 接手：核对「标签 == `VERSION`」→ 再跑一遍门禁 → **OIDC 可信发布**到 npm → 用 `CHANGELOG.md` 里 `## [<版本>]` 那一节建 **GitHub Release**。
+
+所以一次 `--ship` 就让**版本号、git tag、npm、GitHub Release** 四处齐平，不用你分别去记。没有 `NPM_TOKEN` 这类长期密钥。
+
+**一次性配置（必须在 npmjs.com 上做，代码里做不了）**：包的 Settings → Trusted Publisher → GitHub Actions，仓库填 `wufeng0105/dsh-enhance`、工作流文件名填 `release.yml`，并勾上 publish 与 manage dist-tags。没配之前这个工作流会失败——那说明可信发布者还没登记，不是代码坏了。
 
 为什么不用长期 token：npm 在 2026-07 的公告里写明，勾了「bypass 2FA」的 granular access token 从 2026-08 起不能做账号与包管理动作，**约 2027-01 起连直接发布也不行**，发布会收缩成「暂存 + 人工用 2FA 批准」。长期 token 是条死路。
+
+### 随时核对：`--check`
+
+```powershell
+node scripts/release.mjs --check
+```
+
+只读，不改任何文件，把五处版本号并排打出来：`VERSION` / `package.json` / 最新 git tag / npm latest / GitHub Release。任何一处对不上就 exit 1，并告诉你补哪一条命令。
+
+这五处是**各自独立写入**的，谁也不会自动跟着谁变——忘了打标签、CI 挂了没建 Release，都会让它们分叉。所以「一致」不是天然成立的，这个开关就是那条余检查。它不进七道门（那七道要能离线跑），适合发版前或定时任务里用。
 
 ### 路二：本机手动发（需要验证码）
 
