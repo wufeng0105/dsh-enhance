@@ -4,13 +4,17 @@
 # 两条解析规则（实测 DSH 0.2.1-rc.3）：
 #   - bundle patch 的 entry name 相对**本包目录**解析（不是 profile 目录）；
 #   - 浏览器的 dsh.client 发现只认「包的精确包名」或「路径」里的最近 package.json，
-#     裸子路径（`dsh-enhance/ui/index.js`）会被当成非包跳过。
+#     裸子路径会被当成非包跳过。
 # 所以 enhance-ui 用 `./ui/index.js`：入口从包目录解析，最近的 package.json 是
 # ui/package.json，浏览器半才会被装载。scope / approve 没有浏览器半，用包名子路径即可。
+#
+# ⚠️ 前两行的包名前缀必须与 package.json 的 `name` 逐字一致——2026-11-03 起包名是
+# `@wufeng0105/dsh-enhance`（此前是无 scope 的 `dsh-enhance`）。改包名时这两行一起改，
+# 否则装完两个入口解析不到，插件等于没装上（`bundle` 门会先红）。
 - insert:
     - id: enhance-scope
-      name: 'dsh-enhance/enhance-scope/index.js'
+      name: '@wufeng0105/dsh-enhance/enhance-scope/index.js'
     - id: auto-approve
-      name: 'dsh-enhance/auto-approve/index.js'
+      name: '@wufeng0105/dsh-enhance/auto-approve/index.js'
     - id: enhance-ui
       name: './ui/index.js'

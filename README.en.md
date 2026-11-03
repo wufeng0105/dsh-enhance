@@ -43,12 +43,18 @@ Verified against `DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测�
 ## Install
 
 ```powershell
-dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
+dsh plugin --profile desktop add @wufeng0105/dsh-enhance
 ```
 
 Restart DeepSeek Harness afterwards. Nothing else is required — no separate Node install, no host configuration edit.
 
-To install from a clone instead:
+To stay off npm, install straight from GitHub:
+
+```powershell
+dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
+```
+
+Or from a clone:
 
 ```powershell
 git clone https://github.com/wufeng0105/dsh-enhance.git

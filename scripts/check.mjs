@@ -135,8 +135,20 @@ function gateVersion(base = root, options = {}) {
   } catch (error) {
     return { pass: false, detail: `VERSION 读不到：${String(error?.message ?? error)}` }
   }
-  if (pkg.name !== 'dsh-enhance') problems.push(`package.json name=${String(pkg.name)}（期望 dsh-enhance）`)
-  if (pkg.private !== true) problems.push('package.json private 必须是 true')
+  // 包身份就是 npm 身份：`@wufeng0105/dsh-enhance`（2026-11-03 起）。无 scope 的
+  // `dsh-enhance` 在 npm 上已被他人占用，所以只能用 scope。这个名字同时是
+  // `cordis.patch.yml` 入口名的前缀，两处必须逐字一致——bundle 门会兜住不一致。
+  if (pkg.name !== '@wufeng0105/dsh-enhance') {
+    problems.push(`package.json name=${String(pkg.name)}（期望 @wufeng0105/dsh-enhance）`)
+  }
+  // `private: true` 会让 `npm publish` 直接拒绝，所以这里反过来判：
+  // 声明了 private 就是红的。改回 private 等于宣布「不发 npm」，那要连这条与 CONTRIBUTING 一起改。
+  if (pkg.private === true) {
+    problems.push('package.json 不能声明 private —— 这是要发布到 npm 的包（private 会让 npm publish 直接拒绝）')
+  }
+  if (pkg.publishConfig?.access !== 'public') {
+    problems.push('package.json publishConfig.access 必须是 public —— scope 包默认私有，不加发出去别人装不了')
+  }
   if (pkg.type !== 'module') problems.push('package.json type 必须是 module')
   if (!/^\d+\.\d+\.\d+$/.test(version)) problems.push(`VERSION 不是 x.y.z：${version}`)
   if (pkg.version !== version) problems.push(`package.json version=${String(pkg.version)} != VERSION ${version}`)
@@ -548,7 +560,7 @@ function runSelfTest() {
     (copy) => {
       const file = join(copy, 'cordis.patch.yml')
       const text = readFileSync(file, 'utf8')
-      const reverted = text.replace("name: 'dsh-enhance/enhance-scope/index.js'", "name: 'dsh-enhance/enhance-scope/missing.js'")
+      const reverted = text.replace("name: '@wufeng0105/dsh-enhance/enhance-scope/index.js'", "name: '@wufeng0105/dsh-enhance/enhance-scope/missing.js'")
       assertMutated(copy, 'cordis.patch.yml', text, reverted)
     },
     (copy) => expectRed('指向不存在的文件')(gateBundle(copy)),

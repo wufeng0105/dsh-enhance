@@ -24,7 +24,7 @@ CI 在 `windows-latest` 上跑 `--layer fast`（`.github/workflows/ci.yml`）。
 ## 四条硬约束（踩了必红）
 
 1. **常驻源码（不含 `scripts/`、`tests/`）必须登记进 `code-map.json`。** `graph` 门会列出「源码未登记」的文件。登记时写 `id` / `layer` / `path` / `owns`；前三个是判据，别随手改。`scripts/` 与 `tests/` 由语法门与测试门自己守着，不进模型比对——**这句话与 `tools/graph.mjs` 的 `SKIP_DIRS` 逐字对齐，由 graph 门断言钉住**（改豁免范围要两处一起改）。
-2. **`VERSION` 与 `package.json` 的 `version` 必须逐字相同**，且 `private` 必须是 `true`——这不是 npm 包，是 profile bundle。
+2. **`VERSION` 与 `package.json` 的 `version` 必须逐字相同**，且 **`private` 不能是 `true`**、`publishConfig.access` 必须是 `public`。这个包从 2026-11-03 起**同时发布到 npm**（`@wufeng0105/dsh-enhance`）——`private: true` 会让 `npm publish` 直接拒绝，scope 包不加 `access: public` 发出去别人装不了。改名当心：`package.json` 的 `name` 同时是 `cordis.patch.yml` 入口名的前缀，两处必须逐字一致。
 3. **README 的「适用版本」句由 `package.json` 派生**，`version` 门逐字校验。要扩区间就改 `engines.dsh` 与 `dsh.compatibility`，README 那句会被门禁逼着你同步。
 4. **文档里的相对链接与反引号路径必须真实存在**。`docs` 门查死链、死路径，也查正文里写坏的字面 `\n` / `\t`。
 
@@ -56,6 +56,35 @@ CI 在 `windows-latest` 上跑 `--layer fast`（`.github/workflows/ci.yml`）。
 ## 兼容性
 
 `engines.dsh` 声明了核验过的宿主版本区间，宿主自己在**安装**与**启动**时都会执行它。要把新版本并进区间，先按 [`docs/compatibility.md`](docs/compatibility.md) 的例行核验跑一遍（约 15 分钟）。
+
+## 发布（发版与发 npm 是同一条流水线）
+
+改完代码、合并到 `main` 之后，**发版只需要一条命令**：
+
+```powershell
+node scripts/release.mjs patch      # 或 minor / major / 明确版本号如 2.0.1
+```
+
+它按顺序做四件事，任一步失败就停：
+
+1. 检查工作区干净、在 `main` 上、且与 `origin/main` 同步（避免发一个仓库里没有的版本）；
+2. 把 `VERSION` 与 `package.json` 的 `version` 一起改掉（两者必须逐字相同，`version` 门会核）；
+3. 跑 `node scripts/check.mjs` 全七道闸；
+4. `npm pack --dry-run` 打出这次会发出去的文件清单，让你先看一眼。
+
+确认无误后加 `--publish` 才真的发：
+
+```powershell
+node scripts/release.mjs patch --publish
+```
+
+它会用 `--access public` 发到**官方源** `registry.npmjs.org`（本机 `.npmrc` 里配的是 `npmmirror` 镜像，那是只读镜像，发不上去——release 脚本显式指定 registry，不吃全局配置）。
+
+**发完之后不用管市场**：awesome-dsh-plugin 每夜采集一次 npm，自动更新卡片上的版本号、30 天下载量、能力标签，以及「宿主要求」那一格（它读的是 npm 清单里的 `engines.dsh`）。描述文字不在自动采集范围内，那部分要改 `data/plugins/wufeng0105__dsh-enhance.yml` 并向上游提 PR。
+
+**发布前必须的**：`npm whoami --registry https://registry.npmjs.org/` 要能返回 `wufeng0105`。没登录就先 `npm login --registry https://registry.npmjs.org/`（浏览器授权）。
+
+**包名不可随意改**：`@wufeng0105/dsh-enhance` 与 `cordis.patch.yml` 的入口名前缀、老用户的 profile 依赖键三处绑定。真要改名，`scripts/release.mjs` 会拒绝在名字与入口不一致时发布。
 
 ## 提交与 PR
 

@@ -2,6 +2,29 @@
 
 本文件自 `1.1.0` 起维护；版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)，条目格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.0.0] — 2026-11-03
+
+### 变更（破坏性）
+
+- **包名改为 `@wufeng0105/dsh-enhance`。** 无 scope 的 `dsh-enhance` 在 npm 上已被他人占用（现有 0.3.4，另一个作者），拿不回来。这个包从本版起**同时发布到 npm**，所以名字只能落在自己的 scope 下；
+- **推翻「这不是 npm 包」这条旧决策。** `CONTRIBUTING.md` 原先明写「`private` 必须是 `true`——这不是 npm 包，是 profile bundle」，`version` 门也把这条钉成了断言。现在反过来：`private` 不能是 `true`，`publishConfig.access` 必须是 `public`，两条都由 `version` 门判红；
+- `cordis.patch.yml` 的两个入口名跟着换前缀（`dsh-enhance/…` → `@wufeng0105/dsh-enhance/…`）。这是**改了宿主接缝**：入口名以包名为锚，不改则装完两个入口解析不到、插件等于没装上；
+- **老用户要迁移一步**：profile 的依赖键就是包名，改名后旧键会留在 `profiles/<name>/package.json` 的 `dependencies` 与 `dsh.profile.bundles` 里。升级路径是先 `dsh plugin remove dsh-enhance`，再 `dsh plugin add @wufeng0105/dsh-enhance`。
+
+### 新增
+
+- [`scripts/release.mjs`](scripts/release.mjs)：发版一条命令。它把几处隐式依赖收进脚本——工作区干净、在 `main` 上、与远端同步、包名与入口前缀一致、npm 身份与 scope 匹配；改版本后跑全七道闸，`npm pack --dry-run` 先给出会发出去的文件清单，确认后加 `--publish` 才真发。**刻意不自动 commit / tag / push**：版本号被 force-push 覆盖会让 npm 与仓库永久对不上；发布失败时它把版本退回原值；
+- `CONTRIBUTING.md` 增「发布」一节：发版命令、必须的登录态、以及为什么脚本显式指定 `registry.npmjs.org`（本机 `.npmrc` 指向 `npmmirror` 只读镜像，直接发布走的是错的源）。
+
+### 修复
+
+- `tools/smoke.mjs` 的包名不再写死，改为从 `package.json` 读——否则每次改名都会让冒烟假红。
+
+### 验证
+
+- 本地门禁：`node scripts/check.mjs` 七道全过；`--self-test` 全过（`orphan bundle entry red` 那条负例的替换锚点已跟着入口名更新，否则它会因为「回退替换没命中」而静默失效）；
+- 首次发布后核对：`npm view @wufeng0105/dsh-enhance version` 与仓库 `VERSION` 一致。
+
 ## [1.2.1] — 2026-11-02
 
 ### 新增

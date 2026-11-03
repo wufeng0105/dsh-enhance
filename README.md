@@ -43,12 +43,18 @@
 ## 安装
 
 ```powershell
-dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
+dsh plugin --profile desktop add @wufeng0105/dsh-enhance
 ```
 
 装完重启 DeepSeek Harness。别的都不用做——不用单独装 Node，不用改宿主配置。
 
-想从 clone 装：
+不想走 npm，也可以直接从 GitHub 装：
+
+```powershell
+dsh plugin --profile desktop add github:wufeng0105/dsh-enhance
+```
+
+或者从 clone 装：
 
 ```powershell
 git clone https://github.com/wufeng0105/dsh-enhance.git

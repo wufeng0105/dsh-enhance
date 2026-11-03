@@ -1,8 +1,11 @@
 {
-  "name": "dsh-enhance",
-  "version": "1.2.1",
-  "private": true,
+  "name": "@wufeng0105/dsh-enhance",
+  "version": "2.0.0",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "description": "在 DeepSeek Harness 系统提示的末尾追加一段你自己写的文本：写破甲词、人设或内容规矩，存盘即生效，可开关、可检查；还可以一键把 Enhanced 权限档写进你的 profile。",
   "keywords": [

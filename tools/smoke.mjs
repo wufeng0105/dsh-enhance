@@ -54,9 +54,12 @@ console.log(`# repo = ${repo}`)
 console.log()
 
 // ---- 0. 前置：真机装载的痕迹 ----
+// 依赖键取 `package.json` 的 `name`，所以这里不能写死——包名 2026-11-03 从无 scope 的
+// `dsh-enhance` 改成 `@wufeng0105/dsh-enhance`，写死会让冒烟在改名后假红。
+const PKG_NAME = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).name
 const profilePkg = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
-check('0.1 bundle 装进 profile 依赖', String(profilePkg.dependencies?.['dsh-enhance'] ?? '').startsWith('link:'), JSON.stringify(profilePkg.dependencies))
-check('0.2 profile bundles 里有本包', (profilePkg.dsh?.profile?.bundles ?? []).includes('dsh-enhance'))
+check('0.1 bundle 装进 profile 依赖', String(profilePkg.dependencies?.[PKG_NAME] ?? '').startsWith('link:'), JSON.stringify(profilePkg.dependencies))
+check(`0.2 profile bundles 里有本包（${PKG_NAME}）`, (profilePkg.dsh?.profile?.bundles ?? []).includes(PKG_NAME))
 const composed = dsh(['--profile', 'smoke', '--dump-config'])
 check('0.3 dsh --dump-config 能组合出 profile', composed.status === 0, `exit=${composed.status}`)
 for (const id of ['enhance-scope', 'auto-approve', 'enhance-ui']) {
