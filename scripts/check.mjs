@@ -536,6 +536,7 @@ const NEGATIVE_ROSTER = [
   { name: 'engines malformed red', gate: 'version' },
   { name: 'compat readme sentence red', gate: 'version' },
   { name: 'compat readme empty red', gate: 'version' },
+  { name: 'compat readme en red', gate: 'version' },
   { name: 'compat out-of-range red', gate: 'version' },
   { name: 'readme red', gate: 'readme' },
   { name: 'counts-check red', gate: 'docs' },
@@ -798,6 +799,20 @@ function runSelfTest() {
     // 把 README 删空 = 没有那句派生文本；这不许变成「静默过关」（去掉 `readme !== ''` 短路）
     (copy) => writeFileSync(join(copy, 'README.md'), '', 'utf8'),
     (copy) => expectRed('README 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
+  ))
+
+  cases.push(withCopy(
+    'compat readme en red', 'version',
+    // version 门核两份 README 的适用版本句（check.mjs 里 for (const file of ['README.md', 'README.en.md'])）。
+    // 这条负例是「机制叙述的单一来源」示范：docs/compatibility.md「改声明」表第 3 行只许指向它，
+    // 不许再自己复述「漏一份会红」——那句话的可红性由这条负例证明，散文只做指针。
+    (copy) => {
+      const file = join(copy, 'README.en.md')
+      const text = readFileSync(file, 'utf8')
+      const reverted = text.replace(/DeepSeek Harness \S+–\S+（\S+ 实测[^）]*）/g, 'DeepSeek Harness 某版本')
+      assertMutated(copy, 'README.en.md', text, reverted)
+    },
+    (copy) => expectRed('README.en.md 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
   ))
 
   cases.push(withCopy(
