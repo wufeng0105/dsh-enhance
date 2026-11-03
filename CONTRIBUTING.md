@@ -59,30 +59,43 @@ CI 在 `windows-latest` 上跑 `--layer fast`（`.github/workflows/ci.yml`）。
 
 ## 发布（发版与发 npm 是同一条流水线）
 
-改完代码、合并到 `main` 之后，**发版只需要一条命令**：
+有两条路。**推荐走标签那条**——它不用长期 token，也不会在 2027 年 1 月被 npm 掐掉。
+
+### 路一：推标签，CI 发（trusted publishing）
 
 ```powershell
-node scripts/release.mjs patch      # 或 minor / major / 明确版本号如 2.0.1
+node scripts/release.mjs patch          # 只改版本 + 过门禁，不发
+git add VERSION package.json CHANGELOG.md && git commit -m "chore: release 1.2.2"
+git tag v1.2.2
+git push origin main --tags
 ```
 
-它按顺序做四件事，任一步失败就停：
+标签推上去后 [`.github/workflows/release.yml`](.github/workflows/release.yml) 会核对「标签 == `VERSION`」、再跑一遍门禁、然后用 **OIDC 可信发布**把包发出去。没有 `NPM_TOKEN` 这类长期密钥。
 
-1. 检查工作区干净、在 `main` 上、且与 `origin/main` 同步（避免发一个仓库里没有的版本）；
-2. 把 `VERSION` 与 `package.json` 的 `version` 一起改掉（两者必须逐字相同，`version` 门会核）；
-3. 跑 `node scripts/check.mjs` 全七道闸；
-4. `npm pack --dry-run` 打出这次会发出去的文件清单，让你先看一眼。
+**一次性配置（必须在 npmjs.com 上做，代码里做不了）**：包的 Settings → Trusted publishing → 添加可信发布者，仓库填 `wufeng0105/dsh-enhance`、工作流文件名填 `release.yml`。没配之前这个工作流会失败——那说明可信发布者还没登记，不是代码坏了。
 
-确认无误后加 `--publish` 才真的发：
+为什么不用长期 token：npm 在 2026-07 的公告里写明，勾了「bypass 2FA」的 granular access token 从 2026-08 起不能做账号与包管理动作，**约 2027-01 起连直接发布也不行**，发布会收缩成「暂存 + 人工用 2FA 批准」。长期 token 是条死路。
+
+### 路二：本机手动发（需要验证码）
 
 ```powershell
 node scripts/release.mjs patch --publish
 ```
 
-它会用 `--access public` 发到**官方源** `registry.npmjs.org`（本机 `.npmrc` 里配的是 `npmmirror` 镜像，那是只读镜像，发不上去——release 脚本显式指定 registry，不吃全局配置）。
+它按顺序做四件事，任一步失败就停：
+
+1. 检查工作区干净、在 `main` 上、且与 `origin/main` 同步（避免发一个仓库里没有的版本）；
+2. 把 `VERSION` 与 `package.json` 的 `version` 一起改掉（两者必须逐字相同，`version` 门会核）；版本已经是目标值时**不重写文件**；
+3. 跑 `node scripts/check.mjs` 全七道闸；
+4. `npm pack --dry-run` 打出这次会发出去的文件清单，让你先看一眼。
+
+加 `--publish` 才真的发。它用 `--access public` 发到**官方源** `registry.npmjs.org`（本机 `.npmrc` 里配的是 `npmmirror` 镜像，只读，发不上去——脚本显式指定 registry，不吃全局配置）。
+
+**这条路要过 2FA**：npm 对发布强制二次验证，直接跑会拿到 `E403 … Two-factor authentication … required`。两条出路——要么给命令补 `--otp=<6 位验证码>`，要么先在 npmjs.com 建一个勾了「Bypass two-factor authentication」的 granular token 并用它发（注意这条 2027-01 起不能发布）。
+
+**三条都要守的**：`npm whoami --registry https://registry.npmjs.org/` 要能返回 `wufeng0105`；包名的 scope 必须等于当前 npm 账号；`VERSION` 与 `package.json` 的 `version` 必须逐字相同。
 
 **发完之后不用管市场**：awesome-dsh-plugin 每夜采集一次 npm，自动更新卡片上的版本号、30 天下载量、能力标签，以及「宿主要求」那一格（它读的是 npm 清单里的 `engines.dsh`）。描述文字不在自动采集范围内，那部分要改 `data/plugins/wufeng0105__dsh-enhance.yml` 并向上游提 PR。
-
-**发布前必须的**：`npm whoami --registry https://registry.npmjs.org/` 要能返回 `wufeng0105`。没登录就先 `npm login --registry https://registry.npmjs.org/`（浏览器授权）。
 
 **包名不可随意改**：`@wufeng0105/dsh-enhance` 与 `cordis.patch.yml` 的入口名前缀、老用户的 profile 依赖键三处绑定。真要改名，`scripts/release.mjs` 会拒绝在名字与入口不一致时发布。
 

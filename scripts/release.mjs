@@ -171,9 +171,17 @@ console.log(`\n# 发布到 ${NPM_REGISTRY}`)
 const pub = npm(['publish', '--access', 'public', '--registry', NPM_REGISTRY])
 if (pub.status !== 0) {
   // 发布失败时把版本退回原值，避免仓库停在一个 npm 上不存在的版本上。
-  writeFileSync(VERSION_FILE, `${current}\n`, 'utf8')
-  writeFileSync(PKG_FILE, `${JSON.stringify({ ...pkg, version: current }, null, 2)}\n`, 'utf8')
-  fail(`npm publish 失败（exit ${pub.status}），版本已退回 ${current}：\n${pub.stderr ?? ''}`)
+  // 只有真的改过版本才需要退——`next === current` 时原样写回会平白重排 package.json。
+  if (next !== current) {
+    writeFileSync(VERSION_FILE, `${current}\n`, 'utf8')
+    writeFileSync(PKG_FILE, `${JSON.stringify({ ...pkg, version: current }, null, 2)}\n`, 'utf8')
+  }
+  const hint = /E403|two-factor|2fa/i.test(pub.stderr ?? '')
+    ? '\n  这是 npm 的发布 2FA 要求。两条路：给命令加 --otp=<验证码>，'
+      + '\n  或到 npmjs.com → Access Tokens 建一个勾了 "Bypass two-factor authentication" 的'
+      + '\n  Granular Access Token，写进 .npmrc 的 //registry.npmjs.org/:_authToken。'
+    : ''
+  fail(`npm publish 失败（exit ${pub.status}）${hint}\n${pub.stderr ?? ''}`)
 }
 console.log((pub.stdout ?? '').trim())
 
