@@ -57,6 +57,9 @@
     "README.md",
     "LICENSE",
     "VERSION",
-    "docs/brand-persona.md"
+    "docs/brand-persona.md",
+    "CHANGELOG.md",
+    "docs/figures",
+    "showcase"
   ]
 }
