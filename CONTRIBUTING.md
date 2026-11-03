@@ -87,6 +87,16 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁�
 
 发版与发 npm 是同一条链。一条命令推上去，剩下的由 CI 做完。
 
+### 发版前必跑：真装冒烟（纪律，门禁替不了）
+
+```powershell
+pwsh -NoProfile -File tools/smoke.ps1
+```
+
+`--ship` 的门禁全绿只证明「静态没坏」。这个包吃宿主私有 API，**DSH 升级后唯一能证明它还能装、还能跑的东西是真装冒烟**：在一个一次性 `DSH_HOME` 里真装本包、组合出三个入口、验三态与品牌人设遮蔽、写档摘档后再组合（断言条数的单一来源在 [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions`，与 `tools/smoke.mjs` 的常量互相咬）。
+
+它**不进** `--ship`、也不进 CI，这是有意的：它要 `pwsh` + 真机 DSH CLI，CI 的 ubuntu runner 给不了；塞进发布脚本只会让紧急热修在没有装 DSH 的机器上发不出去，而「这次发布要不要信静态门禁」的判断本来就该由人做。所以它是**发版纪律里的硬步骤**：每次发版（哪怕 patch）先跑，红了就停下，按 [`docs/compatibility.md`](docs/compatibility.md) 的「例行核验」查，核验过了再动 `engines.dsh` 区间。
+
 ### 推荐路径：`--ship`
 
 ```powershell
