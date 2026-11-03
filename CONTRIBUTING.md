@@ -32,7 +32,7 @@ Node.js **≥ 22**；一个可用的 DeepSeek Harness（版本在 `package.json`
 
 ```powershell
 node scripts/check.mjs              # 七道闸
-node scripts/check.mjs --self-test  # 20 个负例，证明每道闸与每个内嵌 check 组件都真的能红
+node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道闸与每个内嵌 check 组件都真的能红
 ```
 
 `七道闸`是 `tools/counts-check.mjs` 钉住的字面（改门数要连它一起改），后文统称**门禁**。七道是 version / syntax / tests / graph / docs / readme / bundle。CI 在 `windows-latest` 上跑 `--layer fast`（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)），**PR 要让这两条都 exit 0**。

@@ -10,8 +10,10 @@
  * 每道门禁都必须能红。`--self-test` 用一次性副本证明这一点：坏语法文件、坏测试、
  * 未登记的源文件、死链、坏 README 里的图路径、坏 bundle 声明、超限文本。
  *
- * **仍是七道门、20 个负例**（这两个数是已发布计数，见 `scripts/known-counts.json`）。
- * 2026-11-02 的门禁加固没有新增第八道门：宿主原文核对并进 `version` 门，文档计数一致性并进
+ * **现在是七道门、20 个负例**（见 `scripts/known-counts.json`）。两个数都是**下限**：
+ * 只许多，不许少——加判据、加负例不需要先走一轮文档批。门数不是不许变的指标：
+ * 判据该独立成门就独立成门，只是要连文档一起改。
+ * 2026-11-02 的门禁加固把三处新判据并进了现有门：宿主原文核对并进 `version` 门，文档计数一致性并进
  * `docs` 门，未文档化宿主字段禁令并进 `graph` 门，CHANGELOG/CONTRIBUTING 并进 `docs` 的收集范围，
  * README.en.md 并进 `version` 的适用版本句校验。
  *
@@ -190,7 +192,7 @@ function gateVersion(base = root, options = {}) {
     }
   }
 
-  // ---- 宿主原文基准核对（不新增第八道门：作为 version 门的一个步骤） ----
+  // ---- 宿主原文基准核对（作为 version 门的一个步骤） ----
   // tools/host-check.mjs 自己负责「没有 asar 时如实跳过、坏 asar 判红」的极性；
   // 这里只把它的退出码并进本门，跳过（exit 0 且打印「跳过」）不算红。
   const host = run(['tools/host-check.mjs'], base)
@@ -717,10 +719,15 @@ if (selfTest) {
     console.log(`${item.pass ? 'PASS' : 'FAIL'}  ${item.name.padEnd(32)} ${item.detail}`)
     if (!item.pass) failed += 1
   }
-  // 负例条数也是已发布计数：不新增、也不许悄悄少。这条不进 cases，免得把「20」本身撑大。
-  const expectedCases = knownCount('selfTestCases')
-  const countOk = expectedCases === undefined || cases.length === expectedCases
-  if (!countOk) console.error(`FAIL  ${'self-test case count'.padEnd(32)} cases.length=${cases.length} != 单一来源 scripts/known-counts.json 的 ${expectedCases}`)
+  // 负例条数是**下限**，不是精确值：少于单一来源判红，多于不判。
+  // 为什么允许增长：每新增一条判据都该自带一条负例钉住它的红态，而精确相等会让
+  // 「加一条负例」先欠一轮文档批（CONTRIBUTING 的计数声明位要跟着改）——于是没人
+  // 愿意加，验证能力停在原地。这与 tests 门的 `TEST_FLOOR` 是同一套取舍：地板保证
+  // 不被悄悄掏空，上不封顶保证能长。
+  // 读数缺失（undefined）仍放行：它由 docs 门判红，这里不编默认值。
+  const floorCases = knownCount('selfTestCases')
+  const countOk = floorCases === undefined || cases.length >= floorCases
+  if (!countOk) console.error(`FAIL  ${'self-test case count'.padEnd(32)} cases.length=${cases.length} 低于单一来源 scripts/known-counts.json 的地板 ${floorCases}（负例只许增不许减）`)
 
   // 元检查：每一个内嵌 check 组件（tools/*-check.mjs）都必须至少有一条负例。
   // 这条挡的是今天实测过一次的情形——三个新组件实现都对、但没有任何负例钉住它们的

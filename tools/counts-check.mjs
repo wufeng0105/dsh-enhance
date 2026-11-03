@@ -171,14 +171,36 @@ try {
   process.exit(1)
 }
 const source = {}
+/** 每个计数的 kind：`computed` = 精确值；`floor` = 下限（文档里写的数只许 ≥ 它）。缺省按 computed。 */
+const sourceKind = {}
 for (const [key, entry] of Object.entries(known?.counts ?? {})) {
   if (!Number.isInteger(entry?.value) || entry.value < 0) {
     problems.push(`单一来源里 ${key} 的 value 不是非负整数：${JSON.stringify(entry?.value)}`)
     continue
   }
   source[key] = entry.value
+  sourceKind[key] = entry?.kind === 'floor' ? 'floor' : 'computed'
 }
 if (Object.keys(source).length === 0) problems.push('单一来源里一个计数都没有')
+
+/**
+ * 一个文档声明值是否与单一来源相符。
+ *
+ * `computed` 要精确相等；`floor` 只要求 ≥（「只许增不许减」的计数用它——
+ * 加一条负例、加一道门不该先欠一轮文档批，但悄悄减掉必须判红）。
+ * @param {string} key
+ * @param {number} value
+ * @returns {boolean}
+ */
+function agrees(key, value) {
+  const expected = source[key]
+  return sourceKind[key] === 'floor' ? value >= expected : value === expected
+}
+
+/** 生成「不一致」说明里「应为」那一段的措辞：floor 类要说清是下界。 */
+function expectedLabel(key) {
+  return sourceKind[key] === 'floor' ? `不得低于 ${source[key]}` : `应为 ${source[key]}`
+}
 
 // ---------------------------------------------------------------- 生产事实先自证
 
@@ -201,8 +223,8 @@ else if (source.settingsGroups !== undefined && groups.value !== source.settings
   problems.push(`设置组数漂移：ui/client.js 里数到 ${groups.value} 组（${groups.names.join(' / ')}），单一来源写 ${source.settingsGroups}`)
 }
 
-if (cli.gates !== undefined && source.gates !== undefined && cli.gates !== source.gates) {
-  problems.push(`门数漂移：本次运行 gates=${cli.gates}，单一来源写 ${source.gates}（门数变了要连文档一起改，不能悄悄加第八道）`)
+if (cli.gates !== undefined && source.gates !== undefined && !agrees('gates', cli.gates)) {
+  problems.push(`门数漂移：本次运行 gates=${cli.gates}，单一来源${sourceKind.gates === 'floor' ? '的地板' : '写'} ${source.gates}（门数变了要连文档一起改）`)
 }
 
 // ---------------------------------------------------------------- 文档声明
@@ -296,8 +318,8 @@ for (const file of docs) {
           continue
         }
         scanned += 1
-        if (first !== expected || second !== expected) {
-          problems.push(`${rel}:${index + 1} 的「${match[0].trim()}」与单一来源不一致：${count} 应为 ${expected}，这里是 ${first}${second === first ? '' : `/${second}`}`)
+        if (!agrees(count, first) || !agrees(count, second)) {
+          problems.push(`${rel}:${index + 1} 的「${match[0].trim()}」与单一来源不一致：${count} ${expectedLabel(count)}，这里是 ${first}${second === first ? '' : `/${second}`}`)
         }
       }
     }
@@ -325,8 +347,8 @@ for (const required of REQUIRED) {
   for (const match of matches) {
     const value = toNumber(match[1])
     if (Number.isNaN(value)) continue
-    if (value !== expected) {
-      problems.push(`${required.doc} 的「${match[0].trim()}」与单一来源不一致：${required.count} 应为 ${expected}，这里是 ${value}`)
+    if (!agrees(required.count, value)) {
+      problems.push(`${required.doc} 的「${match[0].trim()}」与单一来源不一致：${required.count} ${expectedLabel(required.count)}，这里是 ${value}`)
     }
   }
 }

@@ -36,7 +36,7 @@ SHA、npm 账号 scope 与包名匹配、发布身份走哪条腿、`main` 的�
 | `CONTRIBUTING.md` | 每类改动各由哪道门禁守着；哪几条靠纪律 | README 结尾把维护者引过来 | ——（末端） |
 
 **一个论点只能出现在一篇名下。** 安装与卸载命令属于 README；「改完跑什么」属于 CONTRIBUTING。
-例外只有计数声明位：`七道闸` 与 `五组` 在中英 README、`七道闸` 与 `20 个负例` 在 CONTRIBUTING
+例外只有计数声明位：`七道闸` 与 `五组` 在中英 README、`七道闸` 与 `至少 20 个负例` 在 CONTRIBUTING
 都出现——那是 `tools/counts-check.mjs` 的**必需声明位**，删掉即红，不算重复。
 
 ## 术语账本

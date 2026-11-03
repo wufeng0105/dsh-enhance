@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "文档计数的唯一来源。改测试条数 / 负例数 / 门数 / 冒烟断言 / 设置组数 / 触点条数时，先改这里，再让门禁逼着文档一起改（docs 门跑 tools/counts-check.mjs）。历史核验记录里的旧读数不按现值校验：那是当时的事实。README 结构检查项数**不在**这里：它随章节数变化、没有声明位，钉住它只产生维护摩擦。",
+  "note": "文档计数的唯一来源。改测试条数 / 负例数 / 门数 / 冒烟断言 / 设置组数 / 触点条数时，先改这里，再让门禁逼着文档一起改（docs 门跑 tools/counts-check.mjs）。历史核验记录里的旧读数不按现值校验：那是当时的事实。README 结构检查项数**不在**这里：它随章节数变化、没有声明位，钉住它只产生维护摩擦。kind 有两种：computed = 精确值，文档里写的数必须与它相等；floor = 下限，文档里写的数只许大于等于它（负例数与门数用 floor：只许增不许减，这样加判据、加负例不必先走一轮文档批）。",
   "counts": {
     "tests": {
       "value": 161,
@@ -9,13 +9,13 @@
     },
     "selfTestCases": {
       "value": 20,
-      "kind": "computed",
-      "computedBy": "`node scripts/check.mjs --self-test` 的 cases.length（现场比对；已发布计数，增删都要走文档批）。其中 3 条专钉内嵌 check 组件的红态：counts-check / field-check / host-check"
+      "kind": "floor",
+      "computedBy": "`node scripts/check.mjs --self-test` 的 cases.length 的下限（现场比对：低于它判红，高于它放行）。当下实际条数看 --self-test 输出的 `summary ... total=N`。其中 3 条专钉内嵌 check 组件的红态：counts-check / field-check / host-check"
     },
     "gates": {
       "value": 7,
       "kind": "computed",
-      "computedBy": "scripts/check.mjs 的 gates 数组长度（docs 门通过 --gates 现场比对）"
+      "computedBy": "scripts/check.mjs 的 gates 数组长度（docs 门通过 --gates 现场比对，不等就判红）。**这一项必须是精确值**：门数写在 README/CONTRIBUTING 里，是给读者看的数，涨到 8 而文档仍写 7 就是文档在说假话——所以加门仍要同步文档。这里不设 floor，是试过之后的结论：floor 会允许文档少说（实测 gates 改 8 后文档写 7 不改也能过）"
     },
     "smokeAssertions": {
       "value": 44,
