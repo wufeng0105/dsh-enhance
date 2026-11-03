@@ -21,11 +21,6 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 手动触发永远是预演（只打包、不发布、不建 Release）；要真发布请推 v* 标签
-        type: boolean
-        default: true
 
 concurrency:
   group: release-${{ github.ref }}

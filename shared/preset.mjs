@@ -26,7 +26,6 @@
 import { readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { eolOf, joinLines, splitLines } from './text-lines.mjs'
-import { defaultPresetApproval } from './preset-shape.mjs'
 import { writeFileAtomic } from './state.mjs'
 
 /** 自定义档名。封闭字面量：改这里等于改宿主的档位菜单，别改。 */
@@ -460,8 +459,6 @@ export function readPresetRecord(paths) {
     return undefined
   }
 }
-
-export { defaultPresetApproval }
 
 /**
  * 写归属记录。目录不存在就建；写入是原子的（借 `shared/state.mjs` 的 `writeFileAtomic`）。

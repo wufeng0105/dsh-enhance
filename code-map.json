@@ -190,11 +190,6 @@
     },
     {
       "from": "core.preset",
-      "to": "core.preset-shape",
-      "kind": "import"
-    },
-    {
-      "from": "core.preset",
       "to": "core.state",
       "kind": "import"
     },

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * 最小 asar 只读读取器（零依赖）。
  *
@@ -16,7 +15,8 @@
  */
 
 import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 /**
  * 打开一个 asar 归档（只读）。
@@ -99,4 +99,11 @@ export function findEntry(entries, exact, suffix) {
   const byExact = entries.find((entry) => entry.path === exact)
   if (byExact !== undefined) return byExact
   return entries.find((entry) => entry.path.endsWith(suffix))
+}
+
+// 直跑守卫：本文件是库，没有 CLI。曾经顶着 shebang 又没有入口，`node tools/asar-read.mjs`
+// 会静默 exit 0——「看起来像跑过了」比报错更坏，所以这里必须出声并给非零退出码。
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  console.error('asar-read 是库（由 tools/host-check.mjs import），不是 CLI。要核宿主原文请跑：node tools/host-check.mjs')
+  process.exit(2)
 }

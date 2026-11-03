@@ -8,14 +8,14 @@
  * 为什么要有 --check：声明会漂移——新加的源码文件没登记、删掉的模块没撤、import 边漏写。
  * 漂移的模型比没有模型更坏，因为它让登记表说出与代码不符的话。
  *
- * **图不归它管。** 架构图由 Archify 在仓外生成，产物直接进 `docs/figures/`，不经本脚本。
+ * **图不归它管。** 架构图由 Archify 在仓外生成，不进仓维护，不经本脚本。
  * 早先这里有一台 `--emit` / `--strict` 的渲染机（把 `code-map.json` 的 `diagrams` 渲染成
  * SVG 写进 `docs/generated/`，再逐字节比对），它**从未接电**——`docs/generated/` 在 git
  * 全历史中不存在、`--emit` 无任何调用方、CI 只跑 fast 层、`gateStrict` 在缺产物时恒 SKIP。
  * 2026-11-03 连同 `code-map.json` 的 `diagrams` 段一起删除。
  *
  * 用法：
- *   node tools/graph.mjs --check [--root <项目根>]
+ *   node tools/graph.mjs --check
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -28,21 +28,15 @@ const enhanceRoot = resolve(here, '..')
 const args = process.argv.slice(2)
 
 /**
- * 用法错（缺值/未知参数）只给一行、exit 1。裸传 `resolve(undefined)` 抛的是
- * `node:path` 的 TypeError，栈对「你把 --root 的值忘了」这件事没有信息。
+ * 用法错（未知参数）只给一行、exit 1，不吐栈。
+ * 不提供 `--root`：本脚本只审自己所在的仓库——check.mjs 是在一次性副本里跑
+ * 副本自己的这份脚本（cwd=副本根），从来没有调用方传过根，参数解析了也从不使用。
  */
-function valueOf(argv, index, flag) {
-  const value = argv[index + 1]
-  if (typeof value !== 'string' || value.trim() === '') throw new Error(`${flag} 需要一个值`)
-  return value
-}
-
 function parseArgs(argv) {
-  const options = { check: false, root: enhanceRoot }
+  const options = { check: false }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--check') options.check = true
-    else if (arg === '--root') { options.root = resolve(valueOf(argv, index, '--root')); index += 1 }
     else throw new Error(`未知参数：${arg}`)
   }
   return options
@@ -55,8 +49,6 @@ try {
   console.error(`graph: ${String(error?.message ?? error)}`)
   process.exit(1)
 }
-
-const projectRoot = cli.root
 
 /** 不参与模型检查的：自指的这个文件 + `tests/` 整个目录；其余 tools/ 下的脚本必须登记进 `code-map.json`。 */
 const IGNORED = new Set(['tools/graph.mjs', 'tests'])

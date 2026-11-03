@@ -3,7 +3,7 @@
  * 文档计数一致性门（补审计 §4.3 的「计数无人管」）。
  *
  * 单一来源是 `scripts/known-counts.json`：测试条数、`--self-test` 负例数、冒烟断言数、
- * 设置组数、触点条数（曾列在其中的一项已移除，原因见下面的「口径边界」）。这个工具做四件事：
+ * 设置组数、触点条数（曾列在其中的一项已移除，原因见下面的「口径边界」）。这个工具做五件事：
  *
  *   1. **生产事实先自证**：设置组数从 `ui/client.js` 的 `group("enh-block-…")` 现场数。
  *      来源写错就红，不是「文档抄来源」的循环论证。
@@ -237,10 +237,10 @@ function collectDocs() {
     const path = join(root, name)
     if (existsSync(path)) out.push(path)
   }
-  // 除 `.md` 之外，还要收文档型产物：SVG 与图源 JSON 里也写着计数（实测漏过——
-  // `docs/figures/sources/compat-verify.workflow.json` 把「36 条独立触点」改成 35，
-  // 只收 `.md` 时这里 exit 0）。这些文件抽纯文本比对即可，不需要解析结构。
-  const DOC_EXT = /\.(md|svg|json)$/i
+  // 只收 `.md`：历史上这里还收 `.svg` / `.json`，是为了数进仓图源里写的计数
+  // （曾抓到 `compat-verify.workflow.json` 把「36 条独立触点」改成 35 而漏检）；
+  // 图与图源已整体移出仓库（仓外工具生成，不进仓维护），这条依据随之消失。
+  const DOC_EXT = /\.md$/i
   const add = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name)
@@ -278,14 +278,12 @@ function datedLineFlags(lines) {
  * 每条必须写 `reason`：豁免本身就是新的静默通道，没有理由的豁免等于把门禁开个洞。
  * 只允许按「文件 + 精确文本片段」豁免，不许按文件整体豁免（那会把整份文档放空）。
  * 豁免片段在扫描时先被抹掉，抹掉后照常扫其余部分。
+ *
+ * 当前为空：唯一的那条（`docs/figures/sources/save-roundtrip.sequence.json` 的「三道门」）
+ * 随图源目录一起删掉了——文件不在收集范围，它的「豁免失效」告警永远不可能响，规则成了死条目。
+ * 机制本体留着：下一条豁免仍按同样的形状登记，失效告警随条目一起回来。
  */
-const EXEMPT = [
-  {
-    file: 'docs/figures/sources/save-roundtrip.sequence.json',
-    text: '三道门',
-    reason: '图里的标题指「文本进系统提示要过的三道判定」，不是门禁道数',
-  },
-]
+const EXEMPT = []
 
 /**
  * 声明位收集表：**只供 `--report` 打印**，不参与任何判定——判定仍然走 `problems`，
@@ -298,7 +296,6 @@ const sites = []
 const requiredSites = []
 
 let scanned = 0
-const exempted = []
 for (const file of docs) {
   const rel = show(file)
   // 去掉 markdown 的强调标记：「**161** 项测试」与「161 项测试」是同一句声明
@@ -311,7 +308,6 @@ for (const file of docs) {
       continue
     }
     raw = raw.split(rule.text).join('　') // 全角空格占位，保持行号不变
-    exempted.push(`${rel}「${rule.text}」`)
   }
   const lines = raw.split(/\r?\n/)
   const dated = datedLineFlags(lines)
