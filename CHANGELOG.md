@@ -2,6 +2,30 @@
 
 本文件自 `1.1.0` 起维护；版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)，条目格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.3.1] — 2026-11-03
+
+一轮独立只读审计（无上下文、不参与开发）在 1.3.0 发布之后跑出来，报了三个阻塞级问题，全被复现。本版就是那批修复。**这一版是 CI 第一次真正发布出去的版本**——1.3.0 是本机 `npm publish` 发的，CI 那两次绿只是「发现版本已存在就跳过」。
+
+### 修复
+
+- **发版工具一跑就崩。** `scripts/release.mjs` 把 `const npmUser` 缩进进了 `if (publish && !ship)` 块，却在块外的汇总打印里引用它——任何非 `--check` 模式一启动就 `ReferenceError`。语法完全合法，所以语法门（只解析不执行）与 `--check`（提前 exit）都看不见，七道门一直全绿而「一条命令发版」是空的。修法：声明提到块外；
+- **README 中英的卸载命令还是被废弃的旧包名** `dsh-enhance`，与同一文件里的安装命令自相矛盾——照着装能装上，照着卸卸不掉，而去掉 scope 的那个名字在 npm 上是别人的包。修法：改成 `@wufeng0105/dsh-enhance`，并补一句旧包名的迁移说明；
+- **建 GitHub Release 不幂等**：npm 那步有「版本已存在就跳过」的判断，`gh release create` 没有，所以同一个 tag 重跑会在发布成功之后栽在 `already exists` 上。修法：先 `gh release view` 探一下；
+- **手动触发（`workflow_dispatch`）能发布**：一次手动跑就能造出「npm 有版本、git 无 tag、GitHub 无 Release」，而 npm 侧不可回退。修法：发布只认 `push` 标签，手动触发一律预演；
+- **`README.en.md` 把门禁名单里的 `graph` 写成了 `structure`**，与实际门名不符；
+- **`.gitignore` 漏了 `node_modules/`、`package-lock.json`、`*.tgz`**：不忽略的话，本地跑一次 `npm install` 或 `npm pack` 就会挡住 `release.mjs` 的「工作区必须干净」，让人误以为仓库脏了；
+- **发布出去的 tarball 不含 `docs/figures`、`showcase`、`CHANGELOG`**，而 README 用相对路径引用了 5 张图与 1 个长文页——GitHub 上能解析，npm 包页面上六处全是死链。修法：加进 `files`（文件数 25 → 38，解包 264 KB → 538 KB）。
+
+### 新增
+
+- `release.mjs` 的 `--dry` 冒烟模式，并挂进 **syntax 门**（不加第八道门）。这是唯一能自动发现「脚本根本跑不起来」的机制——以前没有，所以上面那个 `ReferenceError` 能带着进 `v1.3.0` 的源码；
+- `release.mjs` 在写盘前先查 packument 的 `time` 与 `versions`：命中「曾发布又被撤除」的版本号就拒绝并提示跳号。`2.0.0` 正是这种号（见 1.3.0 的「已知」），而 `major` 从 `1.3.0` 算出来正好是它。
+
+### 验证
+
+- 本地门禁 `node scripts/check.mjs` 七道全过（syntax 门现在会额外跑 `release.mjs --dry`）、`--self-test` 全过；
+- 本版由 `node scripts/release.mjs patch --ship` 推标签触发 CI 发布，用来验收「推标签 → CI 发 npm → 自动建 Release」这条链——此前它从未真正发成功过。
+
 ## [1.3.0] — 2026-11-03
 
 ### 变更（破坏性）
