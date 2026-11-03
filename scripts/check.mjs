@@ -434,6 +434,21 @@ function gateBundle(base = root) {
   return { pass: true, detail: `${patches.length} 个 bundle patch · 包根入口在` }
 }
 
+// ---------------------------------------------------------------- gates
+
+/**
+ * 门禁表：门名与实现的唯一来源。自检的负例名册核对也读它——门名不在第二处重写。
+ */
+const gates = [
+  ['version', gateVersion],
+  ['syntax', gateSyntax],
+  ['tests', gateTests],
+  ['graph', gateGraph],
+  ['docs', gateDocs],
+  ['readme', gateReadmeGate],
+  ['bundle', gateBundle],
+]
+
 // ---------------------------------------------------------------- self-test
 
 function freshCopy() {
@@ -442,14 +457,14 @@ function freshCopy() {
   return dir
 }
 
-function withCopy(caseName, mutate, observe) {
+function withCopy(caseName, gate, mutate, observe) {
   const copy = freshCopy()
   try {
     mutate(copy)
     const red = observe(copy) === false
-    return { name: caseName, pass: red, detail: red ? 'gate went red' : 'gate stayed green' }
+    return { name: caseName, gate, pass: red, detail: red ? 'gate went red' : 'gate stayed green' }
   } catch (error) {
-    return { name: caseName, pass: false, detail: `threw: ${error?.message ?? error}` }
+    return { name: caseName, gate, pass: false, detail: `threw: ${error?.message ?? error}` }
   } finally {
     rmSync(copy, { recursive: true, force: true })
   }
@@ -460,36 +475,118 @@ function expectRed(marker) {
   return (result) => !(result.pass === false && result.detail.includes(marker))
 }
 
+/**
+ * 负例名册：**哪条负例在守哪道门**。
+ *
+ * 为什么要有它：门禁「能不能红」这件事原先没有「必须存在」的登记——实测把整条
+ * `syntax red` 删掉，`--self-test` 从 21 降到 20，仍高于 `known-counts.json` 的地板 20，
+ * 两层全绿。地板挡得住「大批删除」，挡不住「一条条删」。名册是第二道锁：删掉任何一条
+ * 已登记的负例、或把它改挂到别的门上（总条数不变），这里都判红。
+ *
+ * 名册**不从 cases 推导**——从被测物推导判据等于自己给自己发证。它是独立写一遍的
+ * 声明，`checkNegativeRoster()` 负责和实际负例逐条对账。新增/删除负例时两处一起改；
+ * 「每道门至少一条」由 `gates` 表兜底，门名不在这里重写。
+ */
+const NEGATIVE_ROSTER = [
+  { name: 'syntax red', gate: 'syntax' },
+  { name: 'tests red', gate: 'tests' },
+  { name: 'graph red', gate: 'graph' },
+  { name: 'docs red', gate: 'docs' },
+  { name: 'bundle red', gate: 'bundle' },
+  { name: 'zero tests red', gate: 'tests' },
+  { name: 'syntax counts tracked files', gate: 'syntax' },
+  { name: 'derive refuses oversize text', gate: 'tests' },
+  { name: 'orphan bundle entry red', gate: 'bundle' },
+  { name: 'version mismatch red', gate: 'version' },
+  { name: 'compat declaration red', gate: 'version' },
+  { name: 'compat missing red', gate: 'version' },
+  { name: 'engines malformed red', gate: 'version' },
+  { name: 'compat readme sentence red', gate: 'version' },
+  { name: 'compat readme empty red', gate: 'version' },
+  { name: 'compat out-of-range red', gate: 'version' },
+  { name: 'readme red', gate: 'readme' },
+  { name: 'counts-check red', gate: 'docs' },
+  { name: 'smoke count red', gate: 'docs' },
+  { name: 'field-check red', gate: 'graph' },
+  { name: 'host-check red', gate: 'version' },
+]
+
+/**
+ * 名册 ↔ 实际负例的逐条对账。返回问题清单（空 = 一致）。
+ *
+ * 三个方向都查，缺一不可：
+ *   1. 实际有、名册无 → 新负例没登记它守哪道门；
+ *   2. 名册有、实际无 → 负例被悄悄删了（条数没跌破地板也照红）；
+ *   3. 两边都有但门不同 → 负例被「改挂」到别的门，总数不变也照红。
+ * 外加：每道门至少一条负例；负例名不重复；门名必须在门禁表里。
+ *
+ * @param {{ name: string, gate: string }[]} cases
+ * @param {string[]} gateNames
+ * @returns {string[]}
+ */
+function checkNegativeRoster(cases, gateNames) {
+  const problems = []
+  const actual = new Map()
+  for (const item of cases) {
+    if (actual.has(item.name)) problems.push(`负例重名：${item.name}`)
+    actual.set(item.name, item)
+    if (typeof item.gate !== 'string' || item.gate === '') {
+      problems.push(`负例「${item.name}」没挂门（withCopy 的第二个参数）`)
+    } else if (!gateNames.includes(item.gate)) {
+      problems.push(`负例「${item.name}」挂在门禁表里不存在的门「${item.gate}」上`)
+    }
+  }
+  const roster = new Set()
+  for (const entry of NEGATIVE_ROSTER) {
+    if (roster.has(entry.name)) problems.push(`名册重复登记：${entry.name}`)
+    roster.add(entry.name)
+    if (!gateNames.includes(entry.gate)) problems.push(`名册里的「${entry.name}」挂在不存在的门「${entry.gate}」上`)
+    const item = actual.get(entry.name)
+    if (item === undefined) {
+      problems.push(`名册登记了不存在的负例「${entry.name}」：删负例要连名册一起改，且该门至少留一条`)
+    } else if (item.gate !== entry.gate) {
+      problems.push(`负例「${entry.name}」名册记的是守 ${entry.gate}，实际挂在 ${item.gate}（改挂也算红）`)
+    }
+  }
+  for (const item of cases) {
+    if (!roster.has(item.name)) problems.push(`负例「${item.name}」没登记进名册（新增负例要登记它守哪道门）`)
+  }
+  for (const gate of gateNames) {
+    if (!NEGATIVE_ROSTER.some((entry) => entry.gate === gate)) problems.push(`门「${gate}」没有任何负例在守：每道门至少一条`)
+  }
+  return problems
+}
+
 function runSelfTest() {
   const cases = []
 
   cases.push(withCopy(
-    'syntax red',
+    'syntax red', 'syntax',
     (copy) => appendFileSync(join(copy, 'shared', 'state.mjs'), '\nconst broken =\n'),
     (copy) => expectRed('broken')(gateSyntax(copy)),
   ))
 
   cases.push(withCopy(
-    'tests red',
+    'tests red', 'tests',
     (copy) => writeFileSync(join(copy, 'tests', 'zz-self-test.test.mjs'), "import test from 'node:test'\nimport assert from 'node:assert/strict'\ntest('self-test fails', () => assert.fail('expected'))\n"),
     (copy) => expectRed('self-test fails')(gateTests(copy)),
   ))
 
   cases.push(withCopy(
-    'graph red',
+    'graph red', 'graph',
     (copy) => writeFileSync(join(copy, 'zz-unregistered.mjs'), 'export const x = 1\n'),
     (copy) => expectRed('未登记')(gateGraph(copy)),
   ))
 
   cases.push(withCopy(
-    'docs red',
+    'docs red', 'docs',
     // 门禁扫 README 与 docs/ 下的 markdown：正文里点名一个不存在的仓内路径必须判红
     (copy) => appendFileSync(join(copy, 'README.md'), '\n临时负例：`docs/nope.md`\n'),
     (copy) => expectRed('不存在的路径')(gateDocs(copy)),
   ))
 
   cases.push(withCopy(
-    'bundle red',
+    'bundle red', 'bundle',
     // bundle 门禁：把 patch 指向一个不存在的文件，必须判红
     (copy) => {
       const file = join(copy, 'package.json')
@@ -501,7 +598,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'zero tests red',
+    'zero tests red', 'tests',
     (copy) => {
       for (const file of testFiles(copy)) writeFileSync(file, '// emptied by self-test\n', 'utf8')
     },
@@ -525,22 +622,22 @@ function runSelfTest() {
   }
 
   /** 带回 `.git` 的副本：`git ls-files` 只在真仓库里可用。 */
-  const withGitCopy = (caseName, mutate, observe) => {
+  const withGitCopy = (caseName, gate, mutate, observe) => {
     const copy = mkdtempSync(join(tmpdir(), 'enhance-selftest-git-'))
     try {
       copyRepoTree(root, copy, { includeGit: true })
       mutate(copy)
       const red = observe(copy) === false
-      return { name: caseName, pass: red, detail: red ? 'gate went red' : 'gate stayed green' }
+      return { name: caseName, gate, pass: red, detail: red ? 'gate went red' : 'gate stayed green' }
     } catch (error) {
-      return { name: caseName, pass: false, detail: `threw: ${error?.message ?? error}` }
+      return { name: caseName, gate, pass: false, detail: `threw: ${error?.message ?? error}` }
     } finally {
       rmSync(copy, { recursive: true, force: true })
     }
   }
 
   cases.push(withGitCopy(
-    'syntax counts tracked files',
+    'syntax counts tracked files', 'syntax',
     // 读数口径：退回「走盘数一切」的旧实现（不认 .gitignore，也不问 git）
     // 替换锚在「以 '.git' 开头的那个 Set」上而不是整串字面量：SKIP_DIRS 增减条目
     // 不该让这条负例失效（2026-10-31 给 SKIP_DIRS 补 `.dsh` 时，整串 replace 静默没命中，
@@ -557,7 +654,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'derive refuses oversize text',
+    'derive refuses oversize text', 'tests',
     // 退掉读路径的上限：derive 又会对超限文本返回 injecting:true
     (copy) => {
       const file = join(copy, 'shared', 'state.mjs')
@@ -569,7 +666,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'orphan bundle entry red',
+    'orphan bundle entry red', 'bundle',
     // bundle 门禁的另一侧：patch 里的 insert 名指向包内不存在的文件必须判红
     (copy) => {
       const file = join(copy, 'cordis.patch.yml')
@@ -581,14 +678,14 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'version mismatch red',
+    'version mismatch red', 'version',
     // 版本身份：把 VERSION 改成另一个 x.y.z，package.json 与它就不再一致
     (copy) => writeFileSync(join(copy, 'VERSION'), '9.9.9\n', 'utf8'),
     (copy) => expectRed('!= VERSION')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
   ))
 
   cases.push(withCopy(
-    'compat declaration red',
+    'compat declaration red', 'version',
     // 兼容元数据的 tested 必须落在 engines.dsh 区间内：改成一个区间外的版本
     (copy) => {
       const file = join(copy, 'package.json')
@@ -600,7 +697,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'compat missing red',
+    'compat missing red', 'version',
     // 第三证（空转检查）：整个 engines.dsh 删掉必须判红——挡「常量定义了、没进判定」
     (copy) => {
       const file = join(copy, 'package.json')
@@ -612,7 +709,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'engines malformed red',
+    'engines malformed red', 'version',
     // 区间形状写歪（单界、坏算符）必须判红——宽进等于把宿主已拒的写法放行
     (copy) => {
       const file = join(copy, 'package.json')
@@ -624,7 +721,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'compat readme sentence red',
+    'compat readme sentence red', 'version',
     // README 是派生文本：删掉那句必须判红
     (copy) => {
       const file = join(copy, 'README.md')
@@ -636,21 +733,21 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'compat readme empty red',
+    'compat readme empty red', 'version',
     // 把 README 删空 = 没有那句派生文本；这不许变成「静默过关」（去掉 `readme !== ''` 短路）
     (copy) => writeFileSync(join(copy, 'README.md'), '', 'utf8'),
     (copy) => expectRed('README 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
   ))
 
   cases.push(withCopy(
-    'compat out-of-range red',
+    'compat out-of-range red', 'version',
     // 本机 DSH 不在声明范围：必须判红并给「先跑例行核验」的可操作提示
     () => {},
     (copy) => expectRed('例行核验')(gateVersion(copy, { dshVersion: '0.9.9' })),
   ))
 
   cases.push(withCopy(
-    'readme red',
+    'readme red', 'readme',
     // README 门禁：站内链接指向不存在的文件必须判红——链接红掉没人知道是常事
     (copy) => {
       const file = join(copy, 'README.md')
@@ -668,7 +765,7 @@ function runSelfTest() {
   // 不能只靠「改的时候手工验过一次」。
 
   cases.push(withCopy(
-    'counts-check red',
+    'counts-check red', 'docs',
     // 文档里的计数与单一来源不符 → docs 门的计数一致性必须判红并点名位置
     (copy) => {
       const file = join(copy, 'docs', 'compatibility.md')
@@ -680,7 +777,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'smoke count red',
+    'smoke count red', 'docs',
     // smokeAssertions 的「机器来源」必须真能咬人：tools/smoke.mjs 的 EXPECTED_ASSERTIONS
     // 与单一来源不等时，docs 门的计数一致性要判红（此前副本与常量的漂移只有人肉跑冒烟才暴露）
     (copy) => {
@@ -693,7 +790,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'field-check red',
+    'field-check red', 'graph',
     // 生产代码里写未登记的宿主字段入口 → graph 门的禁令必须判红（fail-closed）
     (copy) => {
       const file = join(copy, 'enhance-scope', 'index.js')
@@ -705,7 +802,7 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
-    'host-check red',
+    'host-check red', 'version',
     // 宿主 asar 读不出来时必须判红、**不能**当成「跳过」（跳过是「没有 asar」，不是「坏了」）
     (copy) => {
       const bad = join(copy, 'not-an-asar.bin')
@@ -730,9 +827,14 @@ if (selfTest) {
   const cases = runSelfTest()
   let failed = 0
   for (const item of cases) {
-    console.log(`${item.pass ? 'PASS' : 'FAIL'}  ${item.name.padEnd(32)} ${item.detail}`)
+    console.log(`${item.pass ? 'PASS' : 'FAIL'}  ${item.name.padEnd(32)} [${(item.gate ?? '?').padEnd(7)}] ${item.detail}`)
     if (!item.pass) failed += 1
   }
+  // 负例名册：门禁「能不能红」这件事本身也要有「必须存在」的登记。
+  // 删一条负例、或把它改挂到别的门上（总条数不变），这里都判红——地板 20 只挡大批删除。
+  const rosterProblems = checkNegativeRoster(cases, gates.map(([name]) => name))
+  for (const problem of rosterProblems) console.error(`FAIL  ${'negative roster'.padEnd(32)} ${problem}`)
+  const rosterOk = rosterProblems.length === 0
   // 负例条数是**下限**，不是精确值：少于单一来源判红，多于不判。
   // 为什么允许增长：每新增一条判据都该自带一条负例钉住它的红态，而精确相等会让
   // 「加一条负例」先欠一轮文档批（CONTRIBUTING 的计数声明位要跟着改）——于是没人
@@ -758,8 +860,8 @@ if (selfTest) {
   const coverageOk = uncovered.length === 0
   if (!coverageOk) console.error(`FAIL  ${'self-test coverage'.padEnd(32)} 这些内嵌 check 组件没有负例：${uncovered.join(', ')}——加一条「<组件名> red」负例`)
 
-  console.log(`summary  pass=${cases.length - failed} fail=${failed} total=${cases.length}`)
-  process.exit(failed === 0 && countOk && coverageOk ? 0 : 1)
+  console.log(`summary  pass=${cases.length - failed} fail=${failed} total=${cases.length} roster=${rosterOk ? 'OK' : 'RED'}`)
+  process.exit(failed === 0 && countOk && coverageOk && rosterOk ? 0 : 1)
 }
 
 /** `tools/*-check.mjs` 的基名（去扩展名，保留 `-check`）：必须自带负例的内嵌组件。 */
@@ -772,16 +874,6 @@ function embeddedCheckModules() {
     return []
   }
 }
-
-const gates = [
-  ['version', gateVersion],
-  ['syntax', gateSyntax],
-  ['tests', gateTests],
-  ['graph', gateGraph],
-  ['docs', gateDocs],
-  ['readme', gateReadmeGate],
-  ['bundle', gateBundle],
-]
 
 let failed = 0
 let skipped = 0
