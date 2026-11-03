@@ -691,6 +691,22 @@ function writeSession(home, name, payload, mtimeMs) {
   return file
 }
 
+/**
+ * 造一份**多条装配记录**的假会话日志：同一个文件里按顺序排多条 `"system-prompt"` 行。
+ *
+ * 真机会话就是这个形态——每改一次设置、下一条请求就重算一次系统提示，新记录追加在同一个
+ * `session.v4.jsonl.zstd` 里。判「宿主原句有没有被顶掉」只能认**最后一条**。
+ */
+function writeSessionRecords(home, name, payloads, mtimeMs) {
+  const dir = join(home, 'sessions', 'workspace', name)
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, 'session.v4.jsonl.zstd')
+  const body = `${payloads.map((payload) => JSON.stringify({ type: 'system-prompt', payload })).join('\n')}\n`
+  writeFileSync(file, zstdCompressSync(Buffer.from(body, 'utf8')))
+  if (mtimeMs !== undefined) utimesSync(file, new Date(mtimeMs), new Date(mtimeMs))
+  return file
+}
+
 /** 一个可注入的假 agent：`agent.ctx.inject` 立刻回调，把遮蔽项记进数组。 */
 function injectableAgent() {
   const sections = []
@@ -831,6 +847,29 @@ test('inject：identity=remove 但最新会话里仍有宿主原句 → 判红�
     await probe.call({ op: 'set', hideHarness: true })
     const stillGreen = await injectCheck(probe)
     assert.equal(stillGreen.pass, true)
+  } finally {
+    await probe.close()
+  }
+})
+
+test('inject：同一会话文件里有多条装配记录时只认最后一条——旧记录带宿主原句不该判红', async () => {
+  // 真机上的形态：用户改完「品牌人设」再发一条消息，同一个 session.v4.jsonl.zstd 里
+  // 会先后出现两条装配记录（改动前那条含宿主原句、改动后那条不含）。按整份文件计数会误报
+  // 「遮蔽没有生效」，而最后一条恰恰是对的。
+  const probe = await harness({ patch: '[]\n' })
+  try {
+    const contentText = (await probe.call({ op: 'state' })).json.text
+    await probe.call({ op: 'set', identity: 'remove' })
+
+    writeSessionRecords(probe.home, 'same-file-green', [`${HOST_SENTENCE}\n${contentText}`, contentText], Date.now())
+    const green = await injectCheck(probe)
+    assert.equal(green.pass, true, '最后一条装配已不含宿主原句，不该判红')
+
+    // 反向钉住方向：把最后一条换成含宿主原句的，同一份文件必须判红。
+    writeSessionRecords(probe.home, 'same-file-red', [contentText, `${HOST_SENTENCE}\n${contentText}`], Date.now() + 1000)
+    const red = await injectCheck(probe)
+    assert.equal(red.pass, false)
+    assert.match(red.detail, /仍有宿主原句/)
   } finally {
     await probe.close()
   }

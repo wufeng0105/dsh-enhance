@@ -137,13 +137,20 @@ function countHits(text, wanted) {
   return hits
 }
 
-/** 解压后的日志里有几条装配记录；0 表示这份文件没有提示词快照（或还没装配过）。 */
-function countPromptRecords(text) {
-  let count = 0
+/**
+ * 解压后的日志里**最后一条**装配记录（整行）；没有则 `undefined`。
+ *
+ * 为什么需要它：同一个会话文件会累积多条装配记录——每改一次设置、下一条请求就重算一次
+ * 系统提示，新记录追加在同一个 `session.v4.jsonl.zstd` 里。判定「宿主原句有没有被顶掉」
+ * 必须只认**最后一条**，否则设置改动之前那条旧记录会永远把判定拉红
+ * （真机实测：同一文件里 00:53 那条带宿主原句、01:10 那条已不含，按整份计数会误报失效）。
+ */
+function lastPromptRecord(text) {
+  let last
   for (const line of text.split('\n')) {
-    if (line.includes(SYSTEM_PROMPT_MARK)) count += 1
+    if (line.includes(SYSTEM_PROMPT_MARK)) last = line
   }
-  return count
+  return last
 }
 
 /**
@@ -251,8 +258,10 @@ export async function sessionOmits(sessionsDir, needle) {
   if (candidates.length === 0) return { ok: false, detail: `没有会话日志（${sessionsDir} 下没有 ${SESSION_FILE}）——装好后先发一条消息再检查` }
 
   const { outcome, stats } = walkSessions(candidates, (decoded, candidate, stat) => {
-    if (countPromptRecords(decoded.text) === 0) return undefined
-    const hits = countHits(decoded.text, wanted)
+    const last = lastPromptRecord(decoded.text)
+    if (last === undefined) return undefined
+    // 只数最后一条装配记录。数整份文件会把「设置改动之前」的旧记录也算进来（真机实测的假红）。
+    const hits = last.includes(wanted) || (wanted.includes('\n') && last.includes(wanted.replace(/\n/g, '\\n'))) ? 1 : 0
     const at = stat.mtime.toISOString().slice(11, 16)
     const meta = {
       file: candidate.file,
