@@ -9,18 +9,23 @@
  *   - scope 包不加 `--access public` 发出去是私有的，别人装不了；
  *   - 仓库里没有的版本发出去，用户从 GitHub 装到的东西和 npm 上的对不上。
  *
- * 刻意**不做**的事：不自动 commit / tag / push。版本号一旦进了 commit 又被 force-push
- * 覆盖，npm 上那个版本就永远对不上仓库了。脚本在最后把该跑的 git 命令打出来，由人决定。
+ * 刻意**保留给人的**事：不代替人决定发哪个版本（`patch`/`minor`/`major`/明确号必须由人给），
+ * 也不代替人写 CHANGELOG。`--ship` 会替人做 commit / tag / push，因为这三步必须与版本号
+ * 原子地发生——分头手做必然出现「版本改了没打标签」或「标签打在前一个提交上」。但它会在
+ * 动手前把工作区、分支、远端同步、包名与入口前缀、版本号是否已作废全查一遍，任一条不符就停。
+ * 想完全手动就在最后一步之前停（不加 `--ship`），脚本会打印该跑的 git 命令。
  *
  * 用法：
  *   node scripts/release.mjs patch              # 只改版本并自检，不发
  *   node scripts/release.mjs minor --ship       # 改版本 → 门禁 → 提交 → 打标签 → 推
  *   node scripts/release.mjs minor --publish    # 自检通过后从本机直接发到 npm
- *   node scripts/release.mjs --check            # 只核对 npm / git tag / GitHub Release 是否一致
+ *   node scripts/release.mjs --check            # 只核对 npm / git tag / Release / 凭据到期
+ *   node scripts/release.mjs 3.0.0 --dry        # 冒烟：跑通只读逻辑后退出，不写不联网
  *   node scripts/release.mjs 3.0.0              # 指定版本（必须 x.y.z，不带预发布标签）
  *
  * `--ship` 是推荐路径：它把「版本、标签、Release、npm」四件事绑成一条链——
- * 推标签后由 `.github/workflows/release.yml` 用 OIDC 发 npm 并建 GitHub Release。
+ * 推标签后由 `.github/workflows/release.yml` 发 npm（仓库有 `NPM_TOKEN` 就用它，
+ * 没有就走 OIDC 可信发布）并建 GitHub Release。
  *
  * 退出码：0 成功 / 1 某一步失败 / 2 用法错。
  */
