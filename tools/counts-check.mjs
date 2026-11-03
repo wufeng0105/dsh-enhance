@@ -2,8 +2,8 @@
 /**
  * 文档计数一致性门（补审计 §4.3 的「计数无人管」）。
  *
- * 单一来源是 `scripts/known-counts.json`：测试条数、`--self-test` 负例数、README 结构
- * 检查项数、冒烟断言数、设置组数、触点条数。这个工具做四件事：
+ * 单一来源是 `scripts/known-counts.json`：测试条数、`--self-test` 负例数、冒烟断言数、
+ * 设置组数、触点条数（曾列在其中的一项已移除，原因见下面的「口径边界」）。这个工具做四件事：
  *
  *   1. **生产事实先自证**：设置组数从 `ui/client.js` 的 `group("enh-block-…")` 现场数。
  *      来源写错就红，不是「文档抄来源」的循环论证。
@@ -23,8 +23,13 @@
  *      或伪造一条，末行数字会跟着变——这是「报告自己数错却自洽」的防线。
  *
  * 口径边界，写清楚不装：
- *   - `smokeAssertions` / `hostContacts` 是**人工维护值**——冒烟要 pwsh + dsh CLI、触点计数口径
- *     是散文公式，fast 层算不出来。它们只校验「来源值 == 各文档声明值」，不假装能机算。
+ *   - `smokeAssertions` / `hostContacts` **原先标人工维护值**——当时的理由是「冒烟要 pwsh + dsh CLI、
+ *     触点计数口径是散文公式，算不出来」，判据只剩「某份日志里写着 total=NN」，而日志不进仓，
+ *     等于没人核：谁把数改成任意值、文档跟着改就全绿。**这一点已证伪**——`tools/smoke.mjs` 的
+ *     `EXPECTED_ASSERTIONS` 跑完自校、`tools/contacts-count.mjs` 按 `docs/compatibility.md` 的口径
+ *     现场数，两个数都有了机器来源，`known-counts.json` 里两者的 `kind` 也已从 `manual` 改成
+ *     `computed`（各自的 `computedBy` 写着来源）。它们现在与其余计数一样，只校验
+ *     「来源值 == 各文档声明值」。
  *   - `readmeChecks` 已从单一来源**移除**：README 结构检查的项数随章节数变化（增删一节就 ±1），
  *     既没有文档声明位、也抓不到缺陷，钉住它只会逼人「改 README 章节就同步一个 JSON」。
  *     readme 门现在只判「结构检查有没有过」，不再比对总数。

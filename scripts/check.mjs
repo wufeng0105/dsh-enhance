@@ -334,7 +334,7 @@ function gateDocs(base = root, options = {}) {
   const countsArgs = ['tools/counts-check.mjs', '--root', base]
   if (Number.isInteger(options.gateCount)) countsArgs.push('--gates', String(options.gateCount))
   const counts = run(countsArgs, base)
-  // 两个「人工维护值」各自的可机算来源：它们原先标 manual，判据是「某份日志里写着
+  // 两个**曾经**的人工维护值各自的可机算来源：它们原先标 manual，判据是「某份日志里写着
   // total=NN」——日志不进仓，等于没人核。这里让它们现场数出来与单一来源对账。
   const contacts = run(['tools/contacts-count.mjs', '--root', base], base)
   const dashes = (result) => {
