@@ -35,16 +35,21 @@ const CHANGELOG_FILE = join(root, 'CHANGELOG.md')
 /** 用法错：直接退出，不动任何文件。 */
 function usage(why) {
   console.error(`release: ${why}`)
-  console.error('用法：node scripts/release.mjs <patch|minor|major|x.y.z> [--publish]')
+  console.error('用法：node scripts/release.mjs <patch|minor|major|x.y.z> [--publish [--otp=NNNNNN]]')
   process.exit(2)
 }
 
 const args = process.argv.slice(2)
 const publish = args.includes('--publish')
+// npm 对发布强制二次验证，手动发布必然要带验证码（30 秒一次、用过即废）。
+// 也可以不用这个开关，改成在 npmjs.com 配 OIDC 可信发布后由 CI 发。
+const otpArg = args.find((a) => a.startsWith('--otp='))
+const otp = otpArg === undefined ? null : otpArg.slice('--otp='.length)
 const bumpArg = args.find((a) => !a.startsWith('--'))
 if (bumpArg === undefined) usage('缺版本参数')
-const unknown = args.filter((a) => a.startsWith('--') && a !== '--publish')
+const unknown = args.filter((a) => a.startsWith('--') && a !== '--publish' && !a.startsWith('--otp='))
 if (unknown.length) usage(`认不出的开关：${unknown.join(' ')}`)
+if (otp !== null && publish && !/^\d{6}$/.test(otp)) usage('--otp 应该是 6 位数字')
 
 /** Windows 上 npm 是 .cmd，必须经 shell 解析。 */
 function npm(argv) {
@@ -168,7 +173,7 @@ if (!publish) {
 // ---------------------------------------------------------------- 5. 发布
 
 console.log(`\n# 发布到 ${NPM_REGISTRY}`)
-const pub = npm(['publish', '--access', 'public', '--registry', NPM_REGISTRY])
+const pub = npm(['publish', '--access', 'public', '--registry', NPM_REGISTRY, ...(otp === null ? [] : ['--otp', otp])])
 if (pub.status !== 0) {
   // 发布失败时把版本退回原值，避免仓库停在一个 npm 上不存在的版本上。
   // 只有真的改过版本才需要退——`next === current` 时原样写回会平白重排 package.json。
@@ -177,9 +182,11 @@ if (pub.status !== 0) {
     writeFileSync(PKG_FILE, `${JSON.stringify({ ...pkg, version: current }, null, 2)}\n`, 'utf8')
   }
   const hint = /E403|two-factor|2fa/i.test(pub.stderr ?? '')
-    ? '\n  这是 npm 的发布 2FA 要求。两条路：给命令加 --otp=<验证码>，'
-      + '\n  或到 npmjs.com → Access Tokens 建一个勾了 "Bypass two-factor authentication" 的'
-      + '\n  Granular Access Token，写进 .npmrc 的 //registry.npmjs.org/:_authToken。'
+    ? '\n  这是 npm 的发布 2FA 要求。三条路：'
+      + '\n   - 加 --otp=<6 位验证码> 再跑一次（验证码 30 秒有效）；'
+      + '\n   - 到 npmjs.com 建带 "Bypass two-factor authentication" 的 granular token'
+      + '\n     （注意：这类 token 约 2027-01 起不能再直接发布）；'
+      + '\n   - 或者推一个 v* 标签，让 .github/workflows/release.yml 走 OIDC 可信发布。'
     : ''
   fail(`npm publish 失败（exit ${pub.status}）${hint}\n${pub.stderr ?? ''}`)
 }
