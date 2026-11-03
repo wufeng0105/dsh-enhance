@@ -20,7 +20,8 @@ import { relative, sep } from 'node:path'
 /**
  * 复制一份仓库副本。
  *
- * - 走盘复制，但**跳过所有被 `.gitignore` 排除的本地件**（见 `IGNORED_TOP_LEVEL`）；
+ * - 走盘复制，但跳过一张**手维护的一级目录表**（`IGNORED_TOP_LEVEL`）：它对应
+ *   `.gitignore` 里的本地件，`.gitignore` 增删目录时要手工同步这张表（漏项不会红）；
  * - `includeGit` 为真时连 `.git` 一起复制（副本里要跑 `git ls-files` /
  *   `git check-ignore` 的用例需要它）；
  * - 未跟踪的新文件**要跟着复制**：自检造负例、新增模块都属于这一类，按 `git ls-files`
@@ -58,4 +59,5 @@ export const IGNORED_TOP_LEVEL = new Set([
   '.tmp',
   '.dsh',
   'ZCode',
+  '.archify',
 ])

@@ -26,9 +26,10 @@ const git = (args, cwd = repo) => spawnSync('git', args, { cwd, encoding: 'utf8'
 /**
  * 仓库副本：带上 `.git`，`git ls-files` 才有得比。
  *
- * 复制走 `copyRepoTree(..., { includeGit: true })`——按 `git ls-files` 复制，不是
- * 整目录 `cpSync`。原先那种写法会把本地克隆的 `ZCode/`（3 GB / 3.6 万文件）一起搬，
- * 这一条测试因此要跑 200 s+，连带 tests 门禁在 120 s 超时处误报。
+ * 复制走 `copyRepoTree(..., { includeGit: true })`：它仍是 `cpSync`，但按一张一级目录
+ * 跳过表（`repo-copy.mjs` 的 `IGNORED_TOP_LEVEL`）排除本地克隆的 `ZCode/`
+ * （3 GB / 3.6 万文件）等本地件。早期实现只排除 `node_modules`，这一条测试因此要跑
+ * 200 s+，连带 tests 门禁在 120 s 超时处误报。
  */
 function copyRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'enhance-counts-'))

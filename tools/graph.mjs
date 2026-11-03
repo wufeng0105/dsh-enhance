@@ -62,7 +62,7 @@ const IGNORED = new Set(['tools/graph.mjs', 'tests'])
  * （审计 §3.3 点过）。现在约束收窄成「常驻源码（不含 `scripts/`、`tests/`）必须登记」，
  * 由门禁钉住，不靠人记得。
  */
-const SKIP_DIRS = new Set(['node_modules', 'tests', 'scripts', 'design', '.codegraph', '.zhll', '.tmp', '.dsh', 'ZCode', '.git'])
+const SKIP_DIRS = new Set(['node_modules', 'tests', 'scripts', 'design', '.codegraph', '.zhll', '.tmp', '.dsh', 'ZCode', '.archify', '.git'])
 
 /** CONTRIBUTING.md 里必须逐字出现的那句登记约束（与上面 SKIP_DIRS 的豁免同源）。 */
 const REGISTRATION_EXEMPTION = '常驻源码（不含 `scripts/`、`tests/`）必须登记进 `code-map.json`'

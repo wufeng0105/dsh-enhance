@@ -680,6 +680,19 @@ function runSelfTest() {
   ))
 
   cases.push(withCopy(
+    'smoke count red',
+    // smokeAssertions 的「机器来源」必须真能咬人：tools/smoke.mjs 的 EXPECTED_ASSERTIONS
+    // 与单一来源不等时，docs 门的计数一致性要判红（此前副本与常量的漂移只有人肉跑冒烟才暴露）
+    (copy) => {
+      const file = join(copy, 'tools', 'smoke.mjs')
+      const text = readFileSync(file, 'utf8')
+      const broken = text.replace('const EXPECTED_ASSERTIONS = 44', 'const EXPECTED_ASSERTIONS = 45')
+      assertMutated(copy, 'tools/smoke.mjs', text, broken)
+    },
+    (copy) => expectRed('冒烟断言数漂移')(gateDocs(copy)),
+  ))
+
+  cases.push(withCopy(
     'field-check red',
     // 生产代码里写未登记的宿主字段入口 → graph 门的禁令必须判红（fail-closed）
     (copy) => {

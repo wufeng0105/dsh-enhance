@@ -15,7 +15,7 @@
     "smokeAssertions": {
       "value": 44,
       "kind": "computed",
-      "computedBy": "tools/smoke.mjs 里的 `EXPECTED_ASSERTIONS` 常量：冒烟跑完自校 `results.length` 与它是否相等，不等即红。原先标 manual（判据是「日志里写着 total=44」）属自证——日志不进仓，等于没人核；改成自校后这个数有了机器来源，本字段只是那个常量的副本"
+      "computedBy": "tools/smoke.mjs 里的 `EXPECTED_ASSERTIONS` 常量：计数门（tools/counts-check.mjs）现场读它与本值对账，不等即红；冒烟真跑时脚本自己再校 `results.length` 与它是否相等。原先标 manual（判据是「日志里写着 total=44」）属自证——日志不进仓，等于没人核"
     },
     "settingsGroups": {
       "value": 5,

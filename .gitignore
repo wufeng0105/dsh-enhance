@@ -20,8 +20,8 @@ desktop.ini
 # local design previews (not part of the repo); anchored so a tracked design/ still works
 /design/
 
-# Archify deliverables: interactive HTML + receipts. The publishable figures are
-# extracted into docs/figures/ and tracked; these are the build byproducts.
+# Archify deliverables (interactive HTML + receipts) are generated outside the
+# repo and are never tracked; nothing under /.archify/ is published.
 /.archify/
 
 # local code index (codegraph cli), machine-specific

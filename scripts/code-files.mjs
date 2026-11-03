@@ -24,10 +24,10 @@ import { join } from 'node:path'
 /**
  * 走盘时跳过的目录：`.git` 是仓库元数据，`node_modules` 是依赖，其余是被 `.gitignore`
  * 排除的本地件（`design/`、代码索引 `.codegraph/`、草稿区 `.zhll/`、临时件 `.tmp/`、
- * 本地 DSH 数据 `.dsh/`、本地克隆的 `ZCode/`）——它们不属于核心仓，数进来会让门禁读数与
- * tracked 对不上。
+ * 本地 DSH 数据 `.dsh/`、本地克隆的 `ZCode/`、仓外 Archify 产物 `.archify/`）——它们不属于
+ * 核心仓，数进来会让门禁读数与 tracked 对不上。
  */
-export const SKIP_DIRS = new Set(['.git', 'node_modules', 'design', '.codegraph', '.zhll', '.tmp', '.dsh', 'ZCode'])
+export const SKIP_DIRS = new Set(['.git', 'node_modules', 'design', '.codegraph', '.zhll', '.tmp', '.dsh', 'ZCode', '.archify'])
 
 /**
  * @param {string} base 项目根

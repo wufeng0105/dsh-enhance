@@ -6,7 +6,7 @@ $cli = Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness\resources\runtime\
 # 注意：不要用 $home —— PowerShell 的 $HOME 是只读自动变量，大小写不敏感。
 $smokeHome = Join-Path $env:TEMP ("dsh-enhance-smoke-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $env:DSH_HOME = $smokeHome
-if (-not $env:HTTPS_PROXY) { $env:HTTPS_PROXY = 'http://127.0.0.1:7897' }
+# 需要代理的机器自己先设 HTTPS_PROXY；不把某台机器的本地端口写进仓库。
 
 Write-Output "# home = $smokeHome"
 Write-Output "# repo = $repo"

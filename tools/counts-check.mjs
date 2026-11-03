@@ -24,11 +24,10 @@
  * 口径边界，写清楚不装：
  *   - `smokeAssertions` / `hostContacts` **原先标人工维护值**——当时的理由是「冒烟要 pwsh + dsh CLI、
  *     触点计数口径是散文公式，算不出来」，判据只剩「某份日志里写着 total=NN」，而日志不进仓，
- *     等于没人核：谁把数改成任意值、文档跟着改就全绿。**这一点已证伪**——`tools/smoke.mjs` 的
- *     `EXPECTED_ASSERTIONS` 跑完自校、`tools/contacts-count.mjs` 按 `docs/compatibility.md` 的口径
- *     现场数，两个数都有了机器来源，`known-counts.json` 里两者的 `kind` 也已从 `manual` 改成
- *     `computed`（各自的 `computedBy` 写着来源）。它们现在与其余计数一样，只校验
- *     「来源值 == 各文档声明值」。
+ *     等于没人核：谁把数改成任意值、文档跟着改就全绿。**这一点已证伪**——`smokeAssertions` 现在
+ *     由本工具现场读 `tools/smoke.mjs` 的 `EXPECTED_ASSERTIONS` 与单一来源对账（冒烟真跑时
+ *     脚本自己还自校一遍），`hostContacts` 由 `tools/contacts-count.mjs` 按 `docs/compatibility.md`
+ *     的口径现场数。`known-counts.json` 里两者的 `kind` 都已从 `manual` 改成 `computed`。
  *   - `readmeChecks` 已从单一来源**移除**：README 结构检查的项数随章节数变化（增删一节就 ±1），
  *     既没有文档声明位、也抓不到缺陷，钉住它只会逼人「改 README 章节就同步一个 JSON」。
  *     readme 门现在只判「结构检查有没有过」，不再比对总数。
@@ -226,6 +225,32 @@ const groups = productionGroupCount()
 if (groups.error !== undefined) problems.push(`设置组数算不出来：${groups.error}`)
 else if (source.settingsGroups !== undefined && groups.value !== source.settingsGroups) {
   problems.push(`设置组数漂移：ui/client.js 里数到 ${groups.value} 组（${groups.names.join(' / ')}），单一来源写 ${source.settingsGroups}`)
+}
+
+/**
+ * 冒烟断言数：`tools/smoke.mjs` 里的 `EXPECTED_ASSERTIONS` 常量。
+ *
+ * known-counts 的 `computedBy` 曾声称「本字段只是那个常量的副本」，但没有任何代码把
+ * 常量算出来交给它——副本与常量的漂移只有人肉跑冒烟时才会暴露。现在这里现场读它：
+ * 单一来源与常量不等就红，`computed` 这个 kind 从此名副其实。
+ */
+function productionSmokeAssertions() {
+  const file = join(root, 'tools', 'smoke.mjs')
+  let text
+  try {
+    text = readFileSync(file, 'utf8')
+  } catch (error) {
+    return { error: `读不到 tools/smoke.mjs：${String(error?.message ?? error)}` }
+  }
+  const match = /const\s+EXPECTED_ASSERTIONS\s*=\s*(\d+)/.exec(text)
+  if (match === null) return { error: 'tools/smoke.mjs 里找不到 `EXPECTED_ASSERTIONS = <数字>`' }
+  return { value: Number(match[1]) }
+}
+
+const smokeCount = productionSmokeAssertions()
+if (smokeCount.error !== undefined) problems.push(`冒烟断言数算不出来：${smokeCount.error}`)
+else if (source.smokeAssertions !== undefined && smokeCount.value !== source.smokeAssertions) {
+  problems.push(`冒烟断言数漂移：tools/smoke.mjs 的 EXPECTED_ASSERTIONS=${smokeCount.value}，单一来源写 ${source.smokeAssertions}`)
 }
 
 // ---------------------------------------------------------------- 文档声明

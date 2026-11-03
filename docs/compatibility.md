@@ -208,13 +208,13 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 | # | 文件 | 改什么 | 门禁会不会逼你改 |
 |---|---|---|---|
 | 1 | `package.json` | `engines.dsh` 的**上界**：`<0.2.1-rc.6` → `<0.2.1-rc.7`。**上界是排他的**，所以要把 rc.6 并进区间，字面必须指向**下一个**版本；写成 `<=0.2.1-rc.6` 不是本仓写法（`shared/compat.mjs` 只解析 `>=`/`<` 这种半开区间）。同时 `dsh.compatibility.tested` → `0.2.1-rc.6`、`verifiedAt` → 本轮日期 | **会**（version 门核区间可解析、`tested` 落在区间内、`verifiedAt` 形状） |
-| 2 | `README.md` | 适用版本句（由声明派生，逐字一致） | **会**（version 门只读 `README.md`） |
-| 3 | `README.en.md` | 同一句的第二语言副本（照同一格式派生） | **不会**——version 门不覆盖英文 README，**最容易漏** |
+| 2 | `README.md` | 适用版本句（由声明派生，逐字一致） | **会**（version 门核 `README.md` 与 `README.en.md` 两处的适用版本句） |
+| 3 | `README.en.md` | 同一句的第二语言副本（照同一格式派生） | **会**（2026-11-02 起 version 门也核英文 README；两份都必须逐字一致，漏一份就红） |
 | 4 | `docs/compatibility.md`（本文） | 七处 + 新增一轮记录：①篇首适用版本句与「哪几轮做过终验」；②「声明」节的 `engines.dsh` JSON 片段；③紧随其后的 semver / 上界排他说明；④`dsh.compatibility` 元数据里的 `tested` 与 `verifiedAt`；⑤「宿主怎么执行这条声明」依据段里的 tag 名；⑥「例行核验」第 2 步的 `$tags` 与第 3 步例子里的 tag；⑦「核验记录」的 SHA 表加一列，并**新增一轮**（不覆盖旧轮） | **不会**（version 门对本文只查存在；counts 门只核计数） |
 | 5 | `CHANGELOG.md` | 新增一条版本条目，写明「兼容区间扩到 rc.6」与本轮「验证」做了什么；即使不发新版插件也记一条 | 不会（docs 门只查字面转义 / 死链 / 死路径，不核版本号） |
 | 6 | 触点表的计数副本 | 只有**触点集合本身变了**才动：计数门禁的单一来源 `scripts/known-counts.json` 里的 `hostContacts`（先改它，门禁会逼着文档一起改）、`docs/brand-persona.md` 里的引用。区间扩张本身不动它们 | 会（counts 门核「36 条触点」的声明位） |
 
-改完跑 `node scripts/check.mjs`：version 门会把 `README.md` 那句与声明逐字核对；但 `README.en.md`、`CHANGELOG.md` 里的版本句**version 门不查**，本文自己的版本行它也不查——docs / counts 两道门只管机械残渣与计数，不管版本号。所以上表要照着走，不能等门禁提醒。
+改完跑 `node scripts/check.mjs`：version 门会把 `README.md` 与 `README.en.md` 两句都与声明逐字核对；但 `CHANGELOG.md` 里的版本句**version 门不查**，本文自己的版本行它也不查——docs / counts 两道门只管机械残渣与计数，不管版本号。所以上表要照着走，不能等门禁提醒。
 
 ## 核验记录
 

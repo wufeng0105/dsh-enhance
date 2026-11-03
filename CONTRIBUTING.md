@@ -44,7 +44,7 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁�
 | 你改了什么 | 门禁 | 要同步什么 |
 |---|---|---|
 | 加 / 删测试、改 `--self-test` 负例 | tests、docs | [`scripts/known-counts.json`](scripts/known-counts.json) 的 `tests` / `selfTestCases` |
-| 改冒烟断言数 | docs | [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions` |
+| 改冒烟断言数 | docs | `tools/smoke.mjs` 的 `EXPECTED_ASSERTIONS` 与 [`scripts/known-counts.json`](scripts/known-counts.json) 的 `smokeAssertions`，两处必须相等（计数门现场对账） |
 | 新增常驻源码文件 | graph | `code-map.json` 登记；新增 `ctx.on(...)` 事件还要登记 `events` |
 | 改 `cordis.patch.yml` 的入口 | bundle | 入口 `name` 必须指向真实存在的文件，且前缀等于 `package.json` 的 `name` |
 | 删掉包根的 `index.js` 或 `package.json` 的 `main` | bundle | 市场装后校验会判这个包 broken 并当场删除（上游 dsh-market/dsh-market#1091）；下面那段判定就是为它加的 |
@@ -53,7 +53,7 @@ node scripts/check.mjs --self-test  # 至少 20 个负例，证明每道门禁�
 | 增删 README 的二级标题 | readme | 有目录则须覆盖全部二级标题 |
 | 写坏文档里的相对链接或反引号路径 | docs | 两者都必须真实存在 |
 
-那张表的第一行（新增常驻源码要登记）有一句必须逐字保留的表述，由 graph 门断言钉住——**常驻源码（不含 `scripts/`、`tests/`）必须登记进 `code-map.json`**。登记时写 `id` / `layer` / `path` / `owns`，前三个是判据，别随手改；`scripts/` 与 `tests/` 由语法门与测试门自己守着，不进模型比对（改豁免范围要两处一起改）。
+那张表的第一行（新增常驻源码要登记）有一句必须逐字保留的表述，由 graph 门断言钉住——**常驻源码（不含 `scripts/`、`tests/`）必须登记进 `code-map.json`**。登记时写 `id` / `layer` / `path` / `owns`；真正被门禁比对的是 `id` 与 `path`（`layer` / `owns` 目前只给人读），别随手改；`scripts/` 与 `tests/` 由语法门与测试门自己守着，不进模型比对（改豁免范围要两处一起改）。
 
 还有两类**不**挡你——它们原先挡，后来按维护成本放开了：README 有没有目录（可选）；README 增删章节导致的检查项数变化（结构检查项数不再钉在 `known-counts.json` 上）。
 
