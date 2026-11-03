@@ -14,6 +14,11 @@
  *   4. **历史不按现值校验**：以日期开头的标题（`### 2026-10-30（…）`）下面记的是**当时的读数**，
  *      是事实、不是承诺（`CHANGELOG.md` 同理由 `known-counts.json` 的 note 与 `.zhll/OUTLINE.md`
  *      的「旧计数不改」定下），不参与现值比对。
+ *   5. **`--report` 只读**：把 2/3 两步扫到的每一处声明位打成清单（`文件:行` + 现写值 +
+ *      是否与来源一致），必需声明位单独成节，末行固定是
+ *      `[counts] report: <M> 处声明 / <R> 个必需声明位`。它**不改任何比对逻辑、不写盘**，
+ *      常规运行的行为与输出逐字不变；M 取清单条数（不是另一套计数器），所以清单被截断
+ *      或伪造一条，末行数字会跟着变——这是「报告自己数错却自洽」的防线。
  *
  * 口径边界，写清楚不装：
  *   - `smokeAssertions` / `hostContacts` 是**人工维护值**——冒烟要 pwsh + dsh CLI、触点计数口径
@@ -22,7 +27,7 @@
  *     既没有文档声明位、也抓不到缺陷，钉住它只会逼人「改 README 章节就同步一个 JSON」。
  *     readme 门现在只判「结构检查有没有过」，不再比对总数。
  *
- * 用法：node tools/counts-check.mjs [--root <项目根>] [--gates <本次运行的门的数量>]
+ * 用法：node tools/counts-check.mjs [--root <项目根>] [--gates <本次运行的门的数量>] [--report]
  * 退出码：0 全一致；1 有漂移/缺声明/用法错。
  */
 
@@ -132,7 +137,7 @@ const DATED_HEADING = /^\d{4}-\d{1,2}-\d{1,2}\b/
 
 /** 用法错只打一行、exit 1。 */
 function parseArgs(argv) {
-  const options = { root: resolve(here, '..'), gates: undefined }
+  const options = { root: resolve(here, '..'), gates: undefined, report: false }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     const value = argv[index + 1]
@@ -144,6 +149,8 @@ function parseArgs(argv) {
       if (typeof value !== 'string' || !/^\d+$/.test(value.trim())) throw new Error('--gates 需要一个是整数的值')
       options.gates = Number(value.trim())
       index += 1
+    } else if (arg === '--report') {
+      options.report = true
     } else throw new Error(`未知参数：${arg}`)
   }
   return options
@@ -286,6 +293,16 @@ const EXEMPT = [
   },
 ]
 
+/**
+ * 声明位收集表：**只供 `--report` 打印**，不参与任何判定——判定仍然走 `problems`，
+ * 所以加不加 `--report`，红绿与常规输出完全一致。
+ *
+ * `sites` 与 `scanned` 在同一处自增：汇总行的 M 取 `sites.length` 而不是 `scanned`，
+ * 是因为报告要「数它自己列出来的东西」——截断清单或伪造一条，M 会跟着变，判据才抓得住。
+ */
+const sites = []
+const requiredSites = []
+
 let scanned = 0
 const exempted = []
 for (const file of docs) {
@@ -318,7 +335,9 @@ for (const file of docs) {
           continue
         }
         scanned += 1
-        if (!agrees(count, first) || !agrees(count, second)) {
+        const ok = agrees(count, first) && agrees(count, second)
+        sites.push({ file: rel, line: index + 1, count, text: match[0].trim(), value: first, second, ok })
+        if (!ok) {
           problems.push(`${rel}:${index + 1} 的「${match[0].trim()}」与单一来源不一致：${count} ${expectedLabel(count)}，这里是 ${first}${second === first ? '' : `/${second}`}`)
         }
       }
@@ -328,29 +347,98 @@ for (const file of docs) {
 
 // ---------------------------------------------------------------- 必需声明位
 
-for (const required of REQUIRED) {
+for (const [ruleIndex, required] of REQUIRED.entries()) {
   const expected = source[required.count]
   if (expected === undefined) continue
   const path = join(root, required.doc)
+  const missingSite = (reason) => requiredSites.push({
+    rule: ruleIndex + 1, file: required.doc, line: 0, count: required.count,
+    what: required.what, text: '', value: undefined, second: undefined, ok: false, missing: reason,
+  })
   let text
   try {
     text = readFileSync(path, 'utf8').replace(/\*/g, '')
   } catch (error) {
     problems.push(`必需声明位缺失：${required.doc} 读不到（${String(error?.message ?? error)}）`)
+    missingSite(`读不到 ${required.doc}`)
     continue
   }
   const matches = [...text.matchAll(required.regex)]
   if (matches.length === 0) {
     problems.push(`${required.doc} 缺计数声明（${required.what}）：删掉声明行不是「没声明就不管」，是红`)
+    missingSite(`缺计数声明（${required.what}）`)
     continue
   }
   for (const match of matches) {
     const value = toNumber(match[1])
     if (Number.isNaN(value)) continue
-    if (!agrees(required.count, value)) {
+    // 行号从 match.index 反推：`*` 已被抹掉但行数不变，所以这里与文件里的行号一致。
+    const line = text.slice(0, match.index).split('\n').length
+    const ok = agrees(required.count, value)
+    requiredSites.push({
+      rule: ruleIndex + 1, file: required.doc, line, count: required.count,
+      what: required.what, text: match[0].trim(), value, second: undefined, ok, missing: '',
+    })
+    if (!ok) {
       problems.push(`${required.doc} 的「${match[0].trim()}」与单一来源不一致：${required.count} ${expectedLabel(required.count)}，这里是 ${value}`)
     }
   }
+}
+
+// ---------------------------------------------------------------- 报告模式
+
+/**
+ * `--report`：只读地把「每一处声明位」打成一张清单，让「改一个计数」从
+ * 「跑门禁 → 读一条红项 → 改一处 → 再跑」变成「照着清单一次改完」。
+ *
+ * 三条硬约束（输出契约，判据靠它解析）：
+ *   1. 每处扫到的声明位一行，行内含 `文件:行` 与当轮现写值；
+ *   2. 必需声明位单独成节，不与扫到的混在一起；
+ *   3. 末行固定 `[counts] report: <M> 处声明 / <R> 个必需声明位`。
+ *
+ * M 取 `sites.length`（清单本身），R 取 `REQUIRED.length`（与常规运行「N 个必需声明位」
+ * 同一个表达式）：两数都是当轮现算。清单被截断或伪造一条，M 会变——这是判据的抓手。
+ * 本分支**不写盘、不改文件**；有 problems 时照常打红到 stderr 并 exit 1。
+ */
+if (cli.report) {
+  if (problems.length > 0) {
+    console.error(`[counts] ${problems.length} 项：`)
+    for (const problem of problems) console.error(`  - ${problem}`)
+  }
+
+  const width = Math.max(
+    0,
+    ...sites.map((site) => `${site.file}:${site.line}`.length),
+    ...requiredSites.filter((site) => site.missing === '').map((site) => `${site.file}:${site.line}`.length),
+  )
+  const where = (site) => `${site.file}:${site.line}`.padEnd(width)
+  const verdict = (site) => (site.ok ? '一致' : `不一致（${expectedLabel(site.count)}）`)
+  const sourceLine = Object.entries(source)
+    .map(([key, value]) => `${key}=${value}${sourceKind[key] === 'floor' ? '（下限）' : ''}`)
+    .join('  ')
+
+  console.log('[counts] 报告模式（--report）：只读，不写盘、不改文件')
+  console.log(`[counts] 单一来源：${Object.keys(source).length} 个计数 / ${docs.length} 份文档`)
+  console.log(`[counts] 来源值：${sourceLine}`)
+  console.log('[counts]')
+  console.log(`[counts] 声明位（扫到 ${sites.length} 处；格式：文件:行  计数=现写值  「原文」  判定）`)
+  for (const site of sites) {
+    const shown = site.second === site.value ? `${site.value}` : `${site.value}/${site.second}`
+    console.log(`  ${where(site)}  ${site.count}=${shown}  「${site.text}」  ${verdict(site)}`)
+  }
+  console.log('[counts]')
+  const hits = requiredSites.filter((site) => site.missing === '').length
+  console.log(`[counts] 必需声明位（REQUIRED ${REQUIRED.length} 条规则，逐处列出共 ${hits} 处）`)
+  for (const site of requiredSites) {
+    if (site.missing !== '') {
+      console.log(`  缺：${site.file}  ${site.count}（${site.missing}）——必需位一处都没命中，这是红`)
+      continue
+    }
+    console.log(`  ${where(site)}  ${site.count}=${site.value}  「${site.text}」  ${verdict(site)}（必需位 ${site.rule}/${REQUIRED.length}：${site.what}）`)
+  }
+  console.log('[counts]')
+  console.log(`[counts] report: ${sites.length} 处声明 / ${REQUIRED.length} 个必需声明位`)
+  process.exit(problems.length > 0 ? 1 : 0)
 }
 
 // ---------------------------------------------------------------- 结果
