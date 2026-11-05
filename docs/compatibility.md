@@ -78,7 +78,9 @@ README 里那句适用版本是这份声明的派生文本，`node scripts/check
 
 上游包对应关系（tree-diff 盯这些）：cordis API 家族的接缝分散在 `packages/core/system-prompt/src`、`packages/host/webserver/src`、`packages/interaction/user-approval/src`；settings.section 槽位契约在 `packages/client/ui-settings/src`（`contract/slots.ts`），渲染它的壳是 `packages/client/ui-permission-presets/src` 之外的 `packages/client/ui-settings-general/src`——`ui-settings-models`/`ui-settings-plugins` 是同槽位的兄弟消费方，宿主改它们不破坏我们，不进核验清单；权限预设与显示契约在 `packages/interaction/permission-presets/src` 与 `packages/client/ui-permission-presets/src`；engines 门禁与装载预检在 `packages/boot/app-boot/src` 与 `packages/boot/plugin-manager/src`。其余触点（会话日志格式、asar 头、CSS token、env 量）没有可直接 tree-diff 的上游包位置，靠冒烟与真机核对兜底。
 
-## 例行核验（新 rc 发布后，约 15 分钟）
+## 例行核验（新 rc 或正式版发布后）
+
+工时不是固定值，按变更规模分档：**rc → rc**（个位数变更文件）约 10–15 分钟；**minor 跳跃**的变更面在第 2 步 tree-diff 跑完即知工作量，第 3 步只精读 `SEAM-HIT` 的文件，工作量与变更文件数成正比。下面按固定顺序走五步。
 
 ### 1. 重数触点
 
@@ -109,9 +111,19 @@ README 里那句适用版本是这份声明的派生文本，`node scripts/check
 
 ### 2. 逐包 tree-diff
 
-逐包比 tree SHA，不要信 GitHub compare API 的文件列表——它的列表上限 300 条，超了会静默截断，用它做触点核验会漏包。
+主路径是仓里的工具（零网络，blobless 缓存建一次反复用）：
 
-**口径先说清：「全系」= 区间里每一个 tag，不是首尾两端点。** 两端点全同不代表中间没变——本项目就有实测反例：`packages/client/ui-settings-general/src` 在 rc.2→rc.3 之间变过一次，只比 rc.1 与 rc.5 是看不出来的（见「核验记录」）。所以脚本按 `$tags` 里的**全部 6 个 tag** 各取一次 tree SHA：
+```powershell
+node tools/compat-diff.mjs --trees dsh-v0.2.1-rc.1,dsh-v0.2.1-rc.2,dsh-v0.2.1-rc.3,dsh-v0.2.1-rc.4,dsh-v0.2.1-rc.5,dsh-v0.2.2-rc.1
+```
+
+它对 9 个核验包逐个列各 tag 的 tree SHA，全同打 `ALL-SAME`，否则打印短 SHA 序列——「从哪个 tag 开始变」一眼可读。tree 对象全在本地（blobless clone 里 commit 与 tree 不回源），这一步**全程零网络**；这是它相对下面 gh api 脚本的真正优势。新 rc 发布后把新 tag **追加**进逗号列表（别删旧的，删了就退化成两端点对比）。首次没有缓存时工具会打印可操作的建缓存命令（`git clone --filter=blob:none --no-checkout`，约 1–2 分钟一次性）后退出 1；也可以 `--repo` 直接指向已有的本地 clone。
+
+**口径先说清：「全系」= 区间里每一个 tag，不是首尾两端点。** 两端点全同不代表中间没变——本项目就有实测反例：`packages/client/ui-settings-general/src` 在 rc.2→rc.3 之间变过一次，只比 rc.1 与 rc.5 是看不出来的（见「核验记录」）。所以 tag 列表要给**全部 6 个 tag**，工具才逐包逐 tag 各取一次 tree SHA。
+
+9 个核验包的清单（工具内置同款，`packages/core/system-prompt/src`、`packages/host/webserver/src`、`packages/interaction/user-approval/src`、`packages/interaction/permission-presets/src`、`packages/client/ui-settings/src`、`packages/client/ui-settings-general/src`、`packages/client/ui-permission-presets/src`、`packages/boot/app-boot/src`、`packages/boot/plugin-manager/src`）；工具改包清单须与本文同步（它头注释声明了这一点）。
+
+**无克隆后备**（没有本地 clone、也不想建缓存，或只想临时抽查一两个包）用 gh api 手工脚本，逐包比 tree SHA，不要信 GitHub compare API 的文件列表——它的列表上限 300 条，超了会静默截断，用它做触点核验会漏包。脚本按**全部 tag** 各取一次 tree SHA：
 
 ```powershell
 $env:HTTPS_PROXY = 'http://127.0.0.1:7897'   # 需要时
@@ -155,6 +167,18 @@ gh api "repos/$repo/git/ref/tags/dsh-v0.2.2-rc.2" --jq '.ref'   # 期望 404 说
 
 ### 3. 有变更时读 diff
 
+主路径还是那条工具，这次用主模式——它列两 tag 间的文件级变更，逐文件做统一 diff（`--out` 落盘），并按第 1a 步表格的 8 组接缝关键词表达式预分类：
+
+```powershell
+node tools/compat-diff.mjs dsh-v0.2.1-rc.5 dsh-v0.2.2-rc.1 --out <目录>
+```
+
+输出首行是机器可判的数量行 `changed-files: <n>`，之后每文件一行分类：`SEAM-HIT <组名,...>`（任一表达式命中，**需人读**）或 `SKIM`（零命中，**可略读**）。分组读法：先读 `SEAM-HIT`，`SKIM` 扫一遍抽查即可。**预分类是分诊不是判决，SKIM 不等于免检**——表达式抓的是机械痕迹，判定标准永远是「我们这侧不改一行代码就会被它弄坏」（判据见下）。
+
+blob 首读按需回源（git promisor lazy fetch）：每个文件第一次读会向远端取一次 blob（秒级/文件，需要代理时按本仓规则临时设 `HTTPS_PROXY`）；blob 一旦进了缓存仓库的 `.git/objects`，同一 diff 重跑**零网络**——「tree 阶段零网络、blob 首读按需回源、缓存后离线」三层，缓存建好后日常这一步基本不出网。重跑失败时工具会提示这一点，补缺失的 blob 而已，已缓存的不再回源。
+
+**无克隆后备**（gh api 手工做单文件排查）：
+
 ```powershell
 $env:HTTPS_PROXY = 'http://127.0.0.1:7897'
 $repo = 'deepseek-ai/deepseek-harness'
@@ -167,15 +191,32 @@ $b64 = gh api "repos/$repo/git/blobs/<sha>" --jq '.content'
 [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($b64 -replace '\s','')))
 ```
 
-两处细节：`--jq '.content'` 拿到的 base64 字段**带换行**，解码前先 `-replace '\s',''`，否则 `FromBase64String` 直接抛；`<sha>` 用上一步列出来的值（不是 tree SHA，是文件条目的 blob sha）。2026-11-02 实测这套命令：`ui-settings-general/src/client` 在 rc.1 与 rc.3 都是 22 个文件，其中 21 个 blob 相同，只有 `index.ts` 不同（rc.1 是 `561174f90be2d053f7d9a30195a3c2097935d31f`、rc.3 是 `218f5c3cc8f2e34bb6cff9f237704ed6da0ba793`，前者解出来没有 `productAnalytics`、后者有）。GitHub 的 blobs 接口单文件上限 100 MB，读不到先怀疑拿错了 sha。
+两处细节：`--jq '.content'` 拿到的 base64 字段**带换行**，解码前先 `-replace '\s',''`，否则 `FromBase64String` 直接抛；`<sha>` 用上一步列出来的值（不是 tree SHA，是文件条目的 blob sha）。2026-11-02 实测这套命令：`ui-settings-general/src/client` 在 rc.1 与 rc.3 都是 22 个文件，其中 21 个 blob 相同，只有 `index.ts` 不同（rc.1 是 `561174f90be2d053f7d9a30195a3c2097935d31f`、rc.3 是 `218f5c3cc8f2e34bb6cff9f237704ed6da0ba793`，前者解出来没有 `productAnalytics`、后者有）。GitHub 的 blobs 接口单文件上限 100 MB，读不到先怀疑拿错了 sha。2026-11-06 的 0.2.2-rc.1 轮起，这套流程由 `tools/compat-diff.mjs` 固化：38 文件基线回放、预分类与人工轮判定一致（见「核验记录」）。
 
 **什么算「改到接缝」**：一句话——**我们这侧不改一行代码就会被它弄坏**，才算改到接缝。落到字面就是这些：包的导出名与入口、`ctx.*` 方法的签名与调用方式、`settings.section`/`slots` 的契约字段名、`engines.dsh` 的读取逻辑、patch 与装载协议的字段/文件名、`system-prompt` 的 section 顺序常量与文本。埋点、注释、内部重构、纯样式值不算——2026-10-30 那轮就是这个判例：`client/index.ts` 新增了一行 `productAnalytics` 埋点与一行 `import type {}`，`settings.section` 槽位机制一个字没动，所以判「不影响接缝」。
 
 同理，「宿主怎么执行这条声明」里那句「10 个文件含 `engines.dsh`」（0.2.2-rc.1 本机 asar 实测；rc.3 那阵是 21 个，数字随宿主打包内容变，不是契约值）是同一个读法的另一向：解 asar 头里的条目表（只读、不解包），对文本条目搜 `engines.dsh`——本仓 `enhance-scope/index.js` 的 `readAsarManifestVersion()` 用的就是这套头布局。
 
-### 4. 冒烟
+### 4. 改声明
 
-用独立 `DSH_HOME`，别碰日常使用的 profile。仓库自带脚本，一条命令跑完（它同时是**发版前的硬步骤**：定位、断言口径与「为什么不进 CI」在 [CONTRIBUTING.md](../CONTRIBUTING.md) 的「发版前必跑：真装冒烟」，这里只把当例行核验用）：
+源码级三步（第 1–3 步）全过之后、冒烟（第 5 步）之前，**一处声明 + 四处派生文本**一起动。顺序为什么是这样：冒烟要真装进本机 DSH，装前 preflight 按 `engines.dsh` 区间拒装——声明未扩就冒烟，FAIL 全落在装载组（2026-11-06 实录 39/44，5 个 FAIL 全由旧区间造成），流程自己制造假失败。扩声明的证据门槛在第 1–3 步，不在冒烟。
+
+下面是「模拟上游发了 0.2.2-rc.2」时按本仓现状要改的**全部**位置（2026-11-06 扩到 0.2.2-rc.1 时逐步走了一遍；行号会随本文增删漂移，按内容定位）：
+
+| # | 文件 | 改什么 | 门禁会不会逼你改 |
+|---|---|---|---|
+| 1 | `package.json` | `engines.dsh` 的**上界**：`<0.2.2-rc.2` → `<0.2.2-rc.3`。**上界是排他的**，所以要把 rc.2 并进区间，字面必须指向**下一个**版本；写成 `<=0.2.2-rc.2` 不是本仓写法（`shared/compat.mjs` 只解析 `>=`/`<` 这种半开区间）。同时 `dsh.compatibility.tested` → `0.2.2-rc.2`、`verifiedAt` → 本轮日期 | **会**（version 门核区间可解析、`tested` 落在区间内、`verifiedAt` 形状） |
+| 2 | `README.md` | 适用版本句（由声明派生，逐字一致） | **会**（version 门核 `README.md` 与 `README.en.md` 两处的适用版本句） |
+| 3 | `README.en.md` | 同一句的第二语言副本（照同一格式派生） | **会**——version 门核两份；「漏英文那份会红」的可红性只由 `--self-test` 的 `compat readme en red` 证明，别的地方只许指向它、不许复述 |
+| 4 | `docs/compatibility.md`（本文） | 七处 + 新增一轮记录：①篇首适用版本句与「哪几轮做过终验」；②「声明」节的 `engines.dsh` JSON 片段；③紧随其后的 semver / 上界排他说明；④`dsh.compatibility` 元数据里的 `tested` 与 `verifiedAt`；⑤「宿主怎么执行这条声明」依据段里的 tag 名；⑥「例行核验」第 2 步的 tag 列表（`--trees` 与后备脚本 `$tags`）与第 3 步例子里的 tag；⑦「核验记录」的 SHA 表加一列，并**新增一轮**（不覆盖旧轮） | **不会**（version 门对本文只查存在；counts 门只核计数） |
+| 5 | `CHANGELOG.md` | 新增一条版本条目，写明「兼容区间扩到 rc.2」与本轮「验证」做了什么；即使不发新版插件也记一条 | 不会（docs 门只查字面转义 / 死链 / 死路径，不核版本号） |
+| 6 | 触点表的计数副本 | 只有**触点集合本身变了**才动：计数门禁的单一来源 `scripts/known-counts.json` 里的 `hostContacts`（先改它，门禁会逼着文档一起改）、`docs/brand-persona.md` 里的引用。区间扩张本身不动它们 | 会（counts 门核「36 条触点」的声明位） |
+
+改完跑 `node scripts/check.mjs`：version 门会把 `README.md` 与 `README.en.md` 两句都与声明逐字核对；但 `CHANGELOG.md` 里的版本句**version 门不查**，本文自己的版本行它也不查——docs / counts 两道门只管机械残渣与计数，不管版本号。所以上表要照着走，不能等门禁提醒。
+
+### 5. 冒烟
+
+改完声明再冒烟：它在新区间下全链路真装一遍收口——装前 preflight 应放行（本机版本已落进声明区间），装不上先回头查第 4 步的声明有没有真扩。用独立 `DSH_HOME`，别碰日常使用的 profile。仓库自带脚本，一条命令跑完（它同时是**发版前的硬步骤**：定位、断言口径与「为什么不进 CI」在 [CONTRIBUTING.md](../CONTRIBUTING.md) 的「发版前必跑：真装冒烟」，这里只把当例行核验用）：
 
 ```powershell
 pwsh -NoProfile -File tools/smoke.ps1
@@ -203,28 +244,13 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 
 真机上看一眼：装好启动、发一条消息、在设置页点「开始检查」，四项都应是 ✓ 或 –；再点「写入 Enhanced 档」并重启，左下角档位菜单、`/permission`、设置页的「默认档位」下拉三处都应出现纯文字的 **Enhanced**；点「移除 Enhanced 档」并重启，三处消失。
 
-### 5. 改声明
-
-核验全过之后，**一处声明 + 四处派生文本**一起动。下面是「模拟上游发了 0.2.2-rc.2」时按本仓现状要改的**全部**位置（2026-11-06 扩到 0.2.2-rc.1 时逐步走了一遍；行号会随本文增删漂移，按内容定位）：
-
-| # | 文件 | 改什么 | 门禁会不会逼你改 |
-|---|---|---|---|
-| 1 | `package.json` | `engines.dsh` 的**上界**：`<0.2.2-rc.2` → `<0.2.2-rc.3`。**上界是排他的**，所以要把 rc.2 并进区间，字面必须指向**下一个**版本；写成 `<=0.2.2-rc.2` 不是本仓写法（`shared/compat.mjs` 只解析 `>=`/`<` 这种半开区间）。同时 `dsh.compatibility.tested` → `0.2.2-rc.2`、`verifiedAt` → 本轮日期 | **会**（version 门核区间可解析、`tested` 落在区间内、`verifiedAt` 形状） |
-| 2 | `README.md` | 适用版本句（由声明派生，逐字一致） | **会**（version 门核 `README.md` 与 `README.en.md` 两处的适用版本句） |
-| 3 | `README.en.md` | 同一句的第二语言副本（照同一格式派生） | **会**——version 门核两份；「漏英文那份会红」的可红性只由 `--self-test` 的 `compat readme en red` 证明，别的地方只许指向它、不许复述 |
-| 4 | `docs/compatibility.md`（本文） | 七处 + 新增一轮记录：①篇首适用版本句与「哪几轮做过终验」；②「声明」节的 `engines.dsh` JSON 片段；③紧随其后的 semver / 上界排他说明；④`dsh.compatibility` 元数据里的 `tested` 与 `verifiedAt`；⑤「宿主怎么执行这条声明」依据段里的 tag 名；⑥「例行核验」第 2 步的 `$tags` 与第 3 步例子里的 tag；⑦「核验记录」的 SHA 表加一列，并**新增一轮**（不覆盖旧轮） | **不会**（version 门对本文只查存在；counts 门只核计数） |
-| 5 | `CHANGELOG.md` | 新增一条版本条目，写明「兼容区间扩到 rc.2」与本轮「验证」做了什么；即使不发新版插件也记一条 | 不会（docs 门只查字面转义 / 死链 / 死路径，不核版本号） |
-| 6 | 触点表的计数副本 | 只有**触点集合本身变了**才动：计数门禁的单一来源 `scripts/known-counts.json` 里的 `hostContacts`（先改它，门禁会逼着文档一起改）、`docs/brand-persona.md` 里的引用。区间扩张本身不动它们 | 会（counts 门核「36 条触点」的声明位） |
-
-改完跑 `node scripts/check.mjs`：version 门会把 `README.md` 与 `README.en.md` 两句都与声明逐字核对；但 `CHANGELOG.md` 里的版本句**version 门不查**，本文自己的版本行它也不查——docs / counts 两道门只管机械残渣与计数，不管版本号。所以上表要照着走，不能等门禁提醒。
-
 ## 核验记录
 
 每改一次声明区间前后各核一轮。**细节不在这里复述**：每一轮当时的完整叙述都在 git 历史里（`git log -p docs/compatibility.md`），本表只留三样——核了什么、结论是什么、想复跑要什么条件。这样记录不随版本数无限膨胀，而结论与复跑条件一条不少。
 
 ### 2026-10-30 – 2026-11-04（历轮汇总）
 
-**源码级区间（2026-10-30）**：9 个包的 5 个 tag 逐个比 tree SHA。取法即「例行核验」第 2 步那条脚本；「同左」= 与 rc.1 同一个 SHA（不是「没测」）。
+**源码级区间（2026-10-30）**：9 个包的 5 个 tag 逐个比 tree SHA。取法即「例行核验」第 2 步那条脚本（现为无克隆后备，工具主路径见该步）；「同左」= 与 rc.1 同一个 SHA（不是「没测」）。
 
 | 包 | tree SHA | 结论 |
 |---|---|---|
@@ -242,7 +268,7 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 
 | 轮次 | 核了什么 | 结论 | 复跑条件 |
 |---|---|---|---|
-| 10-30 · 源码级区间 | 上面那张表 | 8 个包全同、1 个包在 rc.2→rc.3 变且只动埋点 → 「全系源码级核验」成立 | **本机可复跑**（例行核验第 2、3 步） |
+| 10-30 · 源码级区间 | 上面那张表 | 8 个包全同、1 个包在 rc.2→rc.3 变且只动埋点 → 「全系源码级核验」成立 | **本机可复跑**（例行核验第 2、3 步，gh api 后备命令） |
 | 10-30 · rc.5 干净环境终验 | 远端重置后真装 → `--dump-config` 三入口、patch 仍 `[]` → 隔离 home 冒烟 → GUI 侧 `/enhance/api` 命中真实会话 | 装包、组合、冒烟通过；GUI 注入命中（当时有可用会话） | 前三步**可复跑**；GUI 那一环**不可复跑**（要桌面 GUI + 一次有余额的会话） |
 | 10-31 · 远端全量重置后重装 | 杀进程 → 删 `.dsh`／安装根／卸载项 → 静默重装 rc.5 → 复对 SHA → 装包 → 冒烟 | SHA 9/9 一致；装包 exit 0；冒烟当时全过；空 patch 三种写法必败；组合树 `presets` 三档全表、不含 `defaultPreset` | 重置本身**不可复跑**（需可整机重置的测试机）；空 patch 探针**可复跑**（下面那段命令） |
 | 11-02 · 36 条触点那一轮（1.2.0） | 宿主侧 asar 逐条核对新触点；远端真机端到端（双 profile 装包、设置页五组） | 契约假设全部成立；装配层验收在真机会话日志上成立（`custom` 第一句为自定义文本、宿主原句 0 命中；切回 `keep` 逐字回原句） | asar 核对**可复跑**（基准见下）；远端那轮**不可复跑**（桌面 GUI + 有余额的会话） |
@@ -273,7 +299,8 @@ $env:DSH_HOME = Join-Path $env:TEMP 'dsh-smoke-home'
 
 | 轮次 | 核了什么 | 结论 | 复跑条件 |
 |---|---|---|---|
-| 11-06 · 0.2.2-rc.1 收口轮（1.3.4） | 触点重数 36；9 包 × 6 tag tree-diff + 38 文件逐对读 diff；asar 门禁在位；一次性 home 冒烟 44/44；**真机桌面会话装配层验收**（1.3.4 装进日常 desktop profile，重启后设置页「检查」**全部通过**——会话日志回读证实内容边界进了系统提示、品牌人设遮蔽按所选档生效） | 新区间「全系源码级核验」成立；装配层验收在 0.2.2-rc.1 真机上成立（rc.5 那轮之外的第二台真机证据）；本机 pnpm 11 的 24h 供应链冷却期（`minimumReleaseAge` 默认 1440 分钟）曾让市场暂不显示 1.3.4，用 profile 的 `minimumReleaseAgeExclude` 名单现成机制放行 | tree-diff 与读 diff **本机可复跑**（例行核验第 2、3 步）；冒烟**可复跑**（`tools/smoke.ps1`）；桌面装配层验收**不可复跑**（要桌面 GUI + 一次能跑通的会话） |
+| 11-06 · 0.2.2-rc.1 收口轮（1.3.4） | 触点重数 36；9 包 × 6 tag tree-diff + 38 文件逐对读 diff；asar 门禁在位；一次性 home 冒烟 44/44；**真机桌面会话装配层验收**（1.3.4 装进日常 desktop profile，重启后设置页「检查」**全部通过**——会话日志回读证实内容边界进了系统提示、品牌人设遮蔽按所选档生效） | 新区间「全系源码级核验」成立；装配层验收在 0.2.2-rc.1 真机上成立（rc.5 那轮之外的第二台真机证据）；本机 pnpm 11 的 24h 供应链冷却期（`minimumReleaseAge` 默认 1440 分钟）曾让市场暂不显示 1.3.4，用 profile 的 `minimumReleaseAgeExclude` 名单现成机制放行 | tree-diff 与读 diff **本机可复跑**（例行核验第 2、3 步，现工具主路径）；冒烟**可复跑**（`tools/smoke.ps1`）；桌面装配层验收**不可复跑**（要桌面 GUI + 一次能跑通的会话） |
+| 11-06 · 工具化轮（P1/P2 落地后回放） | 流程工具化本身的一轮复核：触点重数仍 **36**（`node tools/contacts-count.mjs` 现场数，与单一来源对账 exit 0）；第 2 步 `node tools/compat-diff.mjs --trees`（6 tag）替代 54 次 gh api，9 包 SHA 表与上表归档值逐位一致；第 3 步主模式回放 rc.5→0.2.2-rc.1，`changed-files: 38`、SEAM-HIT/SKIM 预分类与人工轮「38 文件全部不改到接缝」的判定一致；缓存语义实证：tree 阶段零网络、blob 首读按需回源（lazy fetch）、缓存后死代理重跑 exit 0（离线） | 工具口径与人工轮同源，「例行核验」第 2/3 步自此以工具为主路径（gh api 降为无克隆后备）；流程顺序重排为 4 改声明 → 5 冒烟（先扩声明再真装，冒烟不再死于装前 preflight 的旧区间拒装） | **本机可复跑**（判据：contacts-count 报 36、`--trees` 与主模式回放 exit 0、`--self-test` exit 0；`node scripts/check.mjs` 七门全绿）；复核指针 `.zhll/exec-WP1.md` / `.zhll/exec-WP2.md` 与 `.zhll/gates/wp1-*.log` / `.zhll/gates/wp2-*.log` |
 
 **三条容易忘的边界**
 

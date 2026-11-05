@@ -206,7 +206,7 @@ function gateVersion(base = root, options = {}) {
     if (!inRange(parsed, local)) {
       problems.push(
         `本机 DSH ${local} 不在声明范围 ${displayRange(parsed)}：`
-        + '先按 docs/compatibility.md 的例行核验跑一遍（约 15 分钟），核验过了再扩 package.json 的 engines.dsh 区间',
+        + '先按 docs/compatibility.md 的例行核验跑一遍（工时按变更规模分档，见该文档），核验过了再扩 package.json 的 engines.dsh 区间',
       )
     }
     if (problems.length === 0) return { pass: true, detail: `${pkg.name}@${version} · DSH ${local} · README.md + README.en.md 适用版本句一致 · ${hostNote}` }
