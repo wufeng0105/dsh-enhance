@@ -229,7 +229,7 @@ test('state 快照带 compat：本包版本取自 package.json，本机版本用
     assert.equal(inside.tool, pkg.version)
     assert.equal(inside.host, pkg.dsh.compatibility.tested)
     assert.equal(inside.inRange, true)
-    assert.equal(inside.range, '0.2.1-rc.1–0.2.1-rc.5')
+    assert.equal(inside.range, '0.2.1-rc.1–0.2.2-rc.1')
 
     process.env.DSH_VERSION = '9.9.9'
     const outside = (await probe.call({ op: 'state' })).json.compat

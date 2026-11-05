@@ -116,7 +116,7 @@ const SNAPSHOT = {
     tool: '1.1.0',
     host: '0.2.1-rc.3',
     source: 'env',
-    range: '0.2.1-rc.1–0.2.1-rc.5',
+    range: '0.2.1-rc.1–0.2.2-rc.1',
     tested: '0.2.1-rc.3',
     inRange: true,
   },

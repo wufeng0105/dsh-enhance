@@ -4,6 +4,13 @@
 
 本文件记的是**时间轴**：每个版本改了什么、那一版当时的验证读数。条目里的数字（门禁几道、测试几项、断言几条、适用区间）都是**当时**的读数，不按现值校验——现行规则以 [CONTRIBUTING.md](CONTRIBUTING.md) 为准，接手现状以 [BOOTSTRAP.md](BOOTSTRAP.md) 为准，核验结论以 [docs/compatibility.md](docs/compatibility.md) 为准；计数的现值只住在 `scripts/known-counts.json` 一处。门数现在不是承诺位（口径见 CONTRIBUTING 的「改之前先跑一遍门禁」），早期条目里提到的单一来源条目也有增删（门数、README 检查项都已移出），同样以那份 JSON 的现值为准。
 
+## [1.3.4] — 2026-11-06
+
+### 兼容性
+
+- **兼容区间扩到 DeepSeek Harness 0.2.2-rc.1**：`engines.dsh` 由 `>=0.2.1-rc.1 <0.2.1-rc.6` 改为 `>=0.2.1-rc.1 <0.2.2-rc.2`（上界排他，跨一个 minor）。此前宿主更新到 0.2.2-rc.1 后，插件在装前 preflight、装后校验、启动装载三个时机都会被 `engines.dsh` 门禁判不兼容而禁用——本次扩张后恢复可装可载。
+- **本轮验证**（全记录在 [`docs/compatibility.md`](docs/compatibility.md) 核验记录 2026-11-06 轮）：36 条宿主触点重数一致；9 个上游包 × 6 个 tag tree-diff，0.2.2-rc.1 上 38 个变更文件逐对拉 blob 读 diff，判定**无一改到接缝**（版本门禁两文件 `plugin-compatibility.ts` / `compatibility-preflight.ts` 与 rc.5 逐字节相同；`operations.ts` 的变更属于新增的平台门禁，未声明 `dsh.bundle.platforms` 时全平台放行）；本机 0.2.2-rc.1 的 asar 实扫确认 `engines.dsh` 门禁在位；一次性 `DSH_HOME` 真机冒烟 **44/44** 全过。真机会话上的装配层证据仍以 rc.5 那轮为准，桌面 GUI 侧待更新插件后补验。
+
 ## [1.3.3] — 2026-11-04
 
 ### 修复

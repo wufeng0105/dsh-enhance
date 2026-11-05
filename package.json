@@ -29,7 +29,7 @@
   },
   "engines": {
     "node": ">=22",
-    "dsh": ">=0.2.1-rc.1 <0.2.1-rc.6"
+    "dsh": ">=0.2.1-rc.1 <0.2.2-rc.2"
   },
   "scripts": {
     "check": "node scripts/check.mjs",
@@ -40,9 +40,9 @@
       "patch": "./cordis.patch.yml"
     },
     "compatibility": {
-      "tested": "0.2.1-rc.5",
+      "tested": "0.2.2-rc.1",
       "basis": "source-level",
-      "verifiedAt": "2026-11-02",
+      "verifiedAt": "2026-11-06",
       "doc": "docs/compatibility.md"
     }
   },

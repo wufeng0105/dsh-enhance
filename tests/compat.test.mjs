@@ -69,7 +69,7 @@ test('declarationOf：读真实 package.json，形状齐', () => {
   const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
   const declared = declarationOf(pkg)
   assert.equal(declared.error, undefined)
-  assert.equal(declared.enginesDsh, '>=0.2.1-rc.1 <0.2.1-rc.6')
+  assert.equal(declared.enginesDsh, '>=0.2.1-rc.1 <0.2.2-rc.2')
   assert.equal(declared.tested, pkg.dsh.compatibility.tested)
   assert.equal(inRange(parseEnginesDsh(declared.enginesDsh), declared.tested), true, 'tested 必须落在区间内')
 })

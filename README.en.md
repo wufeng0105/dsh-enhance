@@ -21,7 +21,7 @@ The model is the same model. What changes is the system prompt it reads at the s
 
 Saved to disk, effective on the next message. No restart, no host files touched, one click to revert.
 
-Verified against `DeepSeek Harness 0.2.1-rc.1–0.2.1-rc.5（0.2.1-rc.5 实测，全系源码级核验）`; the host enforces this `engines.dsh` declaration at install and at startup.
+Verified against `DeepSeek Harness 0.2.1-rc.1–0.2.2-rc.1（0.2.2-rc.1 实测，全系源码级核验）`; the host enforces this `engines.dsh` declaration at install and at startup.
 
 ## Contents
 
