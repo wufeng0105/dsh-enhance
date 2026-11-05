@@ -20,7 +20,7 @@
  *   SKIM\t<路径>                    零命中（可略读，但不是免检）
  *   预分类是分诊不是判决，SKIM 不等于免检
  *
- * repo 来源与缓存语义（.zhll/02-审计-S1.md B1 的实证口径，不夸大成「gh api 归零」）：
+ * repo 来源与缓存语义（.zhll/02-审计-S1.md B1 的实证口径，不夸大对 gh api 的替代：
  *   - 优先级：--repo 指向的本地路径 > --repo URL / 缺省时的缓存目录；
  *   - tree 阶段零网络：blobless clone（git clone --filter=blob:none --no-checkout）
  *     里 commit 与 tree 对象全在本地，列变更不回源；
