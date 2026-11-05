@@ -22,12 +22,24 @@
  *   node scripts/release.mjs --check            # 只核对 npm / git tag / Release / 凭据到期
  *   node scripts/release.mjs 3.0.0 --dry        # 冒烟：跑通只读逻辑后退出，不写不联网
  *   node scripts/release.mjs 3.0.0              # 指定版本（必须 x.y.z，不带预发布标签）
+ *   node scripts/release.mjs 1.4.0 --commit "tools: xxx" --ship
+ *                                               # 先把工作区改动提交为独立 commit，再走发版链
+ *
+ * `--commit <msg>` 把「改完文件就发版」的两个真实失败模式挡在链外（2026-11-06 发 1.3.4 连败两次）：
+ *   - 脏工作区：改动不提交就发版，`--ship` 的工作区检查直接拦停。`--commit` 先把已跟踪
+ *     文件的改动（`git add -u`）以给定消息提交为独立 commit，再进现行链；版本号变更仍由
+ *     脚本自己打 "chore: release" commit，两个 commit 分开；
+ *   - 发到仓库外版本：改动从未进 git 就发 npm，仓库里便没有这个版本。先 commit 再发，
+ *     npm 上的内容和 git 里的一一对应。
+ * 边界：未跟踪文件不收编（列出并拒绝——要提交先 git add 或进 .gitignore）；没有可提交的
+ * 修改时拒绝（改动已提交过就请去掉 --commit 重跑）；与 --check 互斥；消息非空；与 --dry
+ * 组合时全链只读，不碰 git 状态。
  *
  * `--ship` 是推荐路径：它把「版本、标签、Release、npm」四件事绑成一条链——
  * 推标签后由 `.github/workflows/release.yml` 发 npm（仓库有 `NPM_TOKEN` 就用它，
  * 没有就走 OIDC 可信发布）并建 GitHub Release。
  *
- * 退出码：0 成功 / 1 某一步失败 / 2 用法错。
+ * 退出码：0 成功 / 1 某一步失败 / 2 用法错（含 --commit 的前置校验不过）。
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -45,7 +57,13 @@ const CHANGELOG_FILE = join(root, 'CHANGELOG.md')
 /** 用法错：直接退出，不动任何文件。 */
 function usage(why) {
   console.error(`release: ${why}`)
-  console.error('用法：node scripts/release.mjs [patch|minor|major|x.y.z] [--ship | --publish [--otp=NNNNNN]] | --check')
+  console.error('用法：node scripts/release.mjs [patch|minor|major|x.y.z] [--commit "<提交说明>"] [--ship | --publish [--otp=NNNNNN]] | --check')
+  process.exit(2)
+}
+
+/** --commit 的前置校验不过：语义错而非拼写错，同样退出码 2，但不重复用法行。 */
+function commitReject(message) {
+  console.error(`release: ${message}`)
   process.exit(2)
 }
 
@@ -58,15 +76,28 @@ const checkOnly = args.includes('--check')
 // 冒烟：跑通全部只读逻辑（含顶部汇总打印）后退出，不写文件、不联网发布。
 // 存在的唯一理由是有东西能自动发现「这个脚本根本跑不起来」。
 const dry = args.includes('--dry')
+// 发版前先把已跟踪文件的改动提交为独立 commit。消息是 --commit 的**下一个参数**，
+// 必须占住这个位置——否则它会被 find 误认成版本参数。
+const commitIndex = args.indexOf('--commit')
+const commitRaw = commitIndex >= 0 ? args[commitIndex + 1] : undefined
+const commitMsg = commitIndex < 0 || commitRaw === undefined || commitRaw.startsWith('--')
+  ? null
+  : commitRaw
 // npm 对发布强制二次验证，手动发布必然要带验证码（30 秒一次、用过即废）。
 // 也可以不用这个开关，改成在 npmjs.com 配 OIDC 可信发布后由 CI 发。
 const otpArg = args.find((a) => a.startsWith('--otp='))
 const otp = otpArg === undefined ? null : otpArg.slice('--otp='.length)
-const bumpArg = args.find((a) => !a.startsWith('--'))
-const KNOWN_FLAGS = new Set(['--publish', '--ship', '--check', '--dry'])
+// 消息参数占住了 --commit 后面的那个位置，不能让它被误认成版本参数。
+const msgArgIndex = commitIndex >= 0 ? commitIndex + 1 : -1
+const bumpArg = args.find((a, i) => !a.startsWith('--') && i !== msgArgIndex)
+const KNOWN_FLAGS = new Set(['--publish', '--ship', '--check', '--dry', '--commit'])
 const unknown = args.filter((a) => a.startsWith('--') && !KNOWN_FLAGS.has(a) && !a.startsWith('--otp='))
 if (unknown.length) usage(`认不出的开关：${unknown.join(' ')}`)
 if (ship && publish) usage('--ship 与 --publish 二选一：前者推标签让 CI 发，后者从本机发')
+if (commitIndex >= 0 && (commitMsg === null || commitMsg.trim() === '')) {
+  usage('--commit 需要一个非空消息：--commit "提交说明"（后面没跟参数、跟的是空串或另一个开关都不行）')
+}
+if (commitMsg !== null && checkOnly) usage('--commit 与 --check 互斥：--check 是只读核对，没有东西可提交')
 if (!checkOnly && bumpArg === undefined) usage('缺版本参数（只想核对就加 --check）')
 if (otp !== null && publish && !/^\d{6}$/.test(otp)) usage('--otp 应该是 6 位数字')
 
@@ -241,10 +272,24 @@ if (checkOnly) consistencyCheck()
 // 「这个脚本能跑到底而不抛异常」，CI 里的分支和工作区状态都不满足发版条件。
 // 它 exercvise 的正是曾经出过事的那几行（顶部汇总打印），所以由 syntax 门调用。
 if (!dry) {
-  // 工作区干净：带未提交改动发版，等于发一个仓库里不存在的版本。
+  // 工作区核对。两种模式各有各的判法：
+  //   - 默认：任何改动都拦——带未提交改动发版，等于发一个仓库里不存在的版本。
+  //   - --commit：已跟踪文件的改动正是要提交的东西，放行；未跟踪文件必须拒收并
+  //     列出（git add -u 碰不到它们，静默忽略会让「发出去的」与「仓库里有的」对不上）。
+  // 这些校验（连同下面的分支 / 远端检查）全部发生在任何写盘之前——负例测试才不会
+  // 先写坏 VERSION/package.json 再失败。
   const status = git(['status', '--porcelain'])
   if (status.status !== 0) fail(`git status 读不到：${status.stderr ?? ''}`)
-  if ((status.stdout ?? '').trim() !== '') {
+  const dirtyLines = (status.stdout ?? '').split('\n').filter((line) => line.trim() !== '')
+  if (commitMsg !== null) {
+    const untracked = dirtyLines.filter((line) => line.startsWith('??'))
+    if (untracked.length > 0) {
+      commitReject(`存在未跟踪文件，--commit 不收编它们（要提交先 git add <文件>，或加进 .gitignore）：\n${untracked.join('\n')}`)
+    }
+    if (dirtyLines.length === 0) {
+      commitReject('没有可提交的修改，若已提交过请去掉 --commit')
+    }
+  } else if (dirtyLines.length > 0) {
     fail(`工作区不干净，先提交或 stash：\n${status.stdout}`)
   }
 
@@ -253,11 +298,24 @@ if (!dry) {
   const currentBranch = (branch.stdout ?? '').trim()
   if (currentBranch !== 'main') fail(`当前分支是 ${currentBranch}，发版要在 main 上`)
 
-  // 与远端同步：仓库里没有的版本不发。
+  // 与远端同步：仓库里没有的版本不发。检查发生在 --commit 的提交**之前**——既有的
+  // 未推送 commit 仍会被拦（先 git pull --rebase origin main），而 --commit 自己落下的
+  // 新提交不算「未推送」，它由链条末尾的 --ship 一并推。
   git(['fetch', 'origin', 'main', '--quiet'])
   const head = (git(['rev-parse', 'HEAD']).stdout ?? '').trim()
   const remote = (git(['rev-parse', 'origin/main']).stdout ?? '').trim()
   if (head !== remote) fail('本地 main 与 origin/main 不一致，先 git pull --rebase origin main')
+
+  // 前置检查全过，才落 --commit 的独立提交：仍在本块内、任何写盘之前——版本号变更
+  // 由 --ship 自己打 "chore: release" commit，与这个业务 commit 分开（双 commit 风格）。
+  if (commitMsg !== null) {
+    const staged = git(['add', '-u'])
+    if (staged.status !== 0) fail(`git add -u 失败：${staged.stderr ?? ''}`)
+    const committed = git(['commit', '-m', commitMsg])
+    if (committed.status !== 0) fail(`git commit 失败：${committed.stderr ?? ''}`)
+    const sha = (git(['rev-parse', '--short', 'HEAD']).stdout ?? '').trim()
+    console.log(`# 已提交工作区改动：${sha} ${commitMsg}`)
+  }
 }
 
 // 包名与 bundle 入口前缀必须一致：不一致时装完两个入口解析不到，插件等于没装上。
