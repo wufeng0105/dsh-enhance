@@ -91,6 +91,12 @@
       "owns": "端到端冒烟：隔离 home 真装 bundle、组合树、三态、品牌人设遮蔽项、写档/摘档后宿主重新组合"
     },
     {
+      "id": "tool.compat-diff",
+      "layer": "cli",
+      "path": "tools/compat-diff.mjs",
+      "owns": "例行核验第 2/3 步工具化：blobless 缓存上列 9 包变更（changed-files 行）、逐文件统一 diff 落盘、按 compatibility.md 第 1a 步表格的 8 组接缝表达式预分类（SEAM-HIT/SKIM，--dsw-/--ds- 前缀去重）、--trees 逐包 tree SHA 表（全程零网络）；预分类是分诊不是判决，SKIM 不等于免检"
+    },
+    {
       "id": "core.text-lines",
       "layer": "core",
       "path": "shared/text-lines.mjs",
