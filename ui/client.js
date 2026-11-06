@@ -566,16 +566,14 @@ window.__ModuleLoader__.load({
 
 			var intro = h("p", { className: "enh-intro" },
 				"这一页管五件事：换掉系统提示开头那句声明、在末尾接一段文字、越界时怎么答、要不要多一个档位、以及它有没有真的生效。");
-			// 版本行：本包版本 + 本机 DSH 版本（读得到才写）。
-			// 区间那一段随版本声明一起删了：宿主对未声明 engines.dsh 的插件全放行，
-			// 没有区间可派生，页面也不再暗示存在一条核验边界。
+			// 版本行：只写「增强 <本包版本>」，不加任何后缀。
+			// 用户口径（Q-VERSION-LINE）：「增强 1.3.4」就这样就行了，不要纠结什么后缀。
+			// 区间那一段随版本声明一起删了；本机 DSH 版本也不上页面——不是探测没用：
+			// `compat.host` 仍是体检功能的一部分（读不到时 `attempts` 说清断在哪一层），
+			// 只是这一行不再展示它。别因为这里没读就把服务端的 host 返回值删掉。
 			function compatLine(compat) {
 				if (compat === null || compat === undefined || typeof compat.tool !== "string") return null;
-				var head = "增强 " + compat.tool;
-				if (typeof compat.host !== "string" || compat.host === "") {
-					return h("p", { className: "enh-hint" }, head);
-				}
-				return h("p", { className: "enh-hint" }, head + " · DSH " + compat.host);
+				return h("p", { className: "enh-hint" }, "增强 " + compat.tool);
 			}
 
 			var versionLine = compatLine(state === null ? null : state.compat);

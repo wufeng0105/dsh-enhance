@@ -507,10 +507,9 @@ test('内容边界只有「保存」「还原」两个动作（清空按钮已�
   assert.ok(!source.includes('清空（= 不加）'), '「清空」按钮不该回来')
 })
 
-test('版本行：只写「增强 <版本>」+ 本机 DSH，渲染树里没有已验后缀', async () => {
+test('版本行：只写「增强 <版本>」，本机 DSH 版本不上页面（Q-VERSION-LINE）', async () => {
   assert.ok(source.includes('function compatLine'), '缺版本行渲染')
   assert.ok(source.includes('"增强 " + compat.tool'), '版本行文案应是「增强 <版本>」')
-  assert.ok(source.includes('" · DSH " + compat.host'), '读得到本机版本时接一段「 · DSH <版本>」')
   assert.ok(source.includes('state.compat'), '版本行数据应来自快照的 compat 段')
   // 声明拆除后没有区间可派生：三个字段与「已验」字样都不许回到页面
   for (const text of ['已验', '超出已验范围']) {
@@ -519,6 +518,11 @@ test('版本行：只写「增强 <版本>」+ 本机 DSH，渲染树里没有�
   for (const field of ['compat.range', 'compat.inRange', 'compat.tested']) {
     assert.ok(!source.includes(field), `版本行不该再读 ${field}`)
   }
+  // 用户口径是「就写增强 1.3.4，不要纠结什么后缀」：连本机 DSH 版本也不许拼进版本行。
+  // 下面断言同时防两件事：将来有人把「 · DSH <host>」加回来，或把 host 拼成任何后缀。
+  assert.ok(!/·\s*DSH\s*"?\s*\+/.test(source), '版本行不该再拼「 · DSH <host>」后缀')
+  assert.ok(!source.includes('" · DSH "'), '版本行不该再有「 · DSH 」这段字面串')
+  assert.ok(!/compat\.host\s*\+/.test(source), '版本行不该把 compat.host 拼进文案')
 
   // 源码形状之外再钉一次渲染结果：字面串拼对了不等于页面上真的这么写。
   const module = loadBundle()
@@ -550,7 +554,10 @@ test('版本行：只写「增强 <版本>」+ 本机 DSH，渲染树里没有�
     walk(tree)
 
     const line = texts.find((text) => text.startsWith('增强 1.1.0'))
-    assert.equal(line, '增强 1.1.0 · DSH 0.2.1-rc.3', '版本行应只含本包版本与本机版本')
+    assert.equal(line, '增强 1.1.0', '版本行应只有「增强 <版本>」，没有后缀')
+    // host 存在时也不显示：SNAPSHOT 的 compat.host 是 '0.2.1-rc.3'，
+    // 整棵渲染树里不该出现它——探测照跑，只是这一行不展示。
+    assert.ok(!texts.some((text) => text.includes('0.2.1-rc.3')), '本机 DSH 版本不该出现在页面上')
   } finally {
     delete globalThis.fetch
   }
