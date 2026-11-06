@@ -41,12 +41,12 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # `version` 门要用 git 历史核对「适用版本」句，浅克隆会让它读不到。
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           # 让 npm 知道目标是官方源；trusted publishing 不接受指向别处的发布。

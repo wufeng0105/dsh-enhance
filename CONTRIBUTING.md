@@ -286,7 +286,7 @@ Agent 不要走这条：验证码由验证器 App 生成、30 秒有效，只有
 
 **包根那个 `index.js` 是一处绕行，带拆除条件。** 它不承载功能，宿主从不加载它——存在的唯一理由是市场插件装完包后会跑一次 `hasLoadableEntry`，它要求包根有 `main` / `exports` / 根 `index.js` 三者之一，而纯 patch 载体按构造就没有，于是被判「没有可安装的内容」并当场删掉（上游 dsh-market/dsh-market#1091）。它**有门禁守着**（bundle 门那条「包根缺可加载入口」），删了会红。上游修好 #1091 之后，拆掉它要三处一起：删根 `index.js`、删 `package.json` 的 `main`、删 bundle 门里那段判定。
 
-另外一处已知取舍：工作流里的 `actions/checkout@v4`、`actions/setup-node@v4` 有意不钉 SHA。发布 job 带 `contents: write` + `id-token: write`，按供应链习惯本该钉 commit SHA；这里没钉，理由是单人仓库加只有这两个官方 action，钉了却没有自动升级，会变成「安全补丁永远收不到」的另一种风险。
+另外一处已知取舍：工作流里的 `actions/checkout@v7`、`actions/setup-node@v7` 有意不钉 SHA。发布 job 带 `contents: write` + `id-token: write`，按供应链习惯本该钉 commit SHA；这里没钉，理由是单人仓库加只有这两个官方 action，钉了却没有自动升级，会变成「安全补丁永远收不到」的另一种风险。
 
 ## 挂着的事，等什么信号
 
