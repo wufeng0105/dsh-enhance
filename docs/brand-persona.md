@@ -2,7 +2,7 @@
 
 **目标**：**在不接管整份系统提示词的前提下，让模型不再把 DeepSeek Harness 当作自己的身份说出来。**
 
-要动的是 harness 自身自指的 **3 个名字（共 5 个注册项）**：开场那句自称（①），以及两段提到它名字的说明（② 实现目录、④ 界面）。「声明层」的准确定义见 `docs/terminology.md`。这一段话是后面所有取舍的准绳——方案、开关、代价都拿它量。
+要动的是 harness 自身自指的 **3 个名字（共 5 个注册项）**：开场那句自称（①），以及两段提到它名字的说明（② 实现目录、④ 界面）。「声明层」的准确定义见 [`CONTRIBUTING.md`](../CONTRIBUTING.md) 的「术语与命名」。这一段话是后面所有取舍的准绳——方案、开关、代价都拿它量。
 
 **做法**：在 agent 作用域内按名遮蔽这 3 个名字；只改声明层，其余段落逐字节保留，存盘即生效、一键退回。
 
@@ -283,16 +283,16 @@ DSH 自己的口径是：
 
 - **装没装上**：状态快照里的 `identityInstall`（机读）与设置页品牌人设组那一行说明（人读）会如实说「已生效 / 已接上 / 未生效」，例如「未生效：本版宿主没有可注入的 agent 上下文（agent.ctx.inject 不可用）」；「还没有 agent 可判」是三态的 `null`，不压成「失败」。
 - **遮蔽是否真的生效**：由设置页的检查项里 `inject` 那一项的第二路证伪——`custom` 要在会话日志里命自定义文本、`remove` 要用反向探针确认最新一份装配记录里已经没有宿主原句；`keep` 不判。
-- **仍要人工记的**：装配层验收在桌面会话上已验通（结论与复跑条件在 [`docs/compatibility.md`](compatibility.md) 的「核验记录」）；还剩 `hideHarness` 在桌面 / web profile 上的效果未核，见下面「仍未核验」。
+- **仍要人工记的**：装配层验收在桌面会话上已验通（证据链见 git 历史与 [`CHANGELOG.md`](../CHANGELOG.md)）；还剩 `hideHarness` 在桌面 / web profile 上的效果未核，见下面「仍未核验」。
 
 ## 10. 落地状态与剩余边界
 
 这个功能已经落地。**状态不在这份契约里复述**——它随每次发版变化，写在这里就一定会变成假话：
 
 - 逐版本改了什么、验证读数是多少 → [`CHANGELOG.md`](../CHANGELOG.md)
-- 宿主接缝、历轮核验的结论与「想复跑要什么条件」 → [`docs/compatibility.md`](compatibility.md)
+- 宿主接缝与逐次 DSH 升级的体检做法 → [`docs/host-seams.md`](host-seams.md) 与 [`docs/compatibility.md`](compatibility.md)
 
 契约只需要记住两条**不会随发版消失**的边界：
 
-- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。补它的条件见 [`docs/compatibility.md`](compatibility.md) 的「核验记录」。
-- **装配层验收**：做法与结论记在 [`docs/compatibility.md`](compatibility.md) 的「核验记录」——桌面会话上已验通（内容边界进提示、遮蔽生效），headless 那一半要**一次有余额的会话**才能复跑。
+- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。补它要**一次有余额的会话**，证据链见 git 历史与 [`CHANGELOG.md`](../CHANGELOG.md)。
+- **装配层验收**：桌面会话上已验通（内容边界进提示、遮蔽生效），headless 那一半要**一次有余额的会话**才能复跑；证据链见 git 历史与 [`CHANGELOG.md`](../CHANGELOG.md)。

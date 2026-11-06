@@ -643,7 +643,7 @@ function runSelfTest() {
     (copy) => {
       const file = join(copy, 'README.md')
       const text = readFileSync(file, 'utf8')
-      const reverted = text.replace('(./docs/terminology.md)', '(./docs/nope.md)')
+      const reverted = text.replace('(./CONTRIBUTING.md)', '(./docs/nope.md)')
       assertMutated(copy, 'README.md', text, reverted)
     },
     (copy) => expectRed('站内链接')(gateReadmeGate(copy)),

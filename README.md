@@ -21,8 +21,6 @@
 
 存盘即生效，下一条消息就带上。不用重启，不改宿主文件，随时一键退回。
 
-已对 `DeepSeek Harness 0.2.1-rc.1–0.2.2-rc.1（0.2.2-rc.1 实测，全系源码级核验）` 核验过，宿主在装的时候和启动的时候都会执行 `engines.dsh` 这条声明。
-
 ## 目录
 
 - [它做什么](#它做什么)
@@ -63,7 +61,7 @@ dsh plugin --profile desktop add .\dsh-enhance
 
 ### 依赖
 
-Node.js ≥ 22（宿主自带一个），以及落在上面那个已验区间里的 DeepSeek Harness。
+Node.js ≥ 22 与 DeepSeek Harness（无版本限制）。
 
 ## 用法
 
@@ -110,7 +108,7 @@ dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 
 `enhance-scope` 注册提示词段、给设置页提供唯一那个接口；`auto-approve` 应答审批请求；界面那半挂在宿主的设置槽位上。
 
-「声明层」指系统提示里描述 harness 自身的注册项——准确定义只有一处，在 [docs/terminology.md](./docs/terminology.md)。品牌人设动的是下面这 **5 个注册项、3 个名字**，一个不多：
+「声明层」指系统提示里描述 harness 自身的注册项——准确定义只有一处，在 [CONTRIBUTING.md](./CONTRIBUTING.md) 的「术语与命名」。品牌人设动的是下面这 **5 个注册项、3 个名字**，一个不多：
 
 | 名字 | 座位 | 是什么 |
 | --- | --- | --- |
@@ -130,11 +128,7 @@ dsh plugin --profile desktop remove @wufeng0105/dsh-enhance
 
 ## 兼容性
 
-`package.json` 里的 `engines.dsh` 是唯一权威。宿主在装前、装后、启动装载时都会读它——不兼容的版本会被直接拒掉，而不是装进去再说。
-
-DeepSeek Harness 出了新版本，下面这套流程约 15 分钟跑完，最后只剩一处可审的 diff：
-
-完整契约——核了哪些宿主接缝、这条区间怎么被执行、怎么扩区间——在 [docs/compatibility.md](./docs/compatibility.md)。
+这个包不声明宿主版本要求，宿主对未声明插件全放行，装前、装后、启动装载都不会因为版本号拒装。上游出了新版本，按 [docs/compatibility.md](./docs/compatibility.md) 的《DSH 升级体检手册》跑一次体检即可；接缝清单在 [docs/host-seams.md](./docs/host-seams.md)。
 
 ## Enhanced 权限档
 
@@ -148,7 +142,7 @@ DeepSeek Harness 出了新版本，下面这套流程约 15 分钟跑完，最�
 
 ## 如何贡献
 
-issue 与 pull request 都在 [GitHub](https://github.com/wufeng0105/dsh-enhance/issues) 上开。提 PR 之前先跑 `node scripts/check.mjs`——它跑全部门禁（version / syntax / tests / graph / docs / readme / bundle，当前门数看它的输出），必须 exit 0。改动要保持 [docs/terminology.md](./docs/terminology.md) 里的术语一致；README 里那句适用版本是从 `package.json` 派生的，改版本区间要先改声明。
+issue 与 pull request 都在 [GitHub](https://github.com/wufeng0105/dsh-enhance/issues) 上开。提 PR 之前先跑 `node scripts/check.mjs`——它跑全部门禁（version / syntax / tests / graph / docs / readme / bundle，当前门数看它的输出），必须 exit 0。改动要保持 [CONTRIBUTING.md](./CONTRIBUTING.md) 里「术语与命名」一节的术语一致。
 
 ## 许可证
 

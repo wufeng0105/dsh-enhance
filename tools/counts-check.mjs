@@ -128,7 +128,7 @@ const SCAN = [
 const REQUIRED = [
   { doc: 'CONTRIBUTING.md', count: 'selfTestCases', what: 'NN 个负例', regex: /(\d+)\s*个负例/g },
   { doc: 'docs/host-seams.md', count: 'hostContacts', what: '共 NN 条', regex: /共\s*(\d+)\s*条/g },
-  { doc: 'docs/terminology.md', count: 'settingsGroups', what: 'N 个组名', regex: /([一二三四五六七八九十\d]+)\s*个组名/g },
+  { doc: 'CONTRIBUTING.md', count: 'settingsGroups', what: 'N 个组名', regex: /([一二三四五六七八九十\d]+)\s*个组名/g },
   { doc: 'README.md', count: 'settingsGroups', what: 'N 组：', regex: /([一二三四五六七八九十\d]+)\s*组[：:]/g },
   { doc: 'README.en.md', count: 'settingsGroups', what: 'five groups', regex: /\b(five|four|three|six|\d+)\s+groups?\b/gi },
 ]

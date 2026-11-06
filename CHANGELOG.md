@@ -2,14 +2,27 @@
 
 本文件自 `1.1.0` 起维护；版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)，条目格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-本文件记的是**时间轴**：每个版本改了什么、那一版当时的验证读数。条目里的数字（门禁几道、测试几项、断言几条、适用区间）都是**当时**的读数，不按现值校验——现行规则以 [CONTRIBUTING.md](CONTRIBUTING.md) 为准，接手现状以 [BOOTSTRAP.md](BOOTSTRAP.md) 为准，核验结论以 [docs/compatibility.md](docs/compatibility.md) 为准；计数的现值只住在 `scripts/known-counts.json` 一处。门数现在不是承诺位（口径见 CONTRIBUTING 的「改之前先跑一遍门禁」），早期条目里提到的单一来源条目也有增删（门数、README 检查项都已移出），同样以那份 JSON 的现值为准。
+本文件记的是**时间轴**：每个版本改了什么、那一版当时的验证读数。条目里的数字（门禁几道、测试几项、断言几条、适用区间）都是**当时**的读数，不按现值校验——现行规则与接手现状以 [CONTRIBUTING.md](CONTRIBUTING.md) 为准，DSH 升级体检的做法以 [docs/compatibility.md](docs/compatibility.md) 为准；计数的现值只住在 `scripts/known-counts.json` 一处。门数现在不是承诺位（口径见 CONTRIBUTING 的「改之前先跑一遍门禁」），早期条目里提到的单一来源条目也有增删（门数、README 检查项都已移出），同样以那份 JSON 的现值为准。
+
+## [1.4.0] — 2026-11-06
+
+### 变更（拆解）
+
+- **拆除版本声明机**：删掉 `package.json` 的 `engines.dsh` 与 `dsh.compatibility`、`shared/compat.mjs`、`tests/compat.test.mjs`；`version` 门随之瘦身，不再核区间、README 派生句与本机超范围。本包不声明 `engines.dsh`，宿主对未声明插件走「零要求 → 全放行」——上游再发 rc 或正式版，插件不会被市场标 incompatible 隐藏。设置页版本行简化为「增强 <版本>」；`compatSnapshot` 的本机版本探测保留为体检功能，只是不上页面。
+- **体检能力独立**：36 条宿主触点表从 `docs/compatibility.md` 搬进 [`docs/host-seams.md`](docs/host-seams.md)（WP2 验收的权威新家），`contacts-count` 改读新路径；`compat-diff.mjs` 与 `smoke.ps1` 的定位从「为声明服务」改成「DSH 出新版时跑一次体检」。[`docs/compatibility.md`](docs/compatibility.md) 整份改写为《DSH 升级体检手册》：篇首讲清不存在版本区间，保留两个与写入 Enhanced 档相关的宿主事实与版本探测链，新增「DSH 出新版时怎么体检」（`--trees`、主模式、缓存语义三层、冒烟、接缝清单指向 `docs/host-seams.md`）。
+- **文档瘦身**：删 `BOOTSTRAP.md` 与术语账本（原 docs/terminology.md），两者仍有效的内容（六份文档归属表、真机冒烟纪律、「同一事实只在一处」、命名分层与术语账本）并入 `CONTRIBUTING.md`；两个 README 删掉「已对 … 核验过 / Verified against …」整句与「约 15 分钟」，依赖句改「无版本限制」；`docs/brand-persona.md` 指向「核验记录」的指针改指 git 历史与 CHANGELOG。
+
+### 验证读数
+
+- `node scripts/check.mjs` 七门 exit 0（含 docs 门死链检查、readme 门结构检查）；`node scripts/check.mjs --self-test` exit 0（19 条负例，`roster=OK`）；`node tools/docs-check.mjs` exit 0；`node tools/contacts-count.mjs` exit 0 且报 **36 条**；真机冒烟 `pwsh -NoProfile -File tools/smoke.ps1` **44 条断言**；账本双校验 exit 0。
+- 旧词 0 命中：`适用版本|已验|核验过|扩区间|约 15 分钟` 在 `docs/compatibility.md` / `README.md` / `README.en.md` / `CONTRIBUTING.md` 四份文件里均无命中；`docs/compatibility.md` 无「## 宿主触点 / 例行核验」节。
 
 ## [1.3.4] — 2026-11-06
 
 ### 兼容性
 
 - **兼容区间扩到 DeepSeek Harness 0.2.2-rc.1**：`engines.dsh` 由 `>=0.2.1-rc.1 <0.2.1-rc.6` 改为 `>=0.2.1-rc.1 <0.2.2-rc.2`（上界排他，跨一个 minor）。此前宿主更新到 0.2.2-rc.1 后，插件在装前 preflight、装后校验、启动装载三个时机都会被 `engines.dsh` 门禁判不兼容而禁用——本次扩张后恢复可装可载。
-- **本轮验证**（全记录在 [`docs/compatibility.md`](docs/compatibility.md) 核验记录 2026-11-06 轮）：36 条宿主触点重数一致；9 个上游包 × 6 个 tag tree-diff，0.2.2-rc.1 上 38 个变更文件逐对拉 blob 读 diff，判定**无一改到接缝**（版本门禁两文件 `plugin-compatibility.ts` / `compatibility-preflight.ts` 与 rc.5 逐字节相同；`operations.ts` 的变更属于新增的平台门禁，未声明 `dsh.bundle.platforms` 时全平台放行）；本机 0.2.2-rc.1 的 asar 实扫确认 `engines.dsh` 门禁在位；一次性 `DSH_HOME` 真机冒烟 **44/44** 全过。真机会话上的装配层证据仍以 rc.5 那轮为准，桌面 GUI 侧待更新插件后补验。
+- **本轮验证**（证据链见 git 历史，当时全记录在 `docs/compatibility.md` 的 2026-11-06 轮）：36 条宿主触点重数一致；9 个上游包 × 6 个 tag tree-diff，0.2.2-rc.1 上 38 个变更文件逐对拉 blob 读 diff，判定**无一改到接缝**（版本门禁两文件 `plugin-compatibility.ts` / `compatibility-preflight.ts` 与 rc.5 逐字节相同；`operations.ts` 的变更属于新增的平台门禁，未声明 `dsh.bundle.platforms` 时全平台放行）；本机 0.2.2-rc.1 的 asar 实扫确认 `engines.dsh` 门禁在位；一次性 `DSH_HOME` 真机冒烟 **44/44** 全过。真机会话上的装配层证据仍以 rc.5 那轮为准，桌面 GUI 侧待更新插件后补验。
 
 ## [1.3.3] — 2026-11-04
 
@@ -112,7 +125,7 @@
 
 ### 变更
 
-- [`docs/terminology.md`](docs/terminology.md) 给出「声明层」的定义：它指系统提示里描述 harness 自身的注册项，一共 **5 个注册项落在 3 个名字上**；README 中英据此各给一张同名清单（`harness:identity` / `harness:source` / `app:web-surface`），并写明默认设置下这三处一个都不动；
+- 当时的术语账本（已并入 `CONTRIBUTING.md`）给出「声明层」的定义：它指系统提示里描述 harness 自身的注册项，一共 **5 个注册项落在 3 个名字上**；README 中英据此各给一张同名清单（`harness:identity` / `harness:source` / `app:web-surface`），并写明默认设置下这三处一个都不动；
 - README 中英把 `hideHarness` 的代价挪到能被看见的地方：一并隐去的除品牌外，还有两条 runtime context 与两段带操作约定的文字；
 - 契约数词统一为「**5 个注册项 / 3 个名字**」（原来散写成 3 / 4 / 4 / 5），两条验收判据改写成对得上 `inject` 两路探针的写法；
 - [`docs/brand-persona.md`](docs/brand-persona.md) 回仓三条被否决或挂起的决策：C 与 H′ 两条路线的对比及被挂起的原因、`hideHarness` 已打破宿主 admitted-legacy 投影语义这个已知缺陷、以及「用 AGENTS.md 补偿」被否决的理由；
@@ -120,7 +133,7 @@
 
 ### 修复
 
-- **品牌人设静默失效现在能发现了**：装不上、或装上了没顶掉时，页面不再照旧显示「已替换」。三处一起改——`state` 快照新增 `identityInstall`（`ok` 是三值：装上 / 明确装不上 / 还没有 agent 可判，不把「还没有证据」报成失败）；`inject` 从只探内容边界扩成「**内容边界 + 品牌人设**」两路，缺失性走新加的反向探针 `sessionOmits`（两路的三态判定口径见 [`docs/brand-persona.md`](docs/brand-persona.md) 与 [`docs/compatibility.md`](docs/compatibility.md)）；
+- **品牌人设静默失效现在能发现了**：装不上、或装上了没顶掉时，页面不再照旧显示「已替换」。三处一起改——`state` 快照新增 `identityInstall`（`ok` 是三值：装上 / 明确装不上 / 还没有 agent 可判，不把「还没有证据」报成失败）；`inject` 从只探内容边界扩成「**内容边界 + 品牌人设**」两路，缺失性走新加的反向探针 `sessionOmits`（两路的三态判定口径见 [`docs/brand-persona.md`](docs/brand-persona.md) 与 [`docs/host-seams.md`](docs/host-seams.md)）；
 - 设置页的降级原因不再一律说成「审批回落到先问我」：改按 `degradedFields` 逐字段说，身份坏值就说「品牌人设回落到保留」。
 
 ### 验证
@@ -146,7 +159,7 @@
 - `readState` 新增 `degradedFields`：坏的是哪个字段要能说清——原来只写「审批回落」会把身份坏值说成审批的事；
 - 文本读写收敛成唯一实现（`readTextFile` / `writeTextFile`），品牌人设不另起第二套；`readIdentity` / `writeIdentity` 是其薄包装；
 - 公开承诺句统一为「**除声明层那一句之外**，宿主提示词一个字节不动」——原来那句「一个字节不动」被本功能打破，README（中英）与 `CONTRIBUTING.md` 已同步；
-- `docs/terminology.md` 新增「人设一名三义」：品牌人设 / 部署人设 / 尾巴文字必须分写；内容边界提示语里的「写人设」改为「写行为规矩、写内容要求、写补充说明」；
+- 术语账本新增「人设一名三义」：品牌人设 / 部署人设 / 尾巴文字必须分写；内容边界提示语里的「写人设」改为「写行为规矩、写内容要求、写补充说明」；
 - `docs/compatibility.md` 触点表加一条（`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽），独立触点项由 35 条重数为 36 条；
 - `package.json` 的 `files` 收录 `docs/brand-persona.md`。
 
@@ -190,12 +203,12 @@
 
 ### 新增
 
-- [`docs/terminology.md`](docs/terminology.md)：术语账本——界面名与机读标识符的 1:1 映射、同名两物的消歧写法、假同物异名的豁免、以及声音锚点。
+- 当时的术语账本（已并入 `CONTRIBUTING.md`）——界面名与机读标识符的 1:1 映射、同名两物的消歧写法、假同物异名的豁免、以及声音锚点。
 
 ### 变更
 
 - 仓库内**手写文本面**（代码注释、设置页文案、`docs/compatibility.md`）统一到同一套术语与文风；
-- 设置页第 2 组的组标题与错误行标签统一为「越界审批」，与术语账本里的四个组名一致（见 [`docs/terminology.md`](docs/terminology.md)；该组内的控件标签保持问句写法）；
+- 设置页第 2 组的组标题与错误行标签统一为「越界审批」，与术语账本里的四个组名一致（当时记在术语账本，现并入 `CONTRIBUTING.md`；该组内的控件标签保持问句写法）；
 - 审批结果的措辞改为「宿主四个 outcome 里我们主动产出的三个」，不再说「一一对应」；
 - `docs/compatibility.md`：「73 处」改为可复算的「21 个文件」；「六层探测」改为「整条探测链」；新增「2026-10-31 复核」一节（重置重装、tree SHA 复对、空 patch 报错、`defaultPreset` 不存在）。
 

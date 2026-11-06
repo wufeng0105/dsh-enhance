@@ -21,8 +21,6 @@ The model is the same model. What changes is the system prompt it reads at the s
 
 Saved to disk, effective on the next message. No restart, no host files touched, one click to revert.
 
-Verified against `DeepSeek Harness 0.2.1-rc.1–0.2.2-rc.1（0.2.2-rc.1 实测，全系源码级核验）`; the host enforces this `engines.dsh` declaration at install and at startup.
-
 ## Contents
 
 - [What it does](#what-it-does)
@@ -63,7 +61,7 @@ dsh plugin --profile desktop add .\dsh-enhance
 
 ### Dependencies
 
-Node.js ≥ 22 (the host already ships one) and a DeepSeek Harness within the verified range above.
+Node.js ≥ 22 (the host already ships one) and DeepSeek Harness (no version restriction).
 
 ## Usage
 
@@ -110,7 +108,7 @@ The bundle inserts three entries into the profile's `cordis.patch.yml`. Nothing 
 
 `enhance-scope` registers the prompt section and serves the settings page's only endpoint; `auto-approve` answers approval requests; the browser half of the UI mounts into the host's settings slot.
 
-The **declaration layer** is the set of registrations in the system prompt that describe the harness itself — the definition lives in exactly one place, [docs/terminology.md](./docs/terminology.md). Brand persona touches these **5 registrations under 3 names**, no more:
+The **declaration layer** is the set of registrations in the system prompt that describe the harness itself — the definition lives in exactly one place, [CONTRIBUTING.md](./CONTRIBUTING.md) (Chinese, "术语与命名"). Brand persona touches these **5 registrations under 3 names**, no more:
 
 | Name | Seat | What |
 | --- | --- | --- |
@@ -130,11 +128,7 @@ The settings page writes through one route on the host's own local HTTP server. 
 
 ## Compatibility
 
-`engines.dsh` in `package.json` is the single source of truth. The host reads it at install, after install, and at profile startup — it refuses an incompatible version rather than loading it.
-
-When a new DeepSeek Harness release appears, the routine check below takes about 15 minutes and ends in one reviewable diff:
-
-The full contract — which host seams are verified, how the range is enforced, and how to widen it — lives in [docs/compatibility.md](./docs/compatibility.md).
+This package declares no host version requirement; the host admits undeclared plugins unconditionally, at install, after install, and at profile startup. When a new DeepSeek Harness release appears, run the health check in [docs/compatibility.md](./docs/compatibility.md); the seam inventory lives in [docs/host-seams.md](./docs/host-seams.md).
 
 ## The Enhanced preset
 
@@ -148,7 +142,7 @@ Writing it is the only action in this package that touches host configuration, a
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/wufeng0105/dsh-enhance/issues). Before opening a pull request, run `node scripts/check.mjs` — it runs every gate (version, syntax, tests, graph, docs, readme, bundle; the current count is whatever it prints) and must exit 0. Contributions must keep the terms in [docs/terminology.md](./docs/terminology.md) consistent, and the compatibility sentence in this README is derived from `package.json`, so changing the version range means changing the declaration first.
+Issues and pull requests are welcome on [GitHub](https://github.com/wufeng0105/dsh-enhance/issues). Before opening a pull request, run `node scripts/check.mjs` — it runs every gate (version, syntax, tests, graph, docs, readme, bundle; the current count is whatever it prints) and must exit 0. Contributions must keep the terms in [CONTRIBUTING.md](./CONTRIBUTING.md) ("术语与命名") consistent.
 
 ## License
 
