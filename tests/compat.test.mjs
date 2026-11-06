@@ -69,9 +69,16 @@ test('declarationOf：读真实 package.json，形状齐', () => {
   const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
   const declared = declarationOf(pkg)
   assert.equal(declared.error, undefined)
-  assert.equal(declared.enginesDsh, '>=0.2.1-rc.1 <0.2.2-rc.2')
+  // 不钉具体区间值：扩区间只动 package.json 一处，测试跟着派生。
+  // 但形状与成员关系必须成立——写歪的区间仍然红。
+  const parsed = parseEnginesDsh(declared.enginesDsh)
+  assert.equal(parsed.error, undefined, `engines.dsh 必须可解析为 ">=A <B"：${declared.enginesDsh}`)
   assert.equal(declared.tested, pkg.dsh.compatibility.tested)
-  assert.equal(inRange(parseEnginesDsh(declared.enginesDsh), declared.tested), true, 'tested 必须落在区间内')
+  assert.equal(inRange(parsed, declared.tested), true, 'tested 必须落在区间内')
+  // 防「危险扩宽」：上界核心段必须与 tested 核心段一致（挡住把 <0.2.2-rc.2 改成 <0.3.0 这类形状合法的越级扩宽）
+  const coreOf = (version) => version.split('-')[0]
+  assert.equal(coreOf(parsed.max), coreOf(declared.tested), `上界 ${parsed.max} 的核心段必须与 tested ${declared.tested} 同一条版本线`)
+  assert.notEqual(parsed.max, declared.tested, '上界排他，不能等于 tested')
 })
 
 test('declarationOf：缺 engines.dsh、tested 出区间、坏元数据都给 error', () => {
