@@ -116,9 +116,6 @@ const SNAPSHOT = {
     tool: '1.1.0',
     host: '0.2.1-rc.3',
     source: 'env',
-    range: '0.2.1-rc.1–0.2.2-rc.1',
-    tested: '0.2.1-rc.3',
-    inRange: true,
   },
   preset: {
     patchPath: 'C:/x/profiles/desktop/cordis.patch.yml',
@@ -510,15 +507,53 @@ test('内容边界只有「保存」「还原」两个动作（清空按钮已�
   assert.ok(!source.includes('清空（= 不加）'), '「清空」按钮不该回来')
 })
 
-test('版本行：本包版本 + 本机 DSH 版本 + 已验范围，超范围只变黄不拦人', () => {
+test('版本行：只写「增强 <版本>」+ 本机 DSH，渲染树里没有已验后缀', async () => {
   assert.ok(source.includes('function compatLine'), '缺版本行渲染')
-  for (const text of ['已验 DSH ', '已验 ', '超出已验范围 ']) {
-    assert.ok(source.includes(text), `版本行缺文案：${text}`)
-  }
+  assert.ok(source.includes('"增强 " + compat.tool'), '版本行文案应是「增强 <版本>」')
+  assert.ok(source.includes('" · DSH " + compat.host'), '读得到本机版本时接一段「 · DSH <版本>」')
   assert.ok(source.includes('state.compat'), '版本行数据应来自快照的 compat 段')
-  assert.ok(source.includes('typeof compat.range === "string"'), '版本行应直接消费服务端派生的 range 串')
-  // 超范围是提示，不是拒绝：只给 data-tone=warn，不隐藏任何控件
-  assert.match(source, /"data-tone": "warn" \}, head \+ " · DSH "/, '超范围应只变黄')
+  // 声明拆除后没有区间可派生：三个字段与「已验」字样都不许回到页面
+  for (const text of ['已验', '超出已验范围']) {
+    assert.ok(!source.includes(text), `版本行不该再有「${text}」字样`)
+  }
+  for (const field of ['compat.range', 'compat.inRange', 'compat.tested']) {
+    assert.ok(!source.includes(field), `版本行不该再读 ${field}`)
+  }
+
+  // 源码形状之外再钉一次渲染结果：字面串拼对了不等于页面上真的这么写。
+  const module = loadBundle()
+  let component
+  module.apply({
+    slots: {
+      inject: (_name, run) => run(),
+      register: (_spec, registered) => { component = registered; return () => {} },
+    },
+  })
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => SNAPSHOT })
+
+  try {
+    // 首帧只负责触发 state 请求；假 React 不会自己在 setState 后重渲染，
+    // 所以第二次调用组件取「已落地的快照」渲染出来的树。
+    component({})
+    await new Promise((resolve) => setImmediate(resolve))
+    module.__react.reset()
+    const tree = component({})
+
+    /** 收集整棵树里的文本节点。 */
+    const texts = []
+    const walk = (node) => {
+      if (typeof node === 'string') { texts.push(node); return }
+      if (node === null || node === undefined || typeof node !== 'object') return
+      if (Array.isArray(node)) { node.forEach(walk); return }
+      for (const child of node.children ?? []) walk(child)
+    }
+    walk(tree)
+
+    const line = texts.find((text) => text.startsWith('增强 1.1.0'))
+    assert.equal(line, '增强 1.1.0 · DSH 0.2.1-rc.3', '版本行应只含本包版本与本机版本')
+  } finally {
+    delete globalThis.fetch
+  }
 })
 
 test('状态：服务端 active / degraded 必须被用上，降级原因要有一行说明', () => {

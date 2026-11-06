@@ -206,9 +206,8 @@ export function resolveProfilePatch(ctx) {
  * 本包版本。**2026-11-06 起不再有「已验 DSH 范围」**：`package.json` 不声明
  * `engines.dsh`，宿主对未声明的插件走「零要求 → 全放行」分支，所以也没有区间可派生。
  *
- * WP1 只做「不依赖 `shared/compat.mjs`」的最小改动：`range` / `tested` 置 null，
- * 快照字段形状保持不变（`ui/client.js` 仍在读 `compat.range`）。字段本身的删除
- * 与版本行文案简化是 WP3 的活。
+ * 快照里因此只剩版本号：区间、核验版本、区间判定这三样都随声明一起删掉了，
+ * 不留空字段位——留空会让页面继续以为自己该渲染「已验」。
  */
 const PACKAGE = (() => {
   try {
@@ -220,8 +219,6 @@ const PACKAGE = (() => {
 
 const COMPATIBILITY = {
   tool: typeof PACKAGE.version === 'string' ? PACKAGE.version : null,
-  range: null,
-  tested: null,
 }
 
 /**
@@ -400,8 +397,8 @@ export async function readHostVersion(home) {
 
 /**
  * 版本行用的快照：本包版本 + 本机 DSH 版本。
- * `range` / `tested` / `inRange` 保留字段位但恒为 null —— 声明拆除后没有区间可派生，
- * 页面见到 null 就不渲染「已验」那一段（WP3 才把字段本身删掉）。
+ * 声明拆除后没有「已验范围」可派生，所以只有这两个版本号 + 来源 + 探测尝试记录；
+ * 区间、核验版本、区间判定这三样字段都不再返回——页面按字段是否存在决定渲染哪一段。
  *
  * @param {string} home
  */
@@ -411,9 +408,6 @@ export async function compatSnapshot(home) {
     tool: COMPATIBILITY.tool,
     host,
     source,
-    range: COMPATIBILITY.range,
-    tested: COMPATIBILITY.tested,
-    inRange: null,
     // 读不到时把每次尝试的失败原因带出来，方便在接口上定位是哪一层断了（不上页面）
     attempts,
   }

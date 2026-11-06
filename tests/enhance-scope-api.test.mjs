@@ -219,25 +219,29 @@ test('readAsarManifestVersion：只读 asar 头里的 package.json（不解包�
     rmSync(dir, { recursive: true, force: true })
   }
 })
-// WP1 中间态：`package.json` 不再有 `dsh.compatibility`，快照的 range/tested/inRange 恒为 null。
-// 这条用例断言的是「已验范围」派生链，**WP3 改写版本行时必须回来重写它**（不是删掉）：
-// 那时应改成只断言 `tool` 取自 package.json、`host` 取自本机探测。
-test.skip('state 快照带 compat：本包版本取自 package.json，本机版本用于核对已验范围 [WP1 skip · WP3 恢复]', async () => {
+// WP3：声明链已拆完，快照只剩版本号本身。这条用例原先断言「已验范围」派生链
+// （`pkg.dsh.compatibility.tested` 与固定 range 串），WP1 删掉声明后那两样已永久
+// 不存在，所以改为断言「字段真的没了」——字段位被删掉、不是留 null 占位。
+test('state 快照带 compat：本包版本取自 package.json，本机版本取本机探测值，已验三字段已删', async () => {
   const pkg = JSON.parse(readFileSync(join(fileURLToPath(new URL('../package.json', import.meta.url)) ), 'utf8'))
   const previous = process.env.DSH_VERSION
   const probe = await harness({ patch: '[]\n' })
   try {
-    process.env.DSH_VERSION = pkg.dsh.compatibility.tested
-    const inside = (await probe.call({ op: 'state' })).json.compat
-    assert.equal(inside.tool, pkg.version)
-    assert.equal(inside.host, pkg.dsh.compatibility.tested)
-    assert.equal(inside.inRange, true)
-    assert.equal(inside.range, '0.2.1-rc.1–0.2.2-rc.1')
+    // DSH_VERSION 是探测链的第一来源：用它把「本机值」钉住，断言快照照抄探测结果
+    process.env.DSH_VERSION = '0.2.2-rc.1'
+    const compat = (await probe.call({ op: 'state' })).json.compat
+    assert.equal(compat.tool, pkg.version)
+    assert.equal(compat.host, '0.2.2-rc.1')
+    assert.equal(compat.range, undefined)
+    assert.equal(compat.tested, undefined)
+    assert.equal(compat.inRange, undefined)
+    // 「undefined」也可能是字段还在、只是值为空：连键一起核，才证明是删字段
+    assert.deepEqual(Object.keys(compat).sort(), ['attempts', 'host', 'source', 'tool'])
 
     process.env.DSH_VERSION = '9.9.9'
     const outside = (await probe.call({ op: 'state' })).json.compat
     assert.equal(outside.host, '9.9.9')
-    assert.equal(outside.inRange, false)
+    assert.equal(outside.inRange, undefined)
   } finally {
     if (previous === undefined) delete process.env.DSH_VERSION
     else process.env.DSH_VERSION = previous
