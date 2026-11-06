@@ -657,12 +657,14 @@ function runSelfTest() {
 
   cases.push(withCopy(
     'counts-check red', 'docs',
-    // 文档里的计数与单一来源不符 → docs 门的计数一致性必须判红并点名位置
+    // 文档里的计数与单一来源不符 → docs 门的计数一致性必须判红并点名位置。
+    // 声明位随触点表一起搬到了 `docs/host-seams.md`（WP2）：这条负例必须跟着搬，
+    // 否则它替换的是一个已经不存在的位置，守卫会退化成「回退替换没命中」的抛错。
     (copy) => {
-      const file = join(copy, 'docs', 'compatibility.md')
+      const file = join(copy, 'docs', 'host-seams.md')
       const text = readFileSync(file, 'utf8')
       const broken = text.replace('共 36 条', '共 35 条')
-      assertMutated(copy, 'docs/compatibility.md', text, broken)
+      assertMutated(copy, 'docs/host-seams.md', text, broken)
     },
     (copy) => expectRed('hostContacts')(gateDocs(copy)),
   ))

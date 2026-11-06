@@ -25,7 +25,7 @@
     "hostContacts": {
       "value": 36,
       "kind": "computed",
-      "computedBy": "tools/contacts-count.mjs 按 docs/compatibility.md「宿主触点」节的口径现场数：分组表第二列按「、」分段、`版本探测链` 按 `→` 拆，两段相加。原先标 manual（「口径是散文公式，机算不了」）已证伪——实测能精确数出 36"
+      "computedBy": "tools/contacts-count.mjs 按 docs/host-seams.md「宿主触点」节的口径现场数：分组表第二列按「、」分段、`版本探测链` 按 `→` 拆，两段相加。原先标 manual（「口径是散文公式，机算不了」）已证伪——实测能精确数出 36"
     }
   }
 }

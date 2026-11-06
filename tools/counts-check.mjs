@@ -26,7 +26,7 @@
  *     触点计数口径是散文公式，算不出来」，判据只剩「某份日志里写着 total=NN」，而日志不进仓，
  *     等于没人核：谁把数改成任意值、文档跟着改就全绿。**这一点已证伪**——`smokeAssertions` 现在
  *     由本工具现场读 `tools/smoke.mjs` 的 `EXPECTED_ASSERTIONS` 与单一来源对账（冒烟真跑时
- *     脚本自己还自校一遍），`hostContacts` 由 `tools/contacts-count.mjs` 按 `docs/compatibility.md`
+ *     脚本自己还自校一遍），`hostContacts` 由 `tools/contacts-count.mjs` 按 `docs/host-seams.md`
  *     的口径现场数。`known-counts.json` 里两者的 `kind` 都已从 `manual` 改成 `computed`。
  *   - `readmeChecks` 已从单一来源**移除**：README 结构检查的项数随章节数变化（增删一节就 ±1），
  *     既没有文档声明位、也抓不到缺陷，钉住它只会逼人「改 README 章节就同步一个 JSON」。
@@ -120,14 +120,14 @@ const SCAN = [
  * 「现为 NN 条」原先也是必需位，结果是**每加一个测试都得去改契约的措辞**，否则门禁
  * 红——那是把「计数必须说对」错做成了「计数必须提到」。现在这三处改为：写了就按现值
  * 校验，没写不算错；对外承诺（README 的组数、CONTRIBUTING 的负例数）与口径
- * 权威（compatibility 的触点数、terminology 的组名）仍然强制，因为它们是对读者的承诺。
+ * 权威（`docs/host-seams.md` 的触点数、terminology 的组名）仍然强制，因为它们是对读者的承诺。
  *
  * 门数**不在这张表里**：门数不是文档承诺，加一道门也不该逼人改三份文档——本仓拆掉
  * 门数承诺位时把它从 REQUIRED / SCAN / 单一来源三处一起移除了。
  */
 const REQUIRED = [
   { doc: 'CONTRIBUTING.md', count: 'selfTestCases', what: 'NN 个负例', regex: /(\d+)\s*个负例/g },
-  { doc: 'docs/compatibility.md', count: 'hostContacts', what: '共 NN 条', regex: /共\s*(\d+)\s*条/g },
+  { doc: 'docs/host-seams.md', count: 'hostContacts', what: '共 NN 条', regex: /共\s*(\d+)\s*条/g },
   { doc: 'docs/terminology.md', count: 'settingsGroups', what: 'N 个组名', regex: /([一二三四五六七八九十\d]+)\s*个组名/g },
   { doc: 'README.md', count: 'settingsGroups', what: 'N 组：', regex: /([一二三四五六七八九十\d]+)\s*组[：:]/g },
   { doc: 'README.en.md', count: 'settingsGroups', what: 'five groups', regex: /\b(five|four|three|six|\d+)\s+groups?\b/gi },

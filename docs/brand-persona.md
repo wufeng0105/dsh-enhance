@@ -277,7 +277,7 @@ DSH 自己的口径是：
 - `renderPrompt()` 丢弃空文本段，`renderContextSections()` 丢弃空文本 context；
 - 先例：`dsh-persona`、`dsh-subagent` 都据此工作。
 
-`docs/compatibility.md` 的改法：在「cordis 插件 API」那一行的接缝清单里加 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」，并按那一节自己的计数口径把独立触点项总数重数一遍——**总数、公式与拆条规则都以那一节为准，别在这里另立**。`packages/core/system-prompt/src` 已在 tree-diff 清单里，不新增目录；`packages/interaction/agent`（若存在）视核验结果决定是否加入。
+`docs/host-seams.md` 的改法：在「cordis 插件 API」那一行的接缝清单里加 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」，并按那一节自己的计数口径把独立触点项总数重数一遍——**总数、公式与拆条规则都以那一节为准，别在这里另立**。`packages/core/system-prompt/src` 已在 tree-diff 清单里，不新增目录；`packages/interaction/agent`（若存在）视核验结果决定是否加入。
 
 任一条不成立 → 本功能失效，其余功能不受影响。降级路径不再只有「人工记账」一条：
 

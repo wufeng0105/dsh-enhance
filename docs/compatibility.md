@@ -59,30 +59,13 @@ README 里那句适用版本是这份声明的派生文本，`node scripts/check
 
 宿主每个 rc 都可能在动我们依赖的接缝，「最优兼容」没有解。所以这里只声明核验过的范围，并给出一个常数流程：新版本发布后跑一遍，通过了就把版本号并进区间。声明是变量，流程是常数。
 
-## 宿主触点
-
-每一条能力都挂在宿主的一个接缝上。例行核验，核的就是这些接缝有没有动。下面这张表按破坏面分组（完整清单由代码反推而来，按表内独立触点项计共 36 条；**36 是本表口径下的条目数，不是 grep 命中数**——从引用点归并成条目的规则见「例行核验」第 1 步；分组只求「宿主变了坏什么」一眼可读）：
-
-| 组 | 触点（代码侧入口） | 宿主变了坏什么 |
-|---|---|---|
-| cordis 插件 API | 入口形状（`name`/`apply`/`inject`）、`systemPrompt.section()` + `getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX')`、`ctx.effect`、运行期 `ctx.inject(['webServer'])`、`web.register({kind:'exact'})` 路由、`ctx.on('approval/request')` waterfall、`settings.section` 槽位（`ctx.slots.inject` + `register`）、`ctx.on('agent/created')` + `agent.ctx.inject()` 的 agent 作用域同名段遮蔽（品牌人设） | 注入消失 / 审批接管失效 / 设置页分节挂不上 |
-| 浏览器半装载 | `window.__ModuleLoader__.load({id, factory})`、factory 参数 `require('react')`、`dsh.client` 发现规则（`exports["./client"]` + 裸包名行才挂浏览器半） | 设置页整个消失（服务端功能仍在） |
-| 宿主视觉 token | 23 个 `--dsw-*`/`--ds-*` 变量、`body[data-ds-dark-theme]` 属性钩子、排版刻度 | 页面不可读 / 深色模式错乱 |
-| profile 配置与解析 | `profileContext` 形状（`patchPath`）、`DSH_PROFILE_DIR` + `cordis.patch.yml` 文件名、`profiles/<name>/` 布局、patch 顶层数组 + `config` 整块替换 + `- id: permission` 行、`presets`/`defaultPreset` 契约、档位菜单显示契约（表外档名纯文字行）、宿主侧档位中文名文案、审批策略 `approval/policy` 取 `never` 时前置拒绝 | 写档 409 或写坏用户配置 / 播种错开关档（默认档位的审批策略是 `never` 时，种「自动同意」会被宿主前置拒绝，须种「先问我」） |
-| 会话日志探针 | `sessions/<workspace>/<session>/session.v4.jsonl.zstd` 文件名与两层目录、zstd 多帧追加（宿主 Node **≤24.21** 的 `zstdDecompressSync` 只解第一帧，**24.22.1 起解全**；所以探针按魔数逐帧切，不赌版本）、`"system-prompt"` 行标记；另有正反两个探针（`sessionContains` 判「该在的文本在不在」，`sessionOmits` 判「不该在的文本还在不在」——**两者极性不同**：存在性任一命中即证明，缺失性只看**最新一份**含 `"system-prompt"` 装配记录的日志，按 mtime 倒序取第一份，不能扫「最近 N 份都不含」，否则切换设置前的旧日志会把刚生效的遮蔽永久判红） | 设置页的检查项里 `inject` 那一项永远红，或品牌人设遮蔽失效却全绿 |
-| 版本探测链 | `DSH_VERSION` → `@deepseek-ai/dsh-package-manifest` → 安装作用域核心包 → `app.asar` 头布局 → `LOCALAPPDATA` 安装根 → `dsh-runtimes/<runtime>/runtime.json` | 版本行退化成「读不到本机版本」（其余功能不受影响） |
-| home | `DSH_HOME` / `~/.dsh`、`<home>/enhance/` 数据目录 | 自家数据无处落 |
-| 装载与冒烟工具链 | bundle patch entry 解析规则（name 相对本包目录）、`dsh` CLI 与安装根、profile `package.json` 装载痕迹 | 装不上 / 例行核验流程断 |
-
-**插件加了新功能就会带来新触点**，所以例行核验的第一步永远是重数这张表。
-
-上游包对应关系（tree-diff 盯这些）：cordis API 家族的接缝分散在 `packages/core/system-prompt/src`、`packages/host/webserver/src`、`packages/interaction/user-approval/src`；settings.section 槽位契约在 `packages/client/ui-settings/src`（`contract/slots.ts`），渲染它的壳是 `packages/client/ui-permission-presets/src` 之外的 `packages/client/ui-settings-general/src`——`ui-settings-models`/`ui-settings-plugins` 是同槽位的兄弟消费方，宿主改它们不破坏我们，不进核验清单；权限预设与显示契约在 `packages/interaction/permission-presets/src` 与 `packages/client/ui-permission-presets/src`；engines 门禁与装载预检在 `packages/boot/app-boot/src` 与 `packages/boot/plugin-manager/src`。其余触点（会话日志格式、asar 头、CSS token、env 量）没有可直接 tree-diff 的上游包位置，靠冒烟与真机核对兜底。
-
 ## 例行核验（新 rc 或正式版发布后）
 
 工时不是固定值，按变更规模分档：**rc → rc**（个位数变更文件）约 10–15 分钟；**minor 跳跃**的变更面在第 2 步 tree-diff 跑完即知工作量，第 3 步只精读 `SEAM-HIT` 的文件，工作量与变更文件数成正比。下面按固定顺序走五步。
 
 ### 1. 重数触点
+
+触点表已移出本文，独立在 [`docs/host-seams.md`](host-seams.md)（表 + 数法 + 上游包对应关系）；本步的口径与拆条规则以那份文档为准。
 
 从代码 grep 宿主引用重推这张表，不抄旧表。三步，照着走就能得出「是不是还是 36 条」。
 
@@ -107,7 +90,7 @@ README 里那句适用版本是这份声明的派生文本，`node scripts/check
 4. **链按环拆**：`→` 连成的链，每一环各算一条——「版本探测链」那一行按 6 环算 6 条，不是 1 条；
 5. **新能力就新增条目**：加了新功能带来的新接缝必须新增一条，不许并进旧条目充数。
 
-**c. 对数。** 按 b 数：除「版本探测链」外的其余 7 行按「、」共 30 段，「版本探测链」按 `→` 拆成 6 条，30 + 6 = **36**。grep 命中的是**引用点**（通常上百处），36 是归并后的**条目数**；两个数不相等是正常的，相等反而说明没归并。数出来不是 36 就先怀疑表：漏了新触点，或把两件事并成了一条——改表，别改数。计数门禁把这个数当**可机算值**核（`scripts/known-counts.json` 的 `hostContacts`，`kind` 是 `computed`）：`tools/contacts-count.mjs` 按本节 a/b/c 的口径现场数并与单一来源对账，`tools/counts-check.mjs` 再拿它核各文档的声明位。它曾标 `manual`（理由是「口径是散文公式，机算不了」），2026-11-02 证伪后改成机算——真正重数还是按 a/b/c 三步走。
+**c. 对数。** 按 b 数：除「版本探测链」外的其余 7 行按「、」共 30 段，「版本探测链」按 `→` 拆成 6 条，30 + 6 = **36**。grep 命中的是**引用点**（通常上百处），36 是归并后的**条目数**；两个数不相等是正常的，相等反而说明没归并。数出来不是 36 就先怀疑表：漏了新触点，或把两件事并成了一条——改表，别改数。计数门禁把这个数当**可机算值**核（`scripts/known-counts.json` 的 `hostContacts`，`kind` 是 `computed`）：`tools/contacts-count.mjs` 按 [`docs/host-seams.md`](host-seams.md) 的 a/b/c 口径现场数并与单一来源对账，`tools/counts-check.mjs` 再拿它核各文档的声明位。它曾标 `manual`（理由是「口径是散文公式，机算不了」），2026-11-02 证伪后改成机算——真正重数还是按 a/b/c 三步走。
 
 ### 2. 逐包 tree-diff
 

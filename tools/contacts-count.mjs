@@ -2,8 +2,11 @@
 /**
  * 宿主触点数的机器来源。
  *
- * 口径写在 `docs/compatibility.md` 的「宿主触点」节里（数法 a/b/c）：把那张分组表的
+ * 口径写在 `docs/host-seams.md` 的「宿主触点」节里（数法 a/b/c）：把那张分组表的
  * 第二列按「、」分段，其中「版本探测链」按 `→` 拆；两段相加就是触点数。
+ *
+ * 为什么读这份文档而不是 `docs/compatibility.md`：触点表是体检资产，与版本声明契约解耦
+ * （表搬出后契约文档可以整份处置，表长存）。口径仍只有一处，改口径就改那份文档。
  *
  * 为什么需要它：`hostContacts` 原先标 `manual`，理由是「口径是散文公式，机算不了」。
  * 实测可以机算——按上面口径复算得到 36，与文档一致。标 `manual` 的代价是**没人核**：
@@ -30,9 +33,9 @@ for (let i = 0; i < args.length; i += 1) {
   } else { console.error(`contacts-count: 未知参数 ${args[i]}`); process.exit(2) }
 }
 
-const docPath = join(root, 'docs', 'compatibility.md')
+const docPath = join(root, 'docs', 'host-seams.md')
 if (!existsSync(docPath)) {
-  console.error('[contacts] 读不到 docs/compatibility.md：触点表是唯一口径来源，缺了没法数')
+  console.error('[contacts] 读不到 docs/host-seams.md：触点表是唯一口径来源，缺了没法数')
   process.exit(1)
 }
 
