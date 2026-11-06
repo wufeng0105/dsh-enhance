@@ -35,7 +35,6 @@ import {
   clearPresetRecord, ensureEnhancedPreset, readPresetRecord, readPresetState,
   removeEnhancedPreset, writePresetRecord,
 } from '../shared/preset.mjs'
-import { declarationOf, displayRange, inRange, parseEnginesDsh } from '../shared/compat.mjs'
 
 /** 诊断标签；只出现在宿主日志与失败链里。 */
 export const name = 'enhance-scope'
@@ -204,9 +203,12 @@ export function resolveProfilePatch(ctx) {
 }
 
 /**
- * 本包版本与已验的 DSH 范围。**唯一来源是 package.json 的 `engines.dsh`**：
- * README 的适用版本句、`scripts/check.mjs` 的 version 门禁、这一页的版本行，
- * 三处都从 `shared/compat.mjs`（同一实现）派生，改声明只需改一处。
+ * 本包版本。**2026-11-06 起不再有「已验 DSH 范围」**：`package.json` 不声明
+ * `engines.dsh`，宿主对未声明的插件走「零要求 → 全放行」分支，所以也没有区间可派生。
+ *
+ * WP1 只做「不依赖 `shared/compat.mjs`」的最小改动：`range` / `tested` 置 null，
+ * 快照字段形状保持不变（`ui/client.js` 仍在读 `compat.range`）。字段本身的删除
+ * 与版本行文案简化是 WP3 的活。
  */
 const PACKAGE = (() => {
   try {
@@ -216,17 +218,11 @@ const PACKAGE = (() => {
   }
 })()
 
-const COMPATIBILITY = (() => {
-  const declared = declarationOf(PACKAGE)
-  if (declared.error !== undefined) return { tool: null, range: null, tested: null, parsed: null }
-  const parsed = parseEnginesDsh(declared.enginesDsh)
-  return {
-    tool: typeof PACKAGE.version === 'string' ? PACKAGE.version : null,
-    range: parsed.error === undefined ? displayRange(parsed) : null,
-    tested: declared.tested,
-    parsed: parsed.error === undefined ? parsed : null,
-  }
-})()
+const COMPATIBILITY = {
+  tool: typeof PACKAGE.version === 'string' ? PACKAGE.version : null,
+  range: null,
+  tested: null,
+}
 
 /**
  * 从 Electron 的 `app.asar` 头里读出宿主版本（**只读**：读头 + 一个文件条目，不解包、不写、不派生任何产物）。
@@ -403,8 +399,9 @@ export async function readHostVersion(home) {
 }
 
 /**
- * 版本行用的快照：本包版本 + 本机 DSH 版本 + 已验范围。
- * `inRange` 为 null 表示**读不到本机版本**——这时页面不判绿也不判红。
+ * 版本行用的快照：本包版本 + 本机 DSH 版本。
+ * `range` / `tested` / `inRange` 保留字段位但恒为 null —— 声明拆除后没有区间可派生，
+ * 页面见到 null 就不渲染「已验」那一段（WP3 才把字段本身删掉）。
  *
  * @param {string} home
  */
@@ -416,7 +413,7 @@ export async function compatSnapshot(home) {
     source,
     range: COMPATIBILITY.range,
     tested: COMPATIBILITY.tested,
-    inRange: host === null || COMPATIBILITY.parsed === null ? null : inRange(COMPATIBILITY.parsed, host),
+    inRange: null,
     // 读不到时把每次尝试的失败原因带出来，方便在接口上定位是哪一层断了（不上页面）
     attempts,
   }

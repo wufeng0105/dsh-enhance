@@ -8,16 +8,19 @@
  * 每道门禁都必须能红。`--self-test` 用一次性副本证明这一点：坏语法文件、坏测试、
  * 未登记的源文件、死链（README 站内链接指向不存在的文件）、坏 bundle 声明、超限文本。
  *
+ * 2026-11-06 起不再有版本声明机：`package.json` 没有 `engines.dsh`，所以 version 门
+ * 不再核「区间可解析 / README 适用版本句 / 本机超范围」——宿主对未声明 `engines.dsh`
+ * 的插件走「零要求 → 全放行」分支，插件不会再因为上游发版而变成 incompatible。
+ *
  * **门数不是承诺位**：`scripts/known-counts.json` 已不记它，文档也不写数字——加一道门不需要
  * 同步任何文档，当前门数看本命令的输出。两个计数别并成一种口径：负例数（`selfTestCases`）
  * 是**下限**，只许多、不许少，加负例不必先走文档批；测试条数（`tests`）是**精确值**，
  * 加一个测试就要同步单一来源，否则 tests 门红。
  * 2026-11-02 的门禁加固把三处新判据并进了现有门：宿主原文核对并进 `version` 门，文档计数一致性并进
- * `docs` 门，未文档化宿主字段禁令并进 `graph` 门，CHANGELOG/CONTRIBUTING 并进 `docs` 的收集范围，
- * README.en.md 并进 `version` 的适用版本句校验。
+ * `docs` 门，未文档化宿主字段禁令并进 `graph` 门，CHANGELOG/CONTRIBUTING 并进 `docs` 的收集范围。
  *
  * 用法：
- *   node scripts/check.mjs [--self-test] [--dsh-version <版本>]
+ *   node scripts/check.mjs [--self-test]
  *
  * 退出码：0 请求的门禁全过 / 自检全部能红；1 有门禁失败或负例没能变红；2 用法错。
  */
@@ -30,7 +33,6 @@ import { fileURLToPath } from 'node:url'
 import { codeFiles as codeFilesIn } from './code-files.mjs'
 import { copyRepoTree } from './repo-copy.mjs'
 import { gateReadme } from './check-readme.mjs'
-import { basisLabel, declarationOf, displayRange, inRange, parseEnginesDsh } from '../shared/compat.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -59,13 +61,6 @@ function knownCount(name) {
 
 const args = process.argv.slice(2)
 const selfTest = args.includes('--self-test')
-const dshVersionIndex = args.indexOf('--dsh-version')
-const dshVersion = dshVersionIndex >= 0 ? args[dshVersionIndex + 1] : undefined
-
-if (dshVersionIndex >= 0 && (dshVersion === undefined || dshVersion.startsWith('--'))) {
-  console.error('check: --dsh-version needs a value')
-  process.exit(2)
-}
 
 /** 跑一条 Node 命令，两个流都收回来。 */
 function run(toolArgs, cwd = root, timeout = 120_000) {
@@ -101,18 +96,14 @@ function testFiles(base = root) {
 // ---------------------------------------------------------------- gates
 
 /**
- * 版本身份与兼容声明。
+ * 版本身份与包发布形状。
  *
- * **唯一权威是 `package.json` 的 `engines.dsh`**：README 里那句适用版本是它的
- * 派生文本（门禁要求两处逐字一致），本机 DSH 版本超出区间时给可操作提示。
- * 解析与成员判定在 `shared/compat.mjs`（唯一实现），这里只做门禁判断。
- *
- * 为什么 README 不是第二权威：README 是给人读的散文，它的那一句必须由声明生成，
- * 否则「改了声明忘了改 README」和「改了 README 忘了改声明」会各错一次。
- * 为什么不是版本数组：宿主在装/载的三个时机读 engines.dsh 做 semver 匹配
- * （详见 docs/compatibility.md「宿主怎么执行这条声明」），字段形状跟着宿主走。
+ * 2026-11-06 起本门只剩「包身份 + 版本一致 + 宿主原文核对」：`package.json` 不再声明
+ * `engines.dsh`，原先核它的三段（区间能否解析、README 的适用版本句、本机 DSH 是否超范围）
+ * 随声明一起删了。宿主对没有 `engines.dsh` 的插件走「零要求 → 全放行」分支，插件不会
+ * 再因为上游发一个 rc 或正式版就被市场标 incompatible 隐藏。
  */
-function gateVersion(base = root, options = {}) {
+function gateVersion(base = root) {
   const problems = []
   let pkg
   try {
@@ -144,43 +135,6 @@ function gateVersion(base = root, options = {}) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) problems.push(`VERSION 不是 x.y.z：${version}`)
   if (pkg.version !== version) problems.push(`package.json version=${String(pkg.version)} != VERSION ${version}`)
 
-  // ---- 兼容声明（engines.dsh 区间 + dsh.compatibility 证据元数据） ----
-  const declared = declarationOf(pkg)
-  let parsed = null
-  if (declared.error !== undefined) {
-    problems.push(declared.error)
-    if (typeof pkg?.engines?.dsh === 'string') {
-      const attempt = parseEnginesDsh(pkg.engines.dsh)
-      if (attempt.error !== undefined) problems.push(attempt.error)
-    }
-  } else {
-    if (!existsSync(join(base, declared.doc))) {
-      problems.push(`兼容元数据的 doc 指向不存在的文件：${declared.doc}`)
-    } else {
-      parsed = parseEnginesDsh(declared.enginesDsh)
-    }
-  }
-
-  // ---- README 派生句：中英两份都必须逐字包含（2026-11-02 起纳入 README.en.md） ----
-  if (parsed !== null) {
-    const sentence = compatibilitySentence(declared, parsed)
-    for (const file of ['README.md', 'README.en.md']) {
-      const label = file === 'README.md' ? 'README' : file
-      let readme = ''
-      try {
-        readme = readFileSync(join(base, file), 'utf8')
-      } catch {
-        problems.push(`${label} 读不到，无法核对适用版本句`)
-        continue
-      }
-      // 空 README 也必须判红：`readme !== '' &&` 那个短路会让「把 README 删空」
-      // 变成静默关掉这道门（2026-10-31 实测：0 字节 README 时 version 门仍 PASS）。
-      if (!readme.includes(sentence)) {
-        problems.push(`${label} 缺由声明生成的适用版本句（应逐字包含）：${sentence}`)
-      }
-    }
-  }
-
   // ---- 宿主原文基准核对（作为 version 门的一个步骤） ----
   // tools/host-check.mjs 自己负责「没有 asar 时如实跳过、坏 asar 判红」的极性；
   // 这里只把它的退出码并进本门，跳过（exit 0 且打印「跳过」）不算红。
@@ -194,67 +148,11 @@ function gateVersion(base = root, options = {}) {
     problems.push(`宿主原文基准核对没过：${detail}`)
   }
 
-  // ---- 本机 DSH 版本超出声明范围 ----
-  if (parsed !== null) {
-    const local = options.dshVersion ?? detectDshVersion()
-    if (local === undefined) {
-      return {
-        pass: problems.length === 0,
-        detail: problems.length === 0 ? `${pkg.name}@${version} · README.md + README.en.md 适用版本句一致（未探测到本机 DSH 版本）· ${hostNote}` : problems.join(' | '),
-      }
-    }
-    if (!inRange(parsed, local)) {
-      problems.push(
-        `本机 DSH ${local} 不在声明范围 ${displayRange(parsed)}：`
-        + '先按 docs/compatibility.md 的例行核验跑一遍（工时按变更规模分档，见该文档），核验过了再扩 package.json 的 engines.dsh 区间',
-      )
-    }
-    if (problems.length === 0) return { pass: true, detail: `${pkg.name}@${version} · DSH ${local} · README.md + README.en.md 适用版本句一致 · ${hostNote}` }
-    return { pass: false, detail: problems.join(' | ') }
-  }
-
   return {
     pass: problems.length === 0,
     detail: problems.length === 0 ? `${pkg.name}@${version} · ${hostNote}` : problems.join(' | '),
   }
 }
-
-/** 由声明拼出 README 必须逐字包含的那一句（`basis` → 中文口径）。 */
-function compatibilitySentence(declared, parsed) {
-  return `DeepSeek Harness ${displayRange(parsed)}（${declared.tested} 实测，全系${basisLabel(declared.basis)}）`
-}
-
-/**
- * 探测本机 DSH 版本。顺序：`--dsh-version` → `DSH_VERSION` → `dsh --version`。
- * 探不到就返回 undefined——**探测失败不许判红**（CI 上必然探不到）。
- */
-function detectDshVersion() {
-  const env = typeof process.env.DSH_VERSION === 'string' ? process.env.DSH_VERSION.trim() : ''
-  if (VERSION_SHAPE.test(env)) return env
-
-  // 1) PATH 上的 dsh（需要 shell 才能解析 .cmd/.ps1 shim）
-  const onPath = spawnSync('dsh', ['--version'], { encoding: 'utf8', timeout: 8000, shell: true })
-  if (onPath.status === 0) {
-    const match = /(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(`${onPath.stdout ?? ''}`)
-    if (match !== null) return match[1]
-  }
-
-  // 2) 桌面版的启动器（路径含空格，直接 spawn .cmd 会 EINVAL；用 shell 让它自己解析）
-  const local = process.env.LOCALAPPDATA ?? process.env.USERPROFILE
-  if (typeof local === 'string' && local !== '') {
-    const launcher = join(local, 'Programs', 'DeepSeek Harness', 'resources', 'runtime', 'cli', 'bin', 'dsh.cmd')
-    if (existsSync(launcher)) {
-      const result = spawnSync(`"${launcher}" --version`, { encoding: 'utf8', timeout: 8000, shell: true })
-      if (result.status === 0) {
-        const match = /(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(`${result.stdout ?? ''}`)
-        if (match !== null) return match[1]
-      }
-    }
-  }
-  return undefined
-}
-
-const VERSION_SHAPE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
 
 function gateSyntax(base = root) {
   const files = codeFiles(base)
@@ -531,13 +429,6 @@ const NEGATIVE_ROSTER = [
   { name: 'ui client platform red', gate: 'bundle' },
   { name: 'ui client export red', gate: 'bundle' },
   { name: 'version mismatch red', gate: 'version' },
-  { name: 'compat declaration red', gate: 'version' },
-  { name: 'compat missing red', gate: 'version' },
-  { name: 'engines malformed red', gate: 'version' },
-  { name: 'compat readme sentence red', gate: 'version' },
-  { name: 'compat readme empty red', gate: 'version' },
-  { name: 'compat readme en red', gate: 'version' },
-  { name: 'compat out-of-range red', gate: 'version' },
   { name: 'readme red', gate: 'readme' },
   { name: 'counts-check red', gate: 'docs' },
   { name: 'smoke count red', gate: 'docs' },
@@ -743,83 +634,7 @@ function runSelfTest() {
     'version mismatch red', 'version',
     // 版本身份：把 VERSION 改成另一个 x.y.z，package.json 与它就不再一致
     (copy) => writeFileSync(join(copy, 'VERSION'), '9.9.9\n', 'utf8'),
-    (copy) => expectRed('!= VERSION')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
-  ))
-
-  cases.push(withCopy(
-    'compat declaration red', 'version',
-    // 兼容元数据的 tested 必须落在 engines.dsh 区间内：改成一个区间外的版本
-    (copy) => {
-      const file = join(copy, 'package.json')
-      const pkg = JSON.parse(readFileSync(file, 'utf8'))
-      pkg.dsh.compatibility.tested = '9.9.9'
-      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
-    },
-    (copy) => expectRed('tested=')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
-  ))
-
-  cases.push(withCopy(
-    'compat missing red', 'version',
-    // 第三证（空转检查）：整个 engines.dsh 删掉必须判红——挡「常量定义了、没进判定」
-    (copy) => {
-      const file = join(copy, 'package.json')
-      const pkg = JSON.parse(readFileSync(file, 'utf8'))
-      delete pkg.engines.dsh
-      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
-    },
-    (copy) => expectRed('缺兼容声明')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
-  ))
-
-  cases.push(withCopy(
-    'engines malformed red', 'version',
-    // 区间形状写歪（单界、坏算符）必须判红——宽进等于把宿主已拒的写法放行
-    (copy) => {
-      const file = join(copy, 'package.json')
-      const pkg = JSON.parse(readFileSync(file, 'utf8'))
-      pkg.engines.dsh = '>=0.2.1'
-      writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
-    },
-    (copy) => expectRed('区间形状不认')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
-  ))
-
-  cases.push(withCopy(
-    'compat readme sentence red', 'version',
-    // README 是派生文本：删掉那句必须判红
-    (copy) => {
-      const file = join(copy, 'README.md')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace(/DeepSeek Harness \S+–\S+（\S+ 实测[^）]*）/g, 'DeepSeek Harness 某版本')
-      assertMutated(copy, 'README.md', text, reverted)
-    },
-    (copy) => expectRed('README 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
-  ))
-
-  cases.push(withCopy(
-    'compat readme empty red', 'version',
-    // 把 README 删空 = 没有那句派生文本；这不许变成「静默过关」（去掉 `readme !== ''` 短路）
-    (copy) => writeFileSync(join(copy, 'README.md'), '', 'utf8'),
-    (copy) => expectRed('README 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
-  ))
-
-  cases.push(withCopy(
-    'compat readme en red', 'version',
-    // version 门核两份 README 的适用版本句（check.mjs 里 for (const file of ['README.md', 'README.en.md'])）。
-    // 这条负例是「机制叙述的单一来源」示范：docs/compatibility.md「改声明」表第 3 行只许指向它，
-    // 不许再自己复述「漏一份会红」——那句话的可红性由这条负例证明，散文只做指针。
-    (copy) => {
-      const file = join(copy, 'README.en.md')
-      const text = readFileSync(file, 'utf8')
-      const reverted = text.replace(/DeepSeek Harness \S+–\S+（\S+ 实测[^）]*）/g, 'DeepSeek Harness 某版本')
-      assertMutated(copy, 'README.en.md', text, reverted)
-    },
-    (copy) => expectRed('README.en.md 缺由声明生成的适用版本句')(gateVersion(copy, { dshVersion: '0.2.1-rc.3' })),
-  ))
-
-  cases.push(withCopy(
-    'compat out-of-range red', 'version',
-    // 本机 DSH 不在声明范围：必须判红并给「先跑例行核验」的可操作提示
-    () => {},
-    (copy) => expectRed('例行核验')(gateVersion(copy, { dshVersion: '0.9.9' })),
+    (copy) => expectRed('!= VERSION')(gateVersion(copy)),
   ))
 
   cases.push(withCopy(
@@ -912,7 +727,7 @@ function runSelfTest() {
     },
     (copy) => {
       try {
-        return expectRed('asar 读不出来')(gateVersion(copy, { dshVersion: '0.2.1-rc.5' }))
+        return expectRed('asar 读不出来')(gateVersion(copy))
       } finally {
         delete process.env.DSH_ASAR
       }
@@ -981,8 +796,7 @@ let skipped = 0
 const started = Date.now()
 for (const [name, gate] of gates) {
   const at = Date.now()
-  // 只给需要上下文的门传第二个参数：version 要 --dsh-version；其余门显式只传 root。
-  const result = name === 'version' ? gate(root, { dshVersion }) : gate(root)
+  const result = gate(root)
   const ms = Date.now() - at
   if (result.skipped) skipped += 1
   if (!result.pass) failed += 1
