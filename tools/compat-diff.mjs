@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 /**
- * compat-diff：例行核验第 2/3 步（tree-diff 与读 diff）的工具化。
+ * compat-diff：DSH 升级体检工具（tree-diff 与读 diff 一条命令）。
  *
  * 为什么进仓：上游每个 rc 都可能动接缝，「列变更 → 取 blob → 逐文件 diff → 按接缝
  * 关键词预分类」此前靠临时脚本与 gh api 手工完成（2026-11-06 的 0.2.2-rc.1 轮该步
  * 占 35% 工时）。这里把流程固化成一条命令，blobless clone 缓存建一次反复用。
+ * 本包不声明 `engines.dsh`；这个工具不服务于扩区间，只回答「上游改了什么、有没有
+ * 动我们的接缝」。流程见 docs/compatibility.md（《DSH 升级体检手册》）。
  *
  * 用法：
  *   node tools/compat-diff.mjs <oldTag> <newTag> [--out <dir>] [--cache <dir>]
  *                              [--repo <url|path>] [--trees <tag,...>]
  *
  * 主模式：对 9 个核验包列两 tag 间的文件级变更（+/~/-），逐文件统一 diff（--out 落盘，
- * 缺省不落盘只打印清单），并按 docs/compatibility.md「例行核验」第 1a 步表格的 8 组
+ * 缺省不落盘只打印清单），并按 docs/host-seams.md「宿主触点」表的 8 组
  * 接缝关键词表达式预分类。stdout 首行是机器可判的数量行 `changed-files: <n>`，
  * 每文件一行分类，尾部打印边界句：
  *
@@ -33,7 +35,7 @@
  * --trees 模式：对 9 个核验包逐个列各 tag 的 tree SHA（全同打 ALL-SAME，否则短 SHA
  * 序列），替代文档第 2 步的逐包脚本；tree 对象全在本地，全程零网络。
  *
- * 表达式权威源是 docs/compatibility.md 第 1a 步表格：改表须同步这里的 SEAM_GROUPS。
+ * 表达式权威源是 docs/host-seams.md 宿主触点表：改表须同步这里的 SEAM_GROUPS。
  * 预分类是分诊不是判决——判定标准永远是「我们这侧不改一行代码就会被它弄坏」。
  *
  * @module tools/compat-diff
@@ -45,7 +47,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-/** 上游核验包清单：与 docs/compatibility.md「例行核验」第 2 步的 $pkgs 同源。 */
+/** 上游核验包清单：与 docs/host-seams.md「宿主触点」表的分组同源。 */
 const PKGS = [
   'packages/core/system-prompt/src',
   'packages/host/webserver/src',
@@ -59,7 +61,7 @@ const PKGS = [
 ]
 
 /**
- * 8 组接缝表达式，逐字取自 docs/compatibility.md「例行核验」第 1a 步表格（权威源，
+ * 8 组接缝表达式，逐字取自 docs/host-seams.md「宿主触点」表（权威源，
  * 改表须同步这里）。pattern 是字符串，运行时按 `|` 拆回原子表达式再 new RegExp——
  * 不存裸正则字面量，避免正则入字符串的双重转义漂移。
  */
