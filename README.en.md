@@ -30,8 +30,6 @@ Saved to disk, effective on the next message. No restart, no host files touched,
   - [Settings page](#settings-page)
   - [Uninstall](#uninstall)
 - [How it fits together](#how-it-fits-together)
-  - [One message, end to end](#one-message-end-to-end)
-  - [One save, end to end](#one-save-end-to-end)
 - [Compatibility](#compatibility)
 - [The Enhanced preset](#the-enhanced-preset)
 - [Maintainer](#maintainer)
@@ -104,27 +102,11 @@ If you installed under the pre-1.2.x unscoped name (`dsh-enhance`), your profile
 
 ## How it fits together
 
-The bundle inserts three entries into the profile's `cordis.patch.yml`. Nothing else in the host is touched.
+The bundle inserts three entries into the profile's `cordis.patch.yml`, and touches nothing else in the host: `enhance-scope` registers the prompt section and serves the settings page's only endpoint, `auto-approve` answers approval requests, and the browser half of the UI mounts into the host's settings slot.
 
-`enhance-scope` registers the prompt section and serves the settings page's only endpoint; `auto-approve` answers approval requests; the browser half of the UI mounts into the host's settings slot.
+The **declaration layer** is the set of registrations in the system prompt that describe the harness itself; its definition and the "5 registrations under 3 names" table live in [CONTRIBUTING.md](./CONTRIBUTING.md) ("术语与命名", Chinese). With the default settings none of those names is touched; they are only replaced when you change the identity mode or turn on **hide host notes**. That switch also drops passages carrying operational rules — the `pwd` rule, "do not start another server just to make a change take effect", and when client-plugin changes take effect. Boundaries and costs are in [this contract](./docs/brand-persona.md) (Chinese).
 
-The **declaration layer** is the set of registrations in the system prompt that describe the harness itself — the definition lives in exactly one place, [CONTRIBUTING.md](./CONTRIBUTING.md) (Chinese, "术语与命名"). Brand persona touches these **5 registrations under 3 names**, no more:
-
-| Name | Seat | What |
-| --- | --- | --- |
-| `harness:identity` | section | the opening self-description |
-| `harness:source` | section + runtime context | the implementation-checkout passage (two entries under one name) |
-| `app:web-surface` | section + runtime context | the web-interface passage (two entries under one name) |
-
-With the default settings none of the three names is touched; they are only replaced when you change the identity mode or turn on **hide host notes**. That switch hides more than a brand name: it also drops passages carrying operational rules — the `pwd` rule, "do not start another server just to make a change take effect", and when client-plugin changes take effect. Boundaries and costs are in [this contract](./docs/brand-persona.md) (Chinese).
-
-### One message, end to end
-
-Your text reaches the prompt through a callback the host invokes on every assembly — the section's order is read from the host's own persona-suffix order, not hard-coded.
-
-### One save, end to end
-
-The settings page writes through one route on the host's own local HTTP server. The text is size-checked *before* any state changes, so an oversized save leaves both files exactly as they were.
+Your text reaches the prompt through a callback the host invokes on every assembly, with the section's order read from the host's own persona-suffix order rather than hard-coded. The settings page writes through one route on the host's local HTTP server; the text is size-checked before any state changes, so an oversized save leaves both files exactly as they were.
 
 ## Compatibility
 

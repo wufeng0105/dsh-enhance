@@ -266,33 +266,9 @@ DSH 自己的口径是：
 **结论**：本功能的战场是系统提示的声明层；`AGENTS.md` 不在这条链上。别再把它当替代方案重新提出来。
 
 ## 9. 维护：DSH 升级后核这一条
-新 rc 发布后的升级体检多一条触点，也是本功能唯一的宿主依赖：
 
-**按 agent 作用域遮蔽同名段的机制：`ctx.systemPrompt.section()` / `.context()` 的 scope 取自调用方 ctx、`agent/created` 事件、assemble 时「近作用域覆盖全局同名项」。**
+本功能唯一的宿主依赖是「按 agent 作用域遮蔽同名段」：监听 `agent/created`，在 `agent.ctx` 上注册同名段覆盖全局段。机制与出处已在「为什么是「按 agent 遮蔽同名段」」展开，这里只留维护动作——新 rc 发布后跑升级体检时，确认 [docs/host-seams.md](host-seams.md) 的「cordis 插件 API」那一行仍列着 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」；那一行任一不成立，本功能失效，其余功能不受影响。接缝怎么重数、总数怎么定，以那份文档的「数法」为准，别在这里另立公式。
 
-已知位置关系：
+遮蔽有没有真的生效，由设置页的检查项里 `inject` 那一项的第二路证伪：`custom` 要在会话日志里命中自定义文本，`remove` 要用反向探针确认最新一份装配记录里已经没有宿主原句，`keep` 不判。装没装上由状态快照里的 `identityInstall` 与设置页品牌人设组那一行说明如实给出（「还没有 agent 可判」是三态的 `null`，不压成失败）。
 
-- `SystemPrompt.section()` 用 `this.layers.effect(this.ctx, …)`，`this.ctx` 跟随调用方上下文（cordis service 转发）；
-- `assemble()` 用 `this.layers.merge(scope, …)` 合并，近作用域的同名项胜出；
-- `renderPrompt()` 丢弃空文本段，`renderContextSections()` 丢弃空文本 context；
-- 先例：`dsh-persona`、`dsh-subagent` 都据此工作。
-
-`docs/host-seams.md` 的改法：在「cordis 插件 API」那一行的接缝清单里加 `ctx.on('agent/created')` 与「agent 作用域同名段遮蔽」，并按那一节自己的计数口径把独立触点项总数重数一遍——**总数、公式与拆条规则都以那一节为准，别在这里另立**。`packages/core/system-prompt/src` 已在 tree-diff 清单里，不新增目录；`packages/interaction/agent`（若存在）视核验结果决定是否加入。
-
-任一条不成立 → 本功能失效，其余功能不受影响。降级路径不再只有「人工记账」一条：
-
-- **装没装上**：状态快照里的 `identityInstall`（机读）与设置页品牌人设组那一行说明（人读）会如实说「已生效 / 已接上 / 未生效」，例如「未生效：本版宿主没有可注入的 agent 上下文（agent.ctx.inject 不可用）」；「还没有 agent 可判」是三态的 `null`，不压成「失败」。
-- **遮蔽是否真的生效**：由设置页的检查项里 `inject` 那一项的第二路证伪——`custom` 要在会话日志里命自定义文本、`remove` 要用反向探针确认最新一份装配记录里已经没有宿主原句；`keep` 不判。
-- **仍要人工记的**：装配层验收在桌面会话上已验通（证据链见 git 历史与 [`CHANGELOG.md`](../CHANGELOG.md)）；还剩 `hideHarness` 在桌面 / web profile 上的效果未核，见下面「仍未核验」。
-
-## 10. 落地状态与剩余边界
-
-这个功能已经落地。**状态不在这份契约里复述**——它随每次发版变化，写在这里就一定会变成假话：
-
-- 逐版本改了什么、验证读数是多少 → [`CHANGELOG.md`](../CHANGELOG.md)
-- 宿主接缝与逐次 DSH 升级的体检做法 → [`docs/host-seams.md`](host-seams.md) 与 [`docs/compatibility.md`](compatibility.md)
-
-契约只需要记住两条**不会随发版消失**的边界：
-
-- **仍未核验**：`hideHarness` 在**桌面 / web** profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。补它要**一次有余额的会话**，证据链见 git 历史与 [`CHANGELOG.md`](../CHANGELOG.md)。
-- **装配层验收**：桌面会话上已验通（内容边界进提示、遮蔽生效），headless 那一半要**一次有余额的会话**才能复跑；证据链见 git 历史与 [`CHANGELOG.md`](../CHANGELOG.md)。
+**仍未核验**：`hideHarness` 在桌面 / web profile 上的效果。`harness-dev-context` 的 `inject` 含 `webApp`，`headless` 组合里没有它，那两段本来就注册不到，没有基线可比。补它要一次有余额的会话。装配层验收在桌面会话上已验通，证据链见 git 历史与 [CHANGELOG.md](../CHANGELOG.md)。

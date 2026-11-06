@@ -4,24 +4,6 @@
 
 体检分两层：**源码级体检**（`compat-diff` 看上游 9 个核验包的 tree SHA 与逐文件 diff）与**真机冒烟**（一次性 `DSH_HOME` 里真装一遍，44 条断言）。第一层回答「上游有没有动我们依赖的接缝」，第二层回答「这个包还能不能装上、还能不能跑」。接缝清单与 36 条口径在 [`docs/host-seams.md`](host-seams.md)，本文不复制表，只指向它。
 
-## 两个与「写入 Enhanced 档」按钮直接相关的宿主事实
-
-**patch 的 `config` 是整块替换，不是深合并。** 在 profile patch 里写 `- id: permission` 加一条 `enhanced`，基础组合包的 `read-only` / `workspace-write` / `danger-full-access` 会全部消失（`dsh --profile <p> --dump-config` 可复现）。所以设置页写档时写的是完整档位表：宿主基础三档 + `enhanced`。界面名与标识符的逐条对照见 [CONTRIBUTING.md](../CONTRIBUTING.md) 的「术语与命名」——两套都合法，别合并成一个名字。
-
-**`enhanced` 是合法的自定义档名。** 保留名只有 `custom` 与 `auto`，本包不配置它们；`approval: ask` 合法——这里的 `approval` 指宿主的**审批策略** `approval/policy`，与本包那三态的**开关档** `approval` 不是一套词表（消歧见 [CONTRIBUTING.md](../CONTRIBUTING.md) 的「术语与命名」）。未知 kebab-case 档名在档位菜单里渲染成 Title Case 的纯文字行，字形表里没有它——这不是缺陷，是宿主的显示契约。本包这个档就落在其中：patch 里写 `enhanced`，菜单里显示纯文字的 **Enhanced**，同一个档的两个名字。
-
-## 设置页版本探测
-
-设置页现在只显示「增强 <本包版本>」，不显示本机 DSH 版本，也不显示任何版本区间。`enhance-scope/index.js` 的 `compatSnapshot` 仍按下面的顺序探测本机版本，**探测值不上页面、只作诊断**：读不到时 `attempts` 说清断在哪一层，别因为页面不展示就把服务端这段删掉。
-
-1. `DSH_VERSION` 环境变量（显式覆盖，脚本与测试用）；
-2. 宿主的 `@deepseek-ai/dsh-package-manifest` → `getDshRuntimeVersion()`；
-3. 安装作用域里的核心包（`@deepseek-ai/dsh-base` 等，版本号与产品同号）；
-4. 桌面版装机根的 `app.asar` 清单（只读头里的 `package.json` 条目，不解包、不写盘、不派生任何产物）；
-5. `<home>/dsh-runtimes/<runtime>/runtime.json` 的 `desktopVersion`。
-
-rc.5 上的实测：`@deepseek-ai/dsh-package-manifest` 与安装作用域核心包在 profile 插件里分别报 `ERR_MODULE_NOT_FOUND` / `MODULE_NOT_FOUND`；`dsh-runtimes` 的目录在没跑过带工具的会话时不出现；只有 `app.asar` 清单稳定可用。这条只读路径是 1.1.0 唯一新增的宿主耦合；宿主哪天改掉 asar 头布局，它会自动退化成「读不到本机版本」，不影响注入、审批与写档。
-
 ## DSH 出新版时怎么体检
 
 ### 1. 先看 9 个核验包的 tree SHA 有没有动
